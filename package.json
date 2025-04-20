@@ -1,0 +1,33 @@
+{
+  "name": "StartupFromScratch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "develop": "bash scripts/develop.sh",
+    "build": "bash scripts/build.sh",
+    "deploy": "bash scripts/deploy.sh",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "mocha --require ts-node/register __test/setup.js \"packages/**/*.{test,spec}.ts?(x)\""
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "mocha": "^10.2.0",
+    "chai": "^5.0.0",
+    "sinon": "^15.0.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "@types/sinon": "^15.0.0",
+    "eslint": "^8.41.0",
+    "@typescript-eslint/parser": "^5.58.0",
+    "@typescript-eslint/eslint-plugin": "^5.58.0",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "concurrently": "^8.0.1",
+    "pkg": "^5.8.0"
+  }
+} 
