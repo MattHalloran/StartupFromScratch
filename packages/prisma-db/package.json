@@ -1,0 +1,21 @@
+{
+  "name": "@startupfromscratch/prisma-db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "prisma migrate dev --schema=prisma/schema.postgres.prisma",
+    "build": "tsc -b",
+    "generate": "prisma generate",
+    "postinstall": "prisma generate",
+    "test": "echo \"No tests for prisma-db\""
+  },
+  "dependencies": {
+    "@prisma/client": "^4.10.1"
+  },
+  "devDependencies": {
+    "prisma": "^4.10.1",
+    "typescript": "5.4.5"
+  }
+} 

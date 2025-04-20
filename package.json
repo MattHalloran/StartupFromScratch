@@ -1,6 +1,7 @@
 {
   "name": "StartupFromScratch",
   "version": "0.1.0",
+  "packageManager": "yarn@4.0.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -28,6 +29,10 @@
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "concurrently": "^8.0.1",
-    "pkg": "^5.8.0"
-  }
-} 
+    "pkg": "^5.8.0",
+    "@types/node": "^18.16.18",
+    "@types/express": "^4.17.21",
+    "@types/dotenv": "^8.2.0"
+  },
+  "packageManager": "yarn@4.0.0+sha512.955259c0370ab8c06d013faa7d5e7addb6914251029695675f54e04c917ea6b092c379ba8d3521556d90b3874e5037759467072f01d2295341ead43cc259f14b"
+}

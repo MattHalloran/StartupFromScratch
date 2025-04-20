@@ -1,0 +1,24 @@
+{
+  "name": "@startupfromscratch/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "test": "mocha --require ts-node/register __test/setup.js \"src/**/*.{test,spec}.ts\""
+  },
+  "dependencies": {
+    "@startupfromscratch/shared": "workspace:*",
+    "@startupfromscratch/prisma-db": "workspace:*",
+    "@startupfromscratch/redis-db": "workspace:*",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0"
+  }
+} 

@@ -12,7 +12,8 @@ packages/*/node_modules
 Thumbs.db
 
 # Yarn cache
-.yarn
+.yarn/cache
+.yarn/unplugged
 
 # VSCode
 .vscode

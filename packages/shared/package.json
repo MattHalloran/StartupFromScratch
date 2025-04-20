@@ -1,0 +1,17 @@
+{
+  "name": "@startupfromscratch/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "mocha --require ts-node/register __test/setup.js \"src/**/*.{test,spec}.ts\""
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "ts-node": "^10.9.1"
+  }
+} 

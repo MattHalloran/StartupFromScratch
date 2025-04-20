@@ -8,7 +8,9 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "lib": ["ES2020", "DOM"],
+    "types": ["node"]
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts"],
   "exclude": ["node_modules", "dist"]
