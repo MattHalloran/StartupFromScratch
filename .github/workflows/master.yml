@@ -20,6 +20,8 @@ jobs:
         with:
           node-version: 18
           cache: 'yarn'
+      - name: Enable Corepack
+        run: corepack enable
       - name: Yarn install
         run: yarn install --immutable
       - name: Lint
@@ -28,9 +30,18 @@ jobs:
         run: yarn test
       - name: Build
         run: yarn build
+      - name: Set up SSH key for deployment
+        if: env.VPS_SSH_PRIVATE_KEY != '' # Only run if the secret is set
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
       - name: Deploy to Production
         run: bash scripts/deploy.sh prod
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }} 
+          SSH_KEY_PATH: ~/.ssh/deploy_key
+          DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }} # Use environment secret
+          DEPLOY_HOST: ${{ secrets.VPS_DEPLOY_HOST }} # Use environment secret
+          DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }} # Use environment secret 
