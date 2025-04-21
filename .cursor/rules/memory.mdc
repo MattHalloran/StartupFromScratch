@@ -11,38 +11,18 @@ All documentation files are Markdown files, structured clearly to maintain conte
 
 ### Core Files (Always Required):
 
-- **[context.md](mdc:docs/context.md)**
-  - Overview of project purpose and goals  
-  - Business and technical rationale  
-  - User experience expectations and core functionality
+- **[startingPrompt.md](mdc:docs/startingPrompt.md)**  - Initial, approved architecture and setup plan.
+- **[architecture.md](mdc:docs/architecture.md)**      - High‑level system architecture.
+- **[deployment.md](mdc:docs/deployment.md)**         - Deployment guides (Docker, Kubernetes, VPS).
+- **[dev.md](mdc:docs/dev.md)**                       - Local development and Docker instructions.
+- **[setup.md](mdc:docs/setup.md)**                   - Installation and environment setup.
+- **[build.md](mdc:docs/build.md)**                   - Build and packaging processes.
+- **[ci-cd.md](mdc:docs/ci-cd.md)**                   - CI/CD workflow definitions.
+- **[testing.md](mdc:docs/testing.md)**               - Testing strategies, setup, and guidelines.
 
-- **[decisions.md](mdc:docs/decisions.md)**  
-  - Major project decisions  
-  - Justifications for each decision  
-  - Impact and consequences of decisions
+### Task Management
 
-- **[risks.md](mdc:docs/risks.md)**  
-  - Technical, strategic, operational risks  
-  - Risk severity and potential impacts  
-  - Mitigation strategies
-
-- **[roadmap.md](mdc:docs/roadmap.md)**  
-  - Project milestones  
-  - Future vision and long-term goals  
-  - Realistic timelines for delivery
-
-- **[tools.md](mdc:docs/tools.md)**
-  - Commands and tools available to you, typically within the terminal
-
-### Task Management (`/docs/tasks/` folder):
-
-Tasks are clearly organized and managed through multiple Markdown files categorized by their status:
-
-- **[active.md](mdc:docs/tasks/active.md)** : Tasks currently underway
-- **[background.md](mdc:docs/docs/about/background.md)**: Unstructured, quick notes, and ideas awaiting research and clarification
-- **[staged.md](mdc:docs/tasks/staged.md)**: Tasks that have been clarified, researched, and structured but not yet started
-- **[completed.md](mdc:docs/tasks/completed.md)**: Finished tasks with clear documentation on outcomes
-- **[failed.md](mdc:docs/tasks/failed.md)**: Tasks that have been abandoned or blocked permanently, including reasons and lessons learned
+Our project does not currently maintain a `/docs/tasks` directory. Task tracking is managed externally or in dedicated project management tools.
 
 ### Temporary Working Files (`/docs/scratch` folder):
 
@@ -127,7 +107,7 @@ flowchart TD
 ## Key Rules to Remember:
 
 - **Always** start by reading **every** required memory file.
-- Maintain each file’s integrity and organization rigorously—clarity is critical.
+- Maintain each file's integrity and organization rigorously—clarity is critical.
 - Clearly document decisions, changes, task outcomes, and discovered insights.
 - Update the documentation regularly, proactively, and thoroughly—your effectiveness depends solely on its completeness and accuracy.
 - Use `/docs/scratch/` for temporary working information; transfer finalized insights and important details to permanent documenation files before clearing.

@@ -2,16 +2,19 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default ({ mode, ssrBuild }: { mode: string; ssrBuild: boolean }) => {
-  // Load env variables prefixed with VITE_
+export default ({ mode }: { mode: string }) => {
+  // Load environment variables prefixed with VITE_
   const env = loadEnv(mode, process.cwd(), 'VITE_');
 
   return defineConfig({
+    // Root directory for dev server and build
+    root: path.resolve(__dirname, 'src'),
+    // Base public path
+    base: './',
+    // Plugins
     plugins: [react()],
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, 'src'),
-      },
+      alias: { '@': path.resolve(__dirname, 'src') },
     },
     server: {
       port: 3000,
@@ -20,17 +23,14 @@ export default ({ mode, ssrBuild }: { mode: string; ssrBuild: boolean }) => {
     define: {
       __API_URL__: JSON.stringify(env.VITE_API_URL),
     },
-    // Build settings for client vs SSR
-    build: ssrBuild
-      ? {
-          ssr: 'src/entry-server.tsx',
-          outDir: path.resolve(__dirname, '../server/dist'),
-          rollupOptions: {
-            input: 'src/entry-server.tsx',
-          },
-        }
-      : {
-          outDir: 'dist',
-        },
+    build: {
+      // Output directory for production build
+      outDir: path.resolve(__dirname, 'dist'),
+      emptyOutDir: true,
+      rollupOptions: {
+        // Use HTML entry
+        input: path.resolve(__dirname, 'src/index.html'),
+      },
+    },
   });
 }; 

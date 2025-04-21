@@ -30,12 +30,17 @@ echo "🔨 Building for $target using $ENV_FILE..."
 # Clean previous builds
 find packages -maxdepth 2 -type d -name dist -exec rm -rf {} +
 
-# Build all workspaces
-yarn workspaces foreach --recursive run build
+# Generate Prisma client
+echo "🔨 Generating Prisma client..."
+yarn workspace @startupfromscratch/prisma-db run generate -- --schema=packages/prisma-db/prisma/schema.prisma
 
-# SSR-specific build for server-side entry
-echo "🔨 Running SSR build for UI..."
-yarn workspace @startupfromscratch/ui vite build --ssr src/entry-server.tsx
+# Build server package
+echo "🔨 Building server package..."
+yarn workspace @startupfromscratch/server build
+
+# Build UI package
+echo "🔨 Building UI package..."
+yarn workspace @startupfromscratch/ui build
 
 echo "📦 Packaging CLI executables..."
 # Example: bundle a CLI entry (implement as needed)

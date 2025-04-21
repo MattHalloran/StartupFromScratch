@@ -11,11 +11,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 4000;
 
-// Serve static assets from the client build
+// Serve static assets: in development/test serve from `src`, in production from `dist`
 const serverRoot = __dirname;
 const uiPackageRoot = path.resolve(serverRoot, '../../packages/ui');
-// In test, serve from src so dist may not exist
-const clientDist = process.env.NODE_ENV === 'test'
+const clientDist = process.env.NODE_ENV !== 'production'
   ? path.join(uiPackageRoot, 'src')
   : path.join(uiPackageRoot, 'dist');
 app.use(express.static(clientDist));
