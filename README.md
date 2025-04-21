@@ -26,11 +26,13 @@ This project demonstrates:
    ```bash
    yarn develop
    ```
+   - Spins up Postgres and Redis containers and runs server, jobs, and UI locally via TypeScript dev servers.
 
 To run without Docker (requires local SQLite):
 ```bash
 USE_DOCKER=false yarn develop
 ```
+   - Uses SQLite and launches the same TypeScript dev servers for server, jobs, and UI.
 
 4. Run tests:
    ```bash

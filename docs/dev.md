@@ -35,15 +35,17 @@ This guide explains how to develop StartupFromScratch both with Docker and nativ
 
 ## Docker‑Backed Development
 
-Run all services in containers, with shared code mounted:
-
+- Run only database services in containers, and launch other workspaces locally:
 ```bash
-# Default: uses .env-dev inside containers
+# Default: uses .env-dev
 bash scripts/develop.sh
 ```
 
-- This spins up Postgres (pgvector), Redis, server, jobs, and UI via Docker Compose.  
-- Logs stream in the terminal. Ctrl+C to stop.
+- This spins up Postgres (pgvector) and Redis via Docker Compose.
+- Server, jobs, and UI run locally on the host machine via TypeScript dev servers:
+  - `yarn workspace @startupfromscratch/server dev` (Express SSR on port 4000)
+  - `yarn workspace @startupfromscratch/jobs dev`
+  - `yarn workspace @startupfromscratch/ui dev` (Vite on port 3000)
 
 ## Native (Non‑Docker) Development
 
@@ -53,11 +55,8 @@ Run services entirely on your machine:
 USE_DOCKER=false bash scripts/develop.sh
 ```
 
-- Links the appropriate Prisma schema (`.env-dev` vs `.env-prod`).  
-- Launches TypeScript watchers for:
-  - `yarn workspace @startupfromscratch/server dev`  – **SSR-enabled Express server** at `http://localhost:4000` that renders React on the server and hydrates on the client
-  - `yarn workspace @startupfromscratch/jobs dev`
-  - `yarn workspace @startupfromscratch/ui dev`
+- Links the appropriate Prisma schema (SQLite by default).
+- Launches the same TypeScript dev servers for server, jobs, and UI.
 
 ## SSR Development
 

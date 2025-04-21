@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: ankane/pgvector:v0.4.4
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file:
+      - ${ENV_FILE:-.env-dev}
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: startupdb
+
+  redis:
+    image: redis:7.4.0-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    env_file:
+      - ${ENV_FILE:-.env-dev}
+
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    volumes:
+      - ./packages/server:/app
+    ports:
+      - "4000:4000"
+    env_file:
+      - ${ENV_FILE:-.env-dev}
+    depends_on:
+      - postgres
+      - redis
+
+  jobs:
+    build:
+      context: .
+      dockerfile: packages/jobs/Dockerfile
+    volumes:
+      - ./packages/jobs:/app
+    env_file:
+      - ${ENV_FILE:-.env-dev}
+    depends_on:
+      - postgres
+      - redis
+
+  ui:
+    build:
+      context: .
+      dockerfile: packages/ui/Dockerfile
+    volumes:
+      - ./packages/ui:/app
+    ports:
+      - "3000:3000"
+    env_file:
+      - ${ENV_FILE:-.env-dev}
+    depends_on:
+      - server 

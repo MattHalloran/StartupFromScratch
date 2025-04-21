@@ -18,7 +18,7 @@ export default ({ mode }: { mode: string }) => {
     },
     server: {
       port: 3000,
-      open: true,
+      open: false,
     },
     define: {
       __API_URL__: JSON.stringify(env.VITE_API_URL),

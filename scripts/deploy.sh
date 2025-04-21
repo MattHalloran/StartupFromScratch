@@ -39,8 +39,12 @@ if [[ "$target" =~ ^(staging|production)$ ]]; then
   else
     echo "Deploying via SSH to remote $DEPLOY_HOST..."
     ssh -i "$SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /var/www/app && exit"
-    scp -i "$SSH_KEY" "/var/tmp/$(node -p "require('./package.json').version")/*.zip" "$DEPLOY_USER@$DEPLOY_HOST:/var/www/app/"
-    ssh -i "$SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "cd /var/www/app && unzip -o *.zip && systemctl restart app.service"
+    # Copy built packages (server, ui, etc.) from the temp directory to the VPS
+    temp_artifact_dir="/var/tmp/$(node -p \"require('./package.json').version\")"
+    echo "Copying artifacts from $temp_artifact_dir..."
+    scp -r -i "$SSH_KEY" "$temp_artifact_dir/" "$DEPLOY_USER@$DEPLOY_HOST:/var/www/app/"
+    echo "Restarting service..."
+    ssh -i "$SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "systemctl restart app.service"
   fi
 else
   echo "Unknown target: $target"
