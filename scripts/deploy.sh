@@ -30,6 +30,20 @@ else
 fi
 export ENV_FILE
 
+# Check for required environment variables for SSH deployment
+if [ "$USE_K8S" != "true" ]; then
+  : "${SSH_KEY_PATH:?Error: SSH_KEY_PATH environment variable not set.}"
+  : "${DEPLOY_USER:?Error: DEPLOY_USER environment variable not set.}"
+  : "${DEPLOY_HOST:?Error: DEPLOY_HOST environment variable not set.}"
+  : "${DEPLOY_PATH:?Error: DEPLOY_PATH environment variable not set.}"
+  
+  # Ensure the SSH key file exists
+  if [ ! -f "$SSH_KEY_PATH" ]; then
+      echo "Error: SSH key file not found at $SSH_KEY_PATH" >&2
+      exit 1
+  fi
+fi
+
 echo "🚀 Deploying to $target with $ENV_FILE..."
 
 if [[ "$target" =~ ^(staging|production)$ ]]; then
@@ -38,13 +52,13 @@ if [[ "$target" =~ ^(staging|production)$ ]]; then
     kubectl apply -f k8s/$target
   else
     echo "Deploying via SSH to remote $DEPLOY_HOST..."
-    ssh -i "$SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /var/www/app && exit"
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH && exit"
     # Copy built packages (server, ui, etc.) from the temp directory to the VPS
     temp_artifact_dir="/var/tmp/$(node -p \"require('./package.json').version\")"
     echo "Copying artifacts from $temp_artifact_dir..."
-    scp -r -i "$SSH_KEY" "$temp_artifact_dir/" "$DEPLOY_USER@$DEPLOY_HOST:/var/www/app/"
+    scp -o StrictHostKeyChecking=no -r -i "$SSH_KEY_PATH" "$temp_artifact_dir/" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
     echo "Restarting service..."
-    ssh -i "$SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "systemctl restart app.service"
+    ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" "$DEPLOY_USER@$DEPLOY_HOST" "systemctl restart app.service"
   fi
 else
   echo "Unknown target: $target"
