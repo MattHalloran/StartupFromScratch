@@ -12,12 +12,12 @@ on:
   workflow_dispatch:
     inputs:
       ignore_lint_errors:
-        description: 'Continue workflow even if linting fails'
+        description: 'Ignore linting errors'
         required: false
         type: boolean
         default: false
       ignore_test_errors:
-        description: 'Continue workflow even if tests fail'
+        description: 'Ignore test errors'
         required: false
         type: boolean
         default: false
