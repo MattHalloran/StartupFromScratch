@@ -3,9 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "baseUrl": "./",
-    "types": ["node", "mocha", "chai"],
-    "paths": { "@startupfromscratch/redis-db": ["src/types/redis-db.d.ts"] },
-    "typeRoots": ["src/types", "../../node_modules/@types"]
+    "paths": { "@startupfromscratch/redis-db": ["src/types/redis-db.d.ts"] }
   },
   "include": ["src/**/*", "src/global.d.ts"]
 } 
