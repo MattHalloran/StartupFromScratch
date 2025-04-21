@@ -2,8 +2,7 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "baseUrl": "./",
-    "paths": { "@startupfromscratch/redis-db": ["src/types/redis-db.d.ts"] }
+    "types": ["node"]
   },
   "include": ["src/**/*"]
 } 
