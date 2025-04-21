@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // No need to override outDir for tests usually
+    // Add types needed specifically for testing
+    "types": ["node", "mocha", "chai"]
+  },
+  "include": [
+    // Include all test files
+    "src/__test__/**/*.ts",
+    "src/**/*.test.ts",
+    // Include global types needed for tests
+    "src/global.d.ts",
+    // Include custom type stubs if tests import them
+    "src/types/**/*.d.ts" 
+  ],
+  "exclude": [
+    // Exclude non-test files from src to avoid recompiling app code
+    "src/**/!(*.test).ts" 
+    // node_modules and dist are already excluded by the base config
+  ]
+} 
