@@ -10,8 +10,15 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "lib": ["ES2020", "DOM"],
-    "types": ["node"]
+    "typeRoots": ["types", "node_modules/@types"]
   },
-  "include": ["packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts"],
+  "include": [
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "packages/**/*.test.ts",
+    "packages/**/*.test.tsx",
+    "scripts/**/*.ts",
+    "types/**/*.d.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 } 

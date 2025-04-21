@@ -12,7 +12,13 @@ node_modules/
 dist/
 
 # Environment variables
-.env*
+.env-dev
+.env-prod
+.env-test
+!.env-example
+
+# Environment test file
+.env-test
 
 # Logs
 npm-debug.log*

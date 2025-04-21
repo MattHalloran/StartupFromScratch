@@ -7,11 +7,13 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "test": "mocha --require ts-node/register __test/setup.js \"src/**/*.{test,spec}.ts\""
+    "pretest": "rimraf dist",
+    "build-tests": "NODE_ENV=test swc src -d dist --config-file ../../.swcrc",
+    "test": "yarn build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
+    "test-watch": "yarn build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "5.4.5",
-    "ts-node": "^10.9.1"
+    "ts-node": "^10.9.1",
+    "typescript": "5.4.5"
   }
-} 
+}
