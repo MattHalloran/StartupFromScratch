@@ -41,6 +41,12 @@ jobs:
         run: yarn cache clean
       - name: Yarn install
         run: yarn install --immutable
+      - name: Debug @types directories
+        run: |
+          echo "root node_modules/@types:";
+          ls node_modules/@types || echo "not found";
+          echo "server workspace node_modules/@types:";
+          ls packages/server/node_modules/@types || echo "not found";
       - name: Lint
         run: yarn lint
         continue-on-error: ${{ github.event.inputs.ignore_lint_errors == 'true' }}
