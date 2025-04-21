@@ -6,7 +6,7 @@ corepack enable
 corepack prepare yarn@4.0.0 --activate
 
 echo "Installing dependencies..."
-yarn install --immutable
+yarn install
 
 echo "Generating Prisma client..."
 yarn workspace @startupfromscratch/prisma-db generate
