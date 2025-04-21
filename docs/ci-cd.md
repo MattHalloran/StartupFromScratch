@@ -113,6 +113,11 @@ For **each** VPS instance (staging and production), you need to perform the foll
 *   **Staging:** Push changes to the `dev` branch or create a Pull Request targeting `dev`.
 *   **Production:** Push changes to the `master` branch.
 
-You can also manually trigger the workflows from the GitHub Actions tab.
+You can also manually trigger the workflows from the GitHub Actions tab using the "Run workflow" button. When triggering manually, you have the following options:
+
+*   `ignore_lint_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `yarn lint` command fails.
+*   `ignore_test_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `yarn test` command fails.
+
+**Note:** These options only affect manually triggered runs. Runs triggered by pushes or pull requests will always fail if linting or tests fail.
 
 --- 

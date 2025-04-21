@@ -10,6 +10,17 @@ on:
   pull_request:
     branches: [dev]
   workflow_dispatch:
+    inputs:
+      ignore_lint_errors:
+        description: 'Continue workflow even if linting fails'
+        required: false
+        type: boolean
+        default: false
+      ignore_test_errors:
+        description: 'Continue workflow even if tests fail'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-and-deploy:
@@ -30,8 +41,10 @@ jobs:
         run: yarn install --immutable
       - name: Lint
         run: yarn lint
+        continue-on-error: ${{ github.event.inputs.ignore_lint_errors || false }}
       - name: Test
         run: yarn test
+        continue-on-error: ${{ github.event.inputs.ignore_test_errors || false }}
       - name: Build
         run: yarn build
       - name: Set up SSH key for deployment
