@@ -21,9 +21,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'yarn'
-      - name: Enable Corepack
-        run: corepack enable
+          # cache: 'yarn' # Removed cache to rely on Corepack
+      - name: Enable and Prepare Corepack
+        run: |
+          corepack enable
+          corepack prepare --activate
       - name: Yarn install
         run: yarn install --immutable
       - name: Lint
