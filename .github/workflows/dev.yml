@@ -41,10 +41,10 @@ jobs:
         run: yarn install --immutable
       - name: Lint
         run: yarn lint
-        continue-on-error: ${{ github.event.inputs.ignore_lint_errors || false }}
+        continue-on-error: ${{ github.event.inputs.ignore_lint_errors == 'true' }}
       - name: Test
         run: yarn test
-        continue-on-error: ${{ github.event.inputs.ignore_test_errors || false }}
+        continue-on-error: ${{ github.event.inputs.ignore_test_errors == 'true' }}
       - name: Build
         run: yarn build
       - name: Set up SSH key for deployment
