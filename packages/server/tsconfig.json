@@ -26,7 +26,8 @@
         "strictNullChecks": true,
         "removeComments": true,
         "types": [
-            "mocha",
+            "node",
+            "mocha"
         ]
     },
     "include": [

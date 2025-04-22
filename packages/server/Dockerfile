@@ -1,13 +1,14 @@
 # Dockerfile for server
 FROM node:18-alpine3.20
+ENV NODE_ENV=development
 WORKDIR /app
 
 # enable pnpm via Corepack
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# install dependencies via pnpm
+# install dependencies via pnpm (include devDependencies for type declarations)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN NODE_ENV=development pnpm install --frozen-lockfile
 
 COPY packages/server packages/server
 COPY packages/shared packages/shared

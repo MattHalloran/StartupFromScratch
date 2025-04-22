@@ -24,7 +24,7 @@ Usage: $(basename "$0") --target <env> [-h | --help] [--clean] [--ci-cd] [--env-
 Prepares the project for development or production.
 
 Options:
-  --target:                (native-linux|native-macos|docker-compose|kubernetes) The environment to run the setup for
+  --target:                (native-linux|native-macos|docker|k8s) The environment to run the setup for
   -h, --help:              Show this help message
   --clean:                 Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
   --ci-cd:                 Configure the system for CI/CD (via GitHub Actions)
@@ -113,11 +113,11 @@ main() {
 
     # Run the setup script for the target
     case "$TARGET" in
-        native-linux) source "${HERE}/../setup/target/nativeLinux.sh" ; setup_native_linux ;;
-        native-mac)   source "${HERE}/../setup/target/nativeMac.sh" ; setup_native_mac ;;
-        native-win)   source "${HERE}/../setup/target/nativeWin.sh" ; setup_native_win ;;
-        docker)       source "${HERE}/../setup/target/dockerOnly.sh" ; setup_docker_only ;;
-        k8s)          source "${HERE}/../setup/target/k8sCluster.sh" ; setup_k8s_cluster ;;
+        l|nl|linux|native-linux) source "${HERE}/../setup/target/nativeLinux.sh" ; setup_native_linux ;;
+        m|nm|mac|native-mac)   source "${HERE}/../setup/target/nativeMac.sh" ; setup_native_mac ;;
+        w|nw|win|native-win)   source "${HERE}/../setup/target/nativeWin.sh" ; setup_native_win ;;
+        d|dc|docker|docker-compose) source "${HERE}/../setup/target/dockerOnly.sh" ; setup_docker_only ;;
+        k|kc|k8s|kubernetes)          source "${HERE}/../setup/target/k8sCluster.sh" ; setup_k8s_cluster ;;
         *) echo "Bad --target"; exit ${ERROR_USAGE} ;;
     esac
     success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'" 

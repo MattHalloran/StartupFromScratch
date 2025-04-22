@@ -6,10 +6,11 @@ ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${HERE}/../utils/index.sh"
 
-# Clear node_modules at the root and in all project subdirectories
+# Clear node_modules at the root and in all project subdirectories without descending into them
 clear_node_modules() {
     header "Deleting all node_modules directories"
-    find "${HERE}/../.." -maxdepth 4 -name "node_modules" -type d -exec rm -rf {} \;
+    # Prune node_modules directories to avoid find recursing into them after deletion
+    find "${HERE}/../.." -maxdepth 4 -type d -name "node_modules" -prune -exec rm -rf {} +
 }
 
 # Peforms all cleanup steps

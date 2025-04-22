@@ -20,7 +20,7 @@ Usage: $(basename "$0") --target <env> [-h | --help] [--prod] [-y | --yes]
 Starts the development environment for the Vrooli project.
 
 Options:
-  --target:                (native-linux|native-macos|docker-compose|kubernetes) The environment to develop in
+  --target:                (native-linux|native-macos|docker|k8s) The environment to develop in
   -h, --help:              Show this help message
   --prod:                  Skips development-only steps and uses production environment variables
   -y, --yes:               Automatically answer yes to all confirmation prompts
@@ -57,7 +57,7 @@ parse_arguments() {
 }
 
 main() {
-    header "🏃‍♂️ Starting development environment..."
+    header "🏃 Starting development environment..."
     parse_arguments "$@"
 
     # Run the setup script for the target and environment
@@ -72,11 +72,11 @@ main() {
 
     # Run the development script for the target
     case "$TARGET" in
-        native-linux) source "${HERE}/../develop/target/nativeLinux.sh" ; start_development_native_linux ;;
-        native-mac)   source "${HERE}/../develop/target/nativeMac.sh" ; start_development_native_mac ;;
-        native-win)   source "${HERE}/../develop/target/nativeWin.sh" ; start_development_native_win ;;
-        docker)       source "${HERE}/../develop/target/dockerOnly.sh" ; start_development_docker_only ;;
-        k8s)          source "${HERE}/../develop/target/k8sCluster.sh" ; start_development_k8s_cluster ;;
+        l|nl|linux|native-linux) source "${HERE}/../develop/target/nativeLinux.sh" ; start_development_native_linux ;;
+        m|nm|mac|native-mac)   source "${HERE}/../develop/target/nativeMac.sh" ; start_development_native_mac ;;
+        w|nw|win|native-win)   source "${HERE}/../develop/target/nativeWin.sh" ; start_development_native_win ;;
+        d|dc|docker|docker-compose) source "${HERE}/../develop/target/dockerOnly.sh" ; start_development_docker_only ;;
+        k|kc|k8s|kubernetes)          source "${HERE}/../develop/target/k8sCluster.sh" ; start_development_k8s_cluster ;;
         *) echo "Bad --target"; exit ${ERROR_USAGE} ;;
     esac
 

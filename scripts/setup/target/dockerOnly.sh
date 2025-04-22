@@ -7,5 +7,10 @@ source "${HERE}/../../utils/index.sh"
 
 setup_docker_only() {
     header "Setting up Docker only development/production..."
+
+    info "Building Docker images for all services..."
+    docker-compose build
+
+    success "✅ Docker images built successfully."
 }
 

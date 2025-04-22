@@ -5,17 +5,18 @@ WORKDIR /app
 # enable pnpm via Corepack
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Install dependencies via pnpm
+# Copy project manifests and workspace packages
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
-
-# Copy relevant packages
 COPY packages/jobs packages/jobs
 COPY packages/shared packages/shared
 COPY packages/prisma packages/prisma
 COPY packages/redis packages/redis
 
-# Build jobs package with pnpm
+# Install dependencies and generate Prisma client for workspace
+RUN pnpm install --frozen-lockfile \
+    && pnpm --filter @vrooli/prisma run generate
+
+# Build jobs package
 RUN pnpm --filter @vrooli/jobs run build
 
 # Default command to run jobs

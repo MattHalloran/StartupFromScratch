@@ -1,5 +1,6 @@
 #!/bin/bash
 # Posix-compliant script to setup the firewall
+set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
