@@ -1,7 +1,10 @@
 #!/bin/bash
 # Runs all *.bats files in the scripts directory and subdirectories and provides a summary
 
+# Determine this script directory and set up library path for BATS
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Ensure BATS helper libraries are discoverable by bats_load_library
+export BATS_LIB_PATH="${HERE}/helpers:${BATS_LIB_PATH-}"
 source "${HERE}/../utils/index.sh"
 
 SCRIPTS_DIR=$(dirname "${HERE}")
@@ -34,7 +37,7 @@ while IFS= read -r test_file; do
 
     # Print the original output
     echo "${output}"
-done < <(find "${SCRIPTS_DIR}" -type f -name '*.bats')
+done < <(find "${SCRIPTS_DIR}" -path "${SCRIPTS_DIR}/__tests/helpers" -prune -o -type f -name '*.bats' -print)
 
 # Print summary
 echo ""

@@ -1,23 +1,24 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
 
-HERE="$BATS_TEST_DIRNAME"
+# Determine the directory containing this helper library file
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Set up the stub directory and PATH
-export BATS_TMPDIR="${HERE}/tmp" # WARNING: We use `rm -rf "$BATS_TMPDIR"` in teardown. Make sure it's safe to delete!
+# Set up the stub directory and PATH based on test file directory
+export BATS_TMPDIR="${BATS_TEST_DIRNAME}/tmp" # WARNING: We use `rm -rf "$BATS_TMPDIR"` in teardown. Make sure it's safe to delete!
 export BATS_MOCK_BINDIR="${BATS_TMPDIR}/bin"
 mkdir -p "$BATS_MOCK_BINDIR"
 export PATH="$BATS_MOCK_BINDIR:$PATH"
 
-chmod +x "${HERE}/helpers/bats-support/load.bash"
-load "${HERE}/helpers/bats-support/load.bash"
+chmod +x "${LIB_DIR}/helpers/bats-support/load.bash"
+load "${LIB_DIR}/helpers/bats-support/load.bash"
 
-chmod +x "${HERE}/helpers/bats-assert/load.bash"
-load "${HERE}/helpers/bats-assert/load.bash"
+chmod +x "${LIB_DIR}/helpers/bats-assert/load.bash"
+load "${LIB_DIR}/helpers/bats-assert/load.bash"
 
-chmod +x "${HERE}/__stub.bash"
-chmod +x "${HERE}/__binstub"
-load "${HERE}/__stub.bash"
+chmod +x "${LIB_DIR}/__stub.bash"
+chmod +x "${LIB_DIR}/__binstub"
+load "${LIB_DIR}/__stub.bash"
 
 setup() {
     # Reset any environment variables or settings here if necessary
