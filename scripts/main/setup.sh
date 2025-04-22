@@ -21,22 +21,20 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") --target <env> [-h | --help] [--clean] [--ci-cd] [--env-secrets-setup] [--prod] [-y | --yes]
 
-Sets up NPM, Yarn, global dependencies, and anything else required to get the project up and running.
+Prepares the project for development or production.
 
 Options:
   --target:                (native-linux|native-macos|docker-compose|kubernetes) The environment to run the setup for
   -h, --help:              Show this help message
+  --clean:                 Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
   --ci-cd:                 Configure the system for CI/CD (via GitHub Actions)
   --env-secrets-setup:     Adds secret files to the vault
   --prod:                  Skips development-only steps and uses production environment variables
   -y, --yes:               Automatically answer yes to all confirmation prompts
 
-Exit Codes:
-  0                        Success
-  $ERROR_USAGE             Command line usage error
-  $ERROR_NO_INTERNET       No internet access
-
 EOF
+
+    print_exit_codes
 }
 
 parse_arguments() {
@@ -98,26 +96,18 @@ main() {
     source "${HERE}/../setup/setupBats.sh"
     install_bats
 
-    # Enable pnpm via Corepack
-    info "Enabling Corepack and setting pnpm version..."
-    corepack enable
-    corepack prepare pnpm@latest --activate
+    # Load environment variables
+    load_env_file "$ENVIRONMENT"
 
-    info "Installing dependencies via pnpm..."
-    pnpm install
+    # info "Copying environment variables file..."
+    # if [ ! -f .env-dev ]; then
+    # cp .env-example .env-dev
+    # info "Created .env-dev from .env-example"
+    # else
+    # info ".env-dev already exists, skipping copy"
+    # fi
 
-    info "Generating Prisma client..."
-    pnpm --filter @vrooli/prisma run generate
-
-    info "Copying environment variables file..."
-    if [ ! -f .env-dev ]; then
-    cp .env-example .env-dev
-    info "Created .env-dev from .env-example"
-    else
-    info ".env-dev already exists, skipping copy"
-    fi
-
-    # Run the setup script for the target environment
+    # Run the setup script for the target
     case "$TARGET" in
         native-linux) source "${HERE}/../setup/target/nativeLinux.sh" ; setup_native_linux ;;
         native-mac)   source "${HERE}/../setup/target/nativeMac.sh" ; setup_native_mac ;;
@@ -126,7 +116,7 @@ main() {
         k8s)          source "${HERE}/../setup/target/k8sCluster.sh" ; setup_k8s_cluster ;;
         *) echo "Bad --target"; exit ${ERROR_USAGE} ;;
     esac
-    success "Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'" 
+    success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'" 
 }
 
 main "$@"

@@ -2,10 +2,12 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${HERE}/../utils/logging.sh"
 
 load_env_file() {
+    info "Loading environment variables for $ENVIRONMENT..."
+
     HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
     local environment=$1
-    local env_file="$HERE/../.env-dev"
+    local env_file="$HERE/../../.env-dev"
 
     if [ "$environment" != "development" ] && [ "$environment" != "production" ]; then
         error "Error: Environment must be either development or production."
@@ -13,7 +15,7 @@ load_env_file() {
     fi
 
     if [ "$environment" = "production" ]; then
-        env_file="$HERE/../.env-prod"
+        env_file="$HERE/../../.env-prod"
     fi
 
     if [ ! -f "$env_file" ]; then

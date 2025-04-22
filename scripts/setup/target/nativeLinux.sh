@@ -3,8 +3,12 @@
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-source "${HERE}/../utils/index.sh"
+source "${HERE}/../../utils/index.sh"
 
 setup_native_linux() {
     header "Setting up native Linux development/production..."
+
+    # Setup pnpm and generate Prisma client
+    source "${HERE}/../setup/setupPnpm.sh"
+    setup_pnpm
 }
