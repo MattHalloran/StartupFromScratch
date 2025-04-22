@@ -29,3 +29,7 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Bats test helpers (e.g. bats-core)
+scripts/tests/helpers
+scripts/tests/tmp
