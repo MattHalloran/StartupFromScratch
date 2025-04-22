@@ -99,6 +99,10 @@ main() {
     # Load environment variables
     load_env_file "$ENVIRONMENT"
 
+    # Setup firewall
+    source "${HERE}/../setup/setupFirewall.sh"
+    setup_firewall
+
     # info "Copying environment variables file..."
     # if [ ! -f .env-dev ]; then
     # cp .env-example .env-dev
