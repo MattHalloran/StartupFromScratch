@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -p tsconfig.json",
     "dev": "pnpm build",
     "start": "pnpm node dist/index.js",
     "pretest": "rimraf dist && pnpm --filter @vrooli/shared build",
