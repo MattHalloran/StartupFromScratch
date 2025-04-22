@@ -1,31 +1,30 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-load '../__tests/__testHelper.bash'
 
 SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/flow.sh"
 . "$SCRIPT_PATH"
 
-@test "prompt_confirm accepts 'y' input" {
+@test "confirm accepts 'y' input" {
     echo "y" | {
-        run prompt_confirm "Do you want to continue?"
+        run confirm "Do you want to continue?"
         [ "$status" -eq 0 ]
     }
 }
-@test "prompt_confirm accepts 'Y' input" {
+@test "confirm accepts 'Y' input" {
     echo "Y" | {
-        run prompt_confirm "Do you want to continue?"
+        run confirm "Do you want to continue?"
         [ "$status" -eq 0 ]
     }
 }
-@test "prompt_confirm rejects 'n' input" {
+@test "confirm rejects 'n' input" {
     echo "n" | {
-        run prompt_confirm "Do you want to continue?"
+        run confirm "Do you want to continue?"
         [ "$status" -eq 1 ]
     }
 }
-@test "prompt_confirm rejects any other input" {
+@test "confirm rejects any other input" {
     echo "z" | {
-        run prompt_confirm "Do you want to continue?"
+        run confirm "Do you want to continue?"
         [ "$status" -eq 1 ]
     }
 }
@@ -40,43 +39,6 @@ SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/flow.sh"
     run exit_with_error "Custom error message" 2
     [ "$status" -eq 2 ]
     [ "${lines[0]}" = "[ERROR]   Custom error message" ]
-}
-
-@test "run_step returns 0 if the command is successful" {
-    run run_step "test success command" "true"
-    # Because run_step calls exit on failure, if 'true' passes,
-    # we expect an exit code of 0 from the function itself.
-    [ "$status" -eq 0 ]
-
-    # Bats captures all output in ${lines[@]}.
-    # Check if it prints the success logs:
-    [ "${lines[0]}" = "[INFO]    test success command..." ]
-    [ "${lines[1]}" = "[SUCCESS] test success command - done!" ]
-}
-@test "run_step exits with code 1 if the command fails" {
-    # 'false' returns non-zero => run_step should exit with error.
-    run run_step "test failing command" "false"
-    [ "$status" -eq 1 ]
-
-    # Check the last line for the expected error message
-    [ "${lines[-1]}" = "[ERROR]   Failed: test failing command" ]
-}
-
-@test "run_step_noncritical returns 0 if the command succeeds" {
-    run run_step_noncritical "test noncritical success" "true"
-    # If the command is successful, we expect status 0
-    [ "$status" -eq 0 ]
-
-    # Output checks
-    [ "${lines[0]}" = "[INFO]    test noncritical success..." ]
-    [ "${lines[1]}" = "[SUCCESS] test noncritical success - done!" ]
-}
-@test "run_step_noncritical returns 1 if the command fails but does not exit the script" {
-    run run_step_noncritical "test noncritical fail" "false"
-    [ "$status" -eq 1 ]
-
-    # Should still have printed the warning, not an error
-    [ "${lines[-1]}" = "[WARNING] Non-critical step failed: test noncritical fail" ]
 }
 
 @test "is_yes returns 0 for 'y' input" {
@@ -106,4 +68,17 @@ SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/flow.sh"
 @test "is_yes returns 1 for random input" {
     run is_yes "random-string"
     [ "$status" -eq 1 ]
+}
+
+# Tests for auto-confirm skipping the prompt
+@test "confirm auto-confirms when YES is 'y'" {
+    YES=y run confirm "Do you want to continue?"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "[INFO]    Auto-confirm enabled, skipping prompt" ]
+}
+
+@test "confirm auto-confirms when YES is 'yes'" {
+    YES=yes run confirm "Do you want to continue?"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "[INFO]    Auto-confirm enabled, skipping prompt" ]
 }

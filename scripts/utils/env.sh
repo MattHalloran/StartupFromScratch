@@ -9,7 +9,7 @@ load_env_file() {
 
     if [ "$environment" != "development" ] && [ "$environment" != "production" ]; then
         error "Error: Environment must be either development or production."
-        exit 1
+        exit ${ERROR_USAGE}
     fi
 
     if [ "$environment" = "production" ]; then
@@ -18,7 +18,7 @@ load_env_file() {
 
     if [ ! -f "$env_file" ]; then
         error "Error: Environment file $env_file does not exist."
-        exit 1
+        exit ${ERROR_ENV_FILE_MISSING}
     fi
 
     . "$env_file"

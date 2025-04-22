@@ -1,6 +1,5 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-load '../__tests/__testHelper.bash'
 
 SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/logging.sh"
 . "$SCRIPT_PATH"

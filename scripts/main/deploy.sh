@@ -24,7 +24,7 @@ while [[ "$#" -gt 0 ]]; do
       deploy_type="$2"; shift 2;;
     *)
       log_error "Unknown argument: $1"
-      exit 1
+      exit ${ERROR_USAGE}
       ;;
   esac
 done

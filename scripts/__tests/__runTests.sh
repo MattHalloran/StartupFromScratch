@@ -21,7 +21,7 @@ while IFS= read -r test_file; do
     exit_code=$?
 
     # If the bats command failed, consider it a failure
-    if [ $exit_code -ne 0 ] && ! echo "${output}" | grep -q "^not ok"; then
+    if [ $exit_code -ne ${EXIT_SUCCESS} ] && ! echo "${output}" | grep -q "^not ok"; then
         error "Failed to run test: ${test_file}. Got exit code: ${exit_code}"
         total_failures=$((total_failures + 1))
         continue
@@ -42,15 +42,15 @@ done < <(find "${SCRIPTS_DIR}" -path "${SCRIPTS_DIR}/__tests/helpers" -prune -o 
 # Print summary
 echo ""
 info "Total tests run: ${total_tests}"
-if [ ${total_failures} -eq 0 ]; then
+if [ ${total_failures} -eq ${EXIT_SUCCESS} ]; then
     success "All tests passed successfully!"
 else
     error "Total failures: ${total_failures}"
 fi
 
 # Exit with appropriate code
-if [ ${total_failures} -eq 0 ]; then
-    exit 0
+if [ ${total_failures} -eq ${EXIT_SUCCESS} ]; then
+    exit ${EXIT_SUCCESS}
 else
-    exit 1
+    exit ${ERROR_DEFAULT}
 fi

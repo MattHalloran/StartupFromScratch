@@ -2,7 +2,12 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${HERE}/../utils/logging.sh"
 
 # One-line confirmation prompt
-prompt_confirm() {
+confirm() {
+    # If auto-confirm is enabled, skip the prompt
+    if is_yes "$YES"; then
+        info "Auto-confirm enabled, skipping prompt"
+        return 0
+    fi
     local message="$1"
     prompt "$message (y/n) "
     read -r -n 1 confirm
@@ -27,52 +32,6 @@ continue_with_error() {
     local code="${2:-1}" # Default to exit code 1 if not provided
     error "$message"
     return "$code"
-}
-
-# Only run a function if the script is executed (not sourced)
-run_if_executed() {
-    local callback="$1"
-    shift # Remove the first argument
-    if [[ "${BASH_SOURCE[1]}" == "${0}" ]]; then
-        "$callback" "$@"
-    fi
-}
-
-# ------------------------------------------------------------------
-# Runs a command, prints an error, and exits if the command fails.
-# Usage:
-#   run_step "Friendly step description" "actual_command_here"
-# ------------------------------------------------------------------
-run_step() {
-    local step_description="$1"
-    shift
-    local cmd="$*"
-
-    info "${step_description}..."
-    if ! eval "${cmd}"; then
-        error "Failed: ${step_description}"
-        exit 1
-    fi
-    success "${step_description} - done!"
-}
-
-# ------------------------------------------------------------------
-# Runs a command, prints an error if it fails, but does NOT exit.
-# Usage:
-#   run_step_noncritical "Friendly step description" "actual_command_here"
-# ------------------------------------------------------------------
-run_step_noncritical() {
-    local step_description="$1"
-    shift
-    local cmd="$*"
-
-    info "${step_description}..."
-    if ! eval "${cmd}"; then
-        warning "Non-critical step failed: ${step_description}"
-        # We do not exit here
-        return 1
-    fi
-    success "${step_description} - done!"
 }
 
 # ------------------------------------------------------------------------------

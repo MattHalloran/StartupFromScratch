@@ -9,6 +9,9 @@ UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Name of this index script
 CURRENT_SCRIPT="$(basename "${BASH_SOURCE[0]}")"
 
+# Source exit codes first
+source "${UTILS_DIR}/exit_codes.sh"
+
 # Source each .sh file in this directory, excluding this index file
 for util_file in "${UTILS_DIR}"/*.sh; do
     if [[ "$(basename "${util_file}")" != "${CURRENT_SCRIPT}" ]]; then
