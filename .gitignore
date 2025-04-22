@@ -1,5 +1,6 @@
 # Node.js
 node_modules/
+tsconfig.tsbuildinfo
 
 # Yarn v2+ cache and build state
 .yarn/cache/

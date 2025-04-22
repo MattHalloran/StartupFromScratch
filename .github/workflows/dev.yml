@@ -32,29 +32,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          # cache: 'yarn' # Removed cache to rely on Corepack
-      - name: Enable Corepack & Activate Yarn v4
+      - name: Enable Corepack & Activate pnpm
         run: |
           corepack enable
-          corepack prepare yarn@stable --activate
-      - name: Cache Yarn PnP store
+          corepack prepare pnpm@latest --activate
+      - name: Cache pnpm store
         uses: actions/cache@v3
         with:
-          path: |
-            .yarn/cache
-            .yarn/unplugged
-            .yarn/build-state.yml
-          key: ${{ runner.os }}-yarn-pnp-${{ hashFiles('yarn.lock') }}
-      - name: Yarn install (Plug'n'Play)
-        run: yarn install --immutable --immutable-cache
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: pnpm install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
       - name: Lint
-        run: yarn lint
+        run: pnpm run lint
         continue-on-error: ${{ github.event.inputs.ignore_lint_errors == 'true' }}
       - name: Test
-        run: yarn test
+        run: pnpm test
         continue-on-error: ${{ github.event.inputs.ignore_test_errors == 'true' }}
       - name: Build
-        run: yarn build
+        run: pnpm run build
       - name: Set up SSH key for deployment
         if: env.VPS_SSH_PRIVATE_KEY != '' # Only run if the secret is set
         run: |
@@ -64,7 +60,7 @@ jobs:
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
       - name: Deploy to Staging
-        run: bash scripts/deploy.sh staging
+        run: pnpm run deploy staging
         env:
           SSH_KEY_PATH: ~/.ssh/deploy_key
           DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }} # Use environment secret

@@ -20,31 +20,31 @@ This project demonstrates:
    ```
 2. Run initial setup:
    ```bash
-   yarn setup
+   pnpm run setup
    ```
 3. Start development (Docker):
    ```bash
-   yarn develop
+   pnpm run develop
    ```
    - Spins up Postgres and Redis containers and runs server, jobs, and UI locally via TypeScript dev servers.
 
 To run without Docker (requires local SQLite):
 ```bash
-USE_DOCKER=false yarn develop
+USE_DOCKER=false pnpm run develop
 ```
    - Uses SQLite and launches the same TypeScript dev servers for server, jobs, and UI.
 
 4. Run tests:
    ```bash
-   yarn test
+   pnpm test
    ```
 
 5. Build for production:
    ```bash
-   yarn build
+   pnpm run build
    ```
 
 6. Deploy:
    ```bash
-   yarn deploy staging   # or 'prod'
+   pnpm run deploy staging   # or 'prod'
    ``` 

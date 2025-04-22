@@ -1,5 +1,5 @@
 {
-  "name": "@startupfromscratch/shared",
+  "name": "@vrooli/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     "build": "tsc -b",
     "pretest": "rimraf dist",
     "build-tests": "NODE_ENV=test swc src -d dist --config-file ../../.swcrc",
-    "test": "yarn build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
-    "test-watch": "yarn build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
+    "test": "pnpm build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
+    "test-watch": "pnpm build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
   },
   "devDependencies": {
     "ts-node": "^10.9.1",

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
-import redisClient from '@startupfromscratch/redis-db';
+import redisClient from '@vrooli/redis';
 
 // Load env variables
 dotenv.config();

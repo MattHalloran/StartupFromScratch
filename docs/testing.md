@@ -20,10 +20,10 @@ packages/ui/src/components/CustomButton.stories.tsx
 Each package `package.json` includes scripts:
 
 ```json
-"pretest":   "rimraf dist && yarn workspace @startupfromscratch/shared build",
+"pretest":   "rimraf dist && pnpm --filter @vrooli/shared run build",
 "build-tests": "NODE_ENV=test swc src -d dist --config-file ../../.swcrc",
-"test":      "yarn build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
-"test-watch":   "yarn build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
+"test":      "pnpm run build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
+"test-watch":   "pnpm run build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
 ```
 
 - **`build-tests`** uses SWC to compile `src/**/*.ts?(x)` → `dist/` (with source maps).  
@@ -34,16 +34,16 @@ Each package `package.json` includes scripts:
 
 From the root, run:
 ```bash
-yarn test
+pnpm test
 ```
-This invokes `yarn workspaces foreach --recursive run test` to execute each package's `test` script.
+This invokes `pnpm -r run test` to execute each package's `test` script.
 
 ## Storybook & Stories
 
 We co‑locate Storybook stories next to components (`*.stories.tsx`). You can run Storybook separately:
 ```bash
 # Inside ui package
-yarn workspace @startupfromscratch/ui dev   # if using Vite-based Storybook
+pnpm --filter @vrooli/ui run dev   # if using Vite-based Storybook
 ```
 
 --- 

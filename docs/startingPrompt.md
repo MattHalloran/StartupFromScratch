@@ -12,10 +12,11 @@ This document captures the initial, approved architecture and setup plan for **S
 - ❌ = Not yet implemented
 
 ### Project Structure & Tooling
-- ✅ The project is a monorepo with packages for the server, redis-db, prisma-db, jobs, shared, and ui
+- ✅ The project is a monorepo with packages for the server, redis, prisma, jobs, shared, and ui
 - ✅ The project is git-initialized and named "StartupFromScratch"
-- ✅ Use a modern package manager (Yarn v4)
+- ✅ Use pnpm workspaces for dependency management
 - ✅ Code is written in TypeScript v5.4.5
+- ✅ Uses Yarn Plug'n'Play (PnP) or pnpm workspaces for dependency management
 
 ### Infrastructure & Deployment
 - 🚧 Databases use `ankane/pgvector:v0.4.4` and `redis:7.4.0-alpine` (configuration exists but needs testing)
@@ -52,13 +53,13 @@ This document captures the initial, approved architecture and setup plan for **S
 ## 🚀 1. Monorepo & Tooling
 
 - **Package Manager**  
-  Use **Yarn v4 (Berry)** workspaces.
+  Use **pnpm** workspaces.
 
 - **Top‑level layout**  
   ```text
   /StartupFromScratch
   ├─ package.json         # workspace config & scripts
-  ├─ yarn.lock
+  ├─ pnpm-lock.yaml
   ├─ tsconfig.json        # shared TS 5.4.5 settings
   ├─ .env-example
   ├─ .gitignore           # sensible defaults
@@ -68,8 +69,8 @@ This document captures the initial, approved architecture and setup plan for **S
   ├─ scripts/             # setup, develop, build, deploy, etc.
   └─ packages/
      ├─ server/
-     ├─ prisma-db/
-     ├─ redis-db/
+     ├─ prisma/
+     ├─ redis/
      ├─ jobs/
      ├─ shared/
      └─ ui/
@@ -85,7 +86,7 @@ This document captures the initial, approved architecture and setup plan for **S
   - `server`, `jobs`, `ui` → `node:18-alpine3.20`
 
 - **Local‑only mode (no Docker)**:  
-  - `prisma-db` contains two schemas:  
+  - `prisma` contains two schemas:  
     - `schema.postgres.prisma` (for Docker)  
     - `schema.sqlite.prisma`   (for local runs)  
   - At startup, `scripts/develop.sh` picks by `USE_DOCKER=true|false` and symlinks to `schema.prisma`.
@@ -126,24 +127,28 @@ These binaries:
 
 ## 💻 5. Lifecycle Scripts
 
-Defined in `package.json` and `scripts/`:
+Defined in `package.json` and `scripts/main/`:
 
-- **setup.sh**:  
-  - Yarn install, generate Prisma client, copy `.env-example` → `.env-dev`.
+- **setup.sh** (`scripts/main/setup.sh`):
+  - pnpm install, generate Prisma client, copy `.env-example` → `.env-dev`.
 
-- **develop.sh**:  
-  - If `USE_DOCKER=true`: `docker-compose up --build`.  
-  - Else: run TS watchers (`server`, `jobs`, `ui`) + local SQLite migrations.
+- **develop.sh** (`scripts/main/develop.sh`):
+  - Sources component scripts from `scripts/develop/` and `scripts/utils/`.
+  - If `USE_DOCKER=true`: Starts DB containers via Docker Compose.
+  - Else: Sets up local environment (e.g., SQLite migrations).
+  - Runs TS watchers (`server`, `jobs`, `ui`).
 
-- **build.sh**:  
-  - Transpile all packages to `dist/`.  
-  - Package CLI binaries via pkg.  
-  - Zip everything to `/var/tmp/<version>/`.
+- **build.sh** (`scripts/main/build.sh`):
+  - Sources component scripts from `scripts/build/` and `scripts/utils/`.
+  - Cleans previous builds, transpiles all packages to `dist/`.
+  - Packages CLI binaries via pkg (placeholder).
+  - Collects/zips artifacts to `/var/tmp/<version>/`.
 
-- **deploy.sh**:  
-  - Accepts target (`staging|prod`).  
-  - Docker: push images or apply K8s.  
-  - VPS: SSH + `scp` zip + unpack + restart.
+- **deploy.sh** (`scripts/main/deploy.sh`):
+  - Sources component scripts from `scripts/deploy/` and `scripts/utils/`.
+  - Accepts target (`staging|prod`) and deployment type (`--type docker|k8s|vps`).
+  - Runs the build script first.
+  - Executes deployment logic (Docker push/apply, K8s apply, or VPS SSH/SCP).
 
 ---
 
@@ -151,10 +156,10 @@ Defined in `package.json` and `scripts/`:
 
 In `.github/workflows/`:
 
-1. **dev.yml** (branch: `dev` & PRs):  
-   - Lint → Test → Build → **Deploy to Staging** (`scripts/deploy.sh staging`).
-2. **master.yml** (branch: `master`):  
-   - Lint → Test → Build → **Deploy to Production** (`scripts/deploy.sh prod`).
+1. **dev.yml** (branch: `dev` & PRs):
+   - Lint → Test → Build → **Deploy to Staging** (`scripts/main/deploy.sh staging`).
+2. **master.yml** (branch: `master`):
+   - Lint → Test → Build → **Deploy to Production** (`scripts/main/deploy.sh prod`).
 
 Each uses GitHub Actions environments, concurrency, and secrets (see [GitHub Actions Deployment Guide](https://docs.github.com/en/actions/use-cases-and-examples/deploying/deploying-with-github-actions)).
 

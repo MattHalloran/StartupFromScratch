@@ -1,19 +1,18 @@
 {
   "name": "StartupFromScratch",
   "version": "0.1.0",
-  "packageManager": "yarn@4.0.0+sha512.955259c0370ab8c06d013faa7d5e7addb6914251029695675f54e04c917ea6b092c379ba8d3521556d90b3874e5037759467072f01d2295341ead43cc259f14b",
   "private": true,
   "type": "module",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "setup": "bash scripts/setup.sh",
-    "develop": "bash scripts/develop.sh",
-    "build": "bash scripts/build.sh",
-    "deploy": "bash scripts/deploy.sh",
+    "setup": "bash scripts/main/setup.sh",
+    "develop": "bash scripts/main/develop.sh",
+    "build": "bash scripts/main/build.sh",
+    "deploy": "bash scripts/main/deploy.sh",
     "lint": "eslint . --ext .ts,.tsx",
-    "test": "yarn workspaces foreach --recursive run test"
+    "test": "pnpm -r test"
   },
   "devDependencies": {
     "@swc/cli": "^0.1.60",
@@ -25,6 +24,7 @@
     "@types/node": "^18.16.18",
     "@typescript-eslint/eslint-plugin": "^5.58.0",
     "@typescript-eslint/parser": "^5.58.0",
+    "bats": "^1.11.0",
     "chai": "^5.0.0",
     "concurrently": "^8.0.1",
     "dotenv-cli": "^7.2.0",
@@ -36,6 +36,8 @@
     "sinon": "^15.0.0",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.3",
     "typescript": "5.4.5"
-  }
+  },
+  "packageManager": "pnpm@10.9.0+sha512.0486e394640d3c1fb3c9d43d49cf92879ff74f8516959c235308f5a8f62e2e19528a65cdc2a3058f587cde71eba3d5b56327c8c33a97e4c4051ca48a10ca2d5f"
 }

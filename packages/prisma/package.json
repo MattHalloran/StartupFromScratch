@@ -1,5 +1,5 @@
 {
-  "name": "@startupfromscratch/prisma-db",
+  "name": "@vrooli/prisma",
   "version": "0.1.0",
   "private": true,
   "main": "dist/index.js",
@@ -9,7 +9,7 @@
     "build": "tsc -b",
     "generate": "prisma generate",
     "postinstall": "prisma generate",
-    "test": "echo \"No tests for prisma-db\""
+    "test": "echo \"No tests for prisma\""
   },
   "dependencies": {
     "@prisma/client": "^4.10.1"

@@ -1,28 +1,29 @@
 {
-  "name": "@startupfromscratch/server",
+  "name": "@vrooli/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "(tsc -p tsconfig.json || true) && npx concurrently --kill-others \"tsc -p tsconfig.json --watch\" \"node --watch dist/index.js\"",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "dev": "pnpm build",
+    "start": "pnpm node dist/index.js",
     "test": "NODE_ENV=test TS_NODE_PROJECT=tsconfig.test.json mocha --require ts-node/register --file src/__test/setup.ts \"src/__test/**/*.ts\"",
     "test-watch": "NODE_ENV=test TS_NODE_PROJECT=tsconfig.test.json mocha --watch --require ts-node/register --file src/__test/setup.ts \"src/__test/**/*.ts\""
   },
   "dependencies": {
-    "@startupfromscratch/prisma-db": "workspace:*",
-    "@startupfromscratch/redis-db": "workspace:*",
-    "@startupfromscratch/shared": "workspace:*",
+    "@vrooli/prisma": "workspace:*",
+    "@vrooli/redis": "workspace:*",
+    "@vrooli/shared": "workspace:*",
     "dotenv": "^16.0.3",
     "express": "^4.18.2"
   },
   "devDependencies": {
     "@types/chai": "^4.3.0",
+    "@types/express": "^5.0.1",
     "@types/mocha": "^10.0.0",
-    "@types/node": "^18.16.18",
+    "@types/node": "^22.14.1",
     "@types/supertest": "^2.0.12",
     "chai": "^5.0.0",
     "concurrently": "^8.0.1",

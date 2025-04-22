@@ -4,26 +4,26 @@ FROM node:18-alpine3.20
 # Set working directory
 WORKDIR /app
 
-# Enable Yarn v4 (Berry)
-RUN corepack enable && corepack prepare yarn@4.0.0 --activate
+# Enable pnpm via Corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy root Yarn configuration for workspaces
-COPY package.json yarn.lock .yarnrc.yml .yarn/ ./
+# Copy pnpm lockfile and workspace config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install dependencies
-RUN yarn install --immutable
+# Install dependencies via pnpm
+RUN pnpm install --frozen-lockfile
 
 # Copy UI package and its dependencies
 COPY packages/ui packages/ui
 COPY packages/shared packages/shared
-COPY packages/prisma-db packages/prisma-db
-COPY packages/redis-db packages/redis-db
+COPY packages/prisma packages/prisma
+COPY packages/redis packages/redis
 
-# Build UI (optional for prod preview; dev will run yarn dev directly)
-# RUN cd packages/ui && yarn build
+# Build UI (optional for prod preview; dev will run pnpm run dev directly)
+# RUN cd packages/ui && pnpm run build
 
 # Expose Vite dev server port
 EXPOSE 3000
 
 # Start Vite dev server for UI
-CMD ["bash", "-lc", "yarn workspace @startupfromscratch/ui dev"] 
+CMD ["bash", "-lc", "pnpm --filter @vrooli/ui run dev"] 

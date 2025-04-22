@@ -1,24 +1,9 @@
 {
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    // Add types needed specifically for testing UI components
-    "types": ["node", "mocha", "chai"]
-  },
-  "include": [
-    // Include all test files
-    "src/__test__/**/*.ts",
-    "src/__test__/**/*.tsx",
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/**/*.stories.tsx" // Include story files if they use test globals
-    // Add global.d.ts if UI tests need it (create if necessary)
-    // "src/global.d.ts"
-  ],
-  "exclude": [
-    // Exclude non-test/non-story files from src
-    "src/**/!(*.test|*.stories).ts",
-    "src/**/!(*.test|*.stories).tsx",
-    "vite.config.ts" // Exclude vite config from test compilation
-    // node_modules and dist are already excluded by the base config
-  ]
-} 
+    "extends": "./tsconfig.json",
+    "exclude": [],
+    "include": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__test",
+    ]
+}

@@ -1,6 +1,7 @@
-# Ignore node modules and build artifacts
+# Node modules and build artifacts
 node_modules
 packages/*/node_modules
+tsconfig.tsbuildinfo
 **/dist
 
 # Environment files

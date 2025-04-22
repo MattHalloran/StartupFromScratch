@@ -1,12 +1,12 @@
 # Development Guide
 
-This guide explains how to develop StartupFromScratch both with Docker and natively (Windows/Mac/Linux) using the `scripts/develop.sh` entrypoint or the one‑click executables.
+This guide explains how to develop StartupFromScratch both with Docker and natively (Windows/Mac/Linux) using the `scripts/main/develop.sh` entrypoint or the one‑click executables.
 
 ## Prerequisites
 
-- **Node.js** (v18+) and **Yarn** (v4) installed locally
+- **Node.js** (v18+) and **pnpm** (latest via Corepack) installed locally
 - **Docker** & **Docker Compose** (if using Docker mode)
-- **Corepack** enabled for Yarn:
+- **Corepack** enabled (it will manage pnpm):
   ```bash
   corepack enable
   ```
@@ -24,7 +24,7 @@ This guide explains how to develop StartupFromScratch both with Docker and nativ
 
 2. **Install dependencies and generate Prisma client**:
    ```bash
-   bash scripts/setup.sh
+   bash scripts/main/setup.sh
    ```
 
 3. **Prepare `.env-dev`** (if not already):
@@ -38,25 +38,22 @@ This guide explains how to develop StartupFromScratch both with Docker and nativ
 - Run only database services in containers, and launch other workspaces locally:
 ```bash
 # Default: uses .env-dev
-bash scripts/develop.sh
+bash scripts/main/develop.sh
 ```
 
-- This spins up Postgres (pgvector) and Redis via Docker Compose.
-- Server, jobs, and UI run locally on the host machine via TypeScript dev servers:
-  - `yarn workspace @startupfromscratch/server dev` (Express SSR on port 4000)
-  - `yarn workspace @startupfromscratch/jobs dev`
-  - `yarn workspace @startupfromscratch/ui dev` (Vite on port 3000)
+- This spins up Postgres (pgvector) and Redis via Docker Compose (using `scripts/develop/docker.sh`).
+- Server, jobs, and UI run locally on the host machine via TypeScript dev servers, started by `scripts/develop/local.sh`.
 
 ## Native (Non‑Docker) Development
 
 Run services entirely on your machine:
 
 ```bash
-USE_DOCKER=false bash scripts/develop.sh
+USE_DOCKER=false bash scripts/main/develop.sh
 ```
 
-- Links the appropriate Prisma schema (SQLite by default).
-- Launches the same TypeScript dev servers for server, jobs, and UI.
+- Links the appropriate Prisma schema (SQLite by default) via `scripts/develop/local.sh`.
+- Launches the same TypeScript dev servers for server, jobs, and UI via `scripts/develop/local.sh`.
 
 ## SSR Development
 
@@ -64,7 +61,7 @@ Once you've scaffolded the SSR entries and configured `server/src/index.ts` for 
 
 1. Ensure your UI is building in watch mode:
    ```bash
-   USE_DOCKER=false bash scripts/develop.sh  # this already starts the Vite dev server and SSR server
+   USE_DOCKER=false bash scripts/main/develop.sh  # this already starts the Vite dev server and SSR server
    ```
 2. In your browser, navigate to `http://localhost:4000/` to see the app pre-rendered on the server (view source to confirm HTML) and hydrated on the client.
 3. Edit your React components or data-loaders; both Vite HMR and `ts-node-dev` will reload the UI and SSR server automatically.

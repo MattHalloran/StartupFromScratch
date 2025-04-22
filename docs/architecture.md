@@ -4,11 +4,11 @@ This document describes the high‑level architecture of **StartupFromScratch**,
 
 ## Monorepo Structure
 
-- **Package Manager:** Yarn v4 (Berry) workspaces
+- **Package Manager:** Pnpm workspaces
 - **Workspaces (`packages/`)**
   - `server`     – Express/Koa HTTP API in TypeScript
-  - `prisma-db`  – Prisma schema, migrations, and client generation
-  - `redis-db`   – Redis client helper module
+  - `prisma`  – Prisma schema, migrations, and client generation
+  - `redis`   – Redis client helper module
   - `jobs`       – Background worker processes in TypeScript
   - `shared`     – Common utilities and types
   - `ui`         – React 18 + MUI web frontend (Vite) with SSR support (server- and client-entry scripts), using React Helmet to inject head tags from server-fetched SSO configuration
@@ -18,7 +18,7 @@ This document describes the high‑level architecture of **StartupFromScratch**,
 - **PostgreSQL** with vector extension: `ankane/pgvector:v0.4.4`
 - **Redis**: `redis:7.4.0-alpine`
 - **Node.js services** (server, jobs, ui) built on `node:18-alpine3.20`
-- **Local mode** for `prisma-db`: uses SQLite (`schema.sqlite.prisma`)
+- **Local mode** for `prisma`: uses SQLite (`schema.sqlite.prisma`)
 
 ## Docker Compose (Local Development)
 

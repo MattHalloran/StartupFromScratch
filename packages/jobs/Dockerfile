@@ -2,21 +2,21 @@
 FROM node:18-alpine3.20
 WORKDIR /app
 
-# enable Yarn v4
-RUN corepack enable && corepack prepare yarn@4.0.0 --activate
+# enable pnpm via Corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Install dependencies
-COPY package.json yarn.lock .yarnrc.yml .yarn/ ./
-RUN yarn install --immutable
+# Install dependencies via pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy relevant packages
 COPY packages/jobs packages/jobs
 COPY packages/shared packages/shared
-COPY packages/prisma-db packages/prisma-db
-COPY packages/redis-db packages/redis-db
+COPY packages/prisma packages/prisma
+COPY packages/redis packages/redis
 
-# Build jobs package
-RUN yarn workspace @startupfromscratch/jobs build
+# Build jobs package with pnpm
+RUN pnpm --filter @vrooli/jobs run build
 
 # Default command to run jobs
 CMD ["node", "packages/jobs/dist/index.js"] 

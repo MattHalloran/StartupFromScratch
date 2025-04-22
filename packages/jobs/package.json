@@ -1,22 +1,22 @@
 {
-  "name": "@startupfromscratch/jobs",
+  "name": "@vrooli/jobs",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsc -b && npx concurrently \"tsc -b --watch\" \"node --watch dist/index.js\"",
     "build": "tsc -b",
-    "start": "node dist/index.js",
-    "pretest": "rimraf dist && yarn workspace @startupfromscratch/shared build",
+    "dev": "pnpm build",
+    "start": "pnpm node dist/index.js",
+    "pretest": "rimraf dist && pnpm --filter @vrooli/shared build",
     "build-tests": "NODE_ENV=test swc src -d dist --config-file ../../.swcrc",
-    "test": "yarn build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
-    "test-watch": "yarn build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
+    "test": "pnpm build-tests && dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js \"dist/**/*.test.js\"",
+    "test-watch": "pnpm build-tests && dotenv -e ../../.env-test -- mocha --watch --file dist/__test/setup.js \"dist/**/*.test.js\""
   },
   "dependencies": {
-    "@startupfromscratch/prisma-db": "workspace:*",
-    "@startupfromscratch/redis-db": "workspace:*",
-    "@startupfromscratch/shared": "workspace:*",
+    "@vrooli/prisma": "workspace:*",
+    "@vrooli/redis": "workspace:*",
+    "@vrooli/shared": "workspace:*",
     "dotenv": "^16.0.3"
   },
   "devDependencies": {

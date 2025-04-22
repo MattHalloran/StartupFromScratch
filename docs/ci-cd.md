@@ -11,12 +11,12 @@ We have two main workflows defined in `.github/workflows/`:
 
 Both workflows follow these steps:
 1.  **Checkout**: Get the latest code.
-2.  **Setup Node.js & Yarn**: Configure Node.js v18 and install dependencies using Yarn v4.
-3.  **Lint**: Run code linting checks (`yarn lint`).
-4.  **Test**: Run unit tests (`yarn test`).
-5.  **Build**: Build the application (`yarn build`).
+2.  **Setup Node.js & pnpm**: Configure Node.js v18 and install dependencies using pnpm.
+3.  **Lint**: Run code linting checks (`pnpm run lint`).
+4.  **Test**: Run unit tests (`pnpm test`).
+5.  **Build**: Build the application (`pnpm run build`).
 6.  **Setup SSH Key**: Write the SSH private key (from secrets) to a file for deployment.
-7.  **Deploy**: Run `scripts/deploy.sh` with the appropriate target (`staging` or `prod`), passing necessary secrets.
+7.  **Deploy**: Run `scripts/main/deploy.sh` with the appropriate target (`staging` or `prod`) and deployment type (e.g., `--type vps`), passing necessary secrets.
 
 ## GitHub Setup
 
@@ -80,7 +80,7 @@ For **each** VPS instance (staging and production), you need to perform the foll
     ```
 4.  **Install Node.js & Systemd Service:**
     *   Install Node.js v18+ on the VPS.
-    *   Create a systemd service file (e.g., `/etc/systemd/system/app.service`) to run the Node.js server. The `deploy.sh` script assumes this service is named `app.service`. **Make sure the `WorkingDirectory` and `ExecStart` paths match your `VPS_DEPLOY_PATH`**.
+    *   Create a systemd service file (e.g., `/etc/systemd/system/app.service`) to run the Node.js server. The `deploy.sh` script (specifically `scripts/deploy/vps.sh`) assumes this service is named `app.service`. **Make sure the `WorkingDirectory` and `ExecStart` paths match your `VPS_DEPLOY_PATH`**.
 
     *Example `app.service` (adjust paths and user as needed):*
     ```ini
@@ -115,8 +115,8 @@ For **each** VPS instance (staging and production), you need to perform the foll
 
 You can also manually trigger the workflows from the GitHub Actions tab using the "Run workflow" button. When triggering manually, you have the following options:
 
-*   `ignore_lint_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `yarn lint` command fails.
-*   `ignore_test_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `yarn test` command fails.
+*   `ignore_lint_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `pnpm run lint` command fails.
+*   `ignore_test_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `pnpm test` command fails.
 
 **Note:** These options only affect manually triggered runs. Runs triggered by pushes or pull requests will always fail if linting or tests fail.
 

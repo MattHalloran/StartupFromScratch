@@ -1,5 +1,5 @@
 /*
- * Temporary type declarations for '@startupfromscratch/redis-db'.
+ * Temporary type declarations for '@vrooli/redis'.
  * Replace these types with proper definitions when available.
  */
-declare module '@startupfromscratch/redis-db'; 
+declare module '@vrooli/redis'; 
