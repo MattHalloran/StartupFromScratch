@@ -80,6 +80,9 @@ importers:
 
   packages/jobs:
     dependencies:
+      '@prisma/client':
+        specifier: 6.1.0
+        version: 6.1.0(prisma@6.1.0)
       '@vrooli/server':
         specifier: workspace:*
         version: link:../server

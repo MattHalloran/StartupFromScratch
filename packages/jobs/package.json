@@ -22,6 +22,7 @@
     "start:prod": "node --experimental-modules --experimental-specifier-resolution=node dist/index.js"
   },
   "dependencies": {
+    "@prisma/client": "6.1.0",
     "@vrooli/server": "workspace:*",
     "@vrooli/shared": "workspace:*"
   },
