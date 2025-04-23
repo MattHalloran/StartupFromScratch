@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "${HERE}/../utils/index.sh"
+
 # Zips build artifacts for deployment
 zip_artifacts() {
   local target_env="$1"
-  log_info "Zipping artifacts for $target_env..."
+  info "Zipping artifacts for $target_env..."
 
   local version=$(node -p "require('../../package.json').version")
   local outdir="/var/tmp/${version}"
@@ -24,5 +27,5 @@ zip_artifacts() {
   # Create a zip archive (optional)
   # zip -r "${outdir}/app-${version}-${target_env}.zip" "$outdir"
 
-  log_success "Build artifacts have been collected in $outdir"
+  success "Build artifacts have been collected in $outdir"
 } 

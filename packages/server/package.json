@@ -23,17 +23,12 @@
     "start:dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nodemon dist/index.js",
     "start:prod": "node --experimental-modules --experimental-specifier-resolution=node dist/index.js",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:generate": "prisma generate",
-    "preprod": "run-s prisma:migrate prisma:generate",
-    "develop": "run-s preprod start:dev"
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "6.1.0",
-    "@vrooli/prisma": "workspace:*",
-    "@vrooli/redis": "workspace:*",
     "@vrooli/shared": "workspace:*",
     "cors": "^2.8.5",
-    "dotenv": "^16.0.3",
     "express": "^5.0.1",
     "prisma": "6.1.0"
   },

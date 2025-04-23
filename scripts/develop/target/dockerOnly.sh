@@ -2,16 +2,16 @@
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname \"${BASH_SOURCE[0]}\")" && pwd)
-COMPOSE_DIR=$(cd "$HERE"/../../.. && pwd)
+ROOT_DIR=$(cd "$HERE"/../../.. && pwd)
 source "${HERE}/../../utils/index.sh"
 
 start_development_docker_only() {
     header "🚀 Starting Docker only development environment..."
-    cd "$COMPOSE_DIR"
+    cd "$ROOT_DIR"
 
     cleanup() {
-        info "🔧 Cleaning up development environment at $COMPOSE_DIR..."
-        cd "$COMPOSE_DIR"
+        info "🔧 Cleaning up development environment at $ROOT_DIR..."
+        cd "$ROOT_DIR"
         docker-compose down
         cd "$ORIGINAL_DIR"
         exit 0

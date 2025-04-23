@@ -24,9 +24,8 @@ services:
   server:
     build:
       context: .
-      dockerfile: packages/server/Dockerfile
-    volumes:
-      - ./packages/server:/app
+      dockerfile: Dockerfile
+      target: server
     ports:
       - "4000:4000"
     env_file:
@@ -38,9 +37,8 @@ services:
   jobs:
     build:
       context: .
-      dockerfile: packages/jobs/Dockerfile
-    volumes:
-      - ./packages/jobs:/app
+      dockerfile: Dockerfile
+      target: jobs
     env_file:
       - ${ENV_FILE:-.env-dev}
     depends_on:
@@ -50,9 +48,8 @@ services:
   ui:
     build:
       context: .
-      dockerfile: packages/ui/Dockerfile
-    volumes:
-      - ./packages/ui:/app
+      dockerfile: Dockerfile
+      target: ui-dev
     ports:
       - "3000:3000"
     env_file:

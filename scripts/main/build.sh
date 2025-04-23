@@ -1,47 +1,70 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+ORIGINAL_DIR="$(pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${HERE}/../utils/index.sh"
 
-# Load utilities
-source "$SCRIPT_DIR/../utils/logging.sh"
-source "$SCRIPT_DIR/../utils/env.sh"
+# Load build scripts for clean, build, and zip functions
+source "${HERE}/../build/package.sh"
+source "${HERE}/../build/zip.sh"
 
-# Load build scripts
-source "$SCRIPT_DIR/../build/package.sh"
-source "$SCRIPT_DIR/../build/zip.sh"
+# ——— Default values ——— #
+ENVIRONMENT="development"
 
-# Default to development
-production=0
-# Parse flags
-while [[ "$#" -gt 0 ]]; do
-  case "$1" in
-    -p|--production)
-      production=1; shift;;
-    *) shift;;
-  esac
-done
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [--production|-p] [-h|--help]
 
-# Determine env file
-ENV_FILE=$(get_env_file "$production")
-target=development
-if is_yes "$production"; then
-  target=production
-fi
-export ENV_FILE
+Builds all packages and bundles artifacts for the Vrooli project.
 
-log_info "Starting build for $target using $ENV_FILE..."
+Options:
+  -p, --production  Run build in production mode (uses .env-prod)
+  -h, --help        Show this help message
+EOF
+    print_exit_codes
+}
 
-# Clean previous builds
-clean_build
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--production)
+                ENVIRONMENT="production"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit "$EXIT_SUCCESS"
+                ;;
+            *)
+                echo "Unknown flag: $1"
+                usage
+                exit "$ERROR_USAGE"
+                ;;
+        esac
+    done
+}
 
-# Build packages (includes Prisma generate)
-build_packages
+main() {
+    header "🔨 Starting build for ${ENVIRONMENT} environment..."
+    parse_arguments "$@"
 
-# Package CLI executables
-package_cli
+    # info "Loading environment variables for ${ENVIRONMENT}..."
+    # load_env_file "${ENVIRONMENT}"
 
-# Zip artifacts
-zip_artifacts "$target"
+    info "Cleaning previous build artifacts..."
+    clean_build
 
-log_success "Build process completed." 
+    info "Building individual packages..."
+    build_packages
+
+    info "Packaging CLI executables..."
+    package_cli
+
+    info "Zipping build artifacts..."
+    zip_artifacts "${ENVIRONMENT}"
+
+    success "✅ Build process completed for ${ENVIRONMENT} environment."
+}
+
+main "$@" 
