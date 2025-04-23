@@ -3,6 +3,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Zips build artifacts for deployment
@@ -10,14 +11,15 @@ zip_artifacts() {
   local target_env="$1"
   info "Zipping artifacts for $target_env..."
 
-  local version=$(node -p "require('../../package.json').version")
+  local version
+  version=$(node -p "require('../../package.json').version")
   local outdir="/var/tmp/${version}"
   mkdir -p "$outdir"
 
   # Collect built dist folders
   for pkg in ../../packages/*; do
     if [ -d "$pkg/dist" ]; then
-      cp -r "$pkg/dist" "$outdir/$(basename $pkg)-dist"
+      cp -r "$pkg/dist" "$outdir/$(basename "$pkg")-dist"
     fi
   done
 

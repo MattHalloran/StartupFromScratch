@@ -4,9 +4,9 @@
 # occasionally be set incorrectly.
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Fix the system clock

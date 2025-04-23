@@ -3,6 +3,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Placeholder for VPS deployment logic

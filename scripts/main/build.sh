@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ORIGINAL_DIR="$(pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../build/package.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../build/zip.sh"
 
 # ——— Default values ——— #

@@ -22,7 +22,8 @@ get_color_code() {
 # Initialize a single color
 initialize_color() {
     local color_name="$1"
-    local color_code=$(get_color_code "$color_name")
+    local color_code
+    color_code=$(get_color_code "$color_name")
 
     if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
         eval "$color_name=$(tput setaf "$color_code")"
@@ -42,8 +43,9 @@ initialize_reset() {
 
 # Echo colored text
 echo_color() {
-    color="$1"
-    message="$2"
+    local color="$1"
+    local message="$2"
+    local color_value
 
     initialize_color "$color"
     initialize_reset

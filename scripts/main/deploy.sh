@@ -3,9 +3,13 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
+# shellcheck disable=SC1091
 source "$HERE/../deploy/docker.sh"
+# shellcheck disable=SC1091
 source "$HERE/../deploy/k8s.sh"
+# shellcheck disable=SC1091
 source "$HERE/../deploy/vps.sh"
 
 # Default target
@@ -20,7 +24,7 @@ while [[ "$#" -gt 0 ]]; do
       deploy_type="$2"; shift 2;;
     *)
       error "Unknown argument: $1"
-      exit ${ERROR_USAGE}
+      exit "${ERROR_USAGE}"
       ;;
   esac
 done
@@ -37,7 +41,7 @@ info "Starting deployment to $target (Type: ${deploy_type:-auto-detect}) using $
 # Perform build first (assuming build artifacts are needed)
 # Consider adding a flag to skip build if desired
 info "Running build before deployment..."
-"$SCRIPT_DIR/build.sh" ${target:+ -p}
+"$SCRIPT_DIR/build.sh" "${target:+ -p}"
 
 info "Executing deployment logic..."
 

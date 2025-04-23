@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../develop/target/nativeLinux.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../develop/target/nativeMac.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../develop/target/nativeWin.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../develop/target/dockerOnly.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../develop/target/k8sCluster.sh"
 
 # ——— Default values ——— #
 # How the app will be run
 TARGET="native-linux"
 # Force "yes" to every confirmation
-YES="NO"
+export YES="NO"
 # The environment to run the setup for
 ENVIRONMENT=${NODE_ENV:-development}
 
@@ -68,17 +79,11 @@ main() {
     if [ "$ENVIRONMENT" = "production" ]; then
         SETUP_ARGS="$SETUP_ARGS --prod"
     fi
-    source "${HERE}/../main/setup.sh" $SETUP_ARGS
+    # shellcheck disable=SC1091
+    source "${HERE}/../main/setup.sh" "$SETUP_ARGS"
 
     # Run the development script for the target
-    case "$TARGET" in
-        l|nl|linux|native-linux) source "${HERE}/../develop/target/nativeLinux.sh" ; start_development_native_linux ;;
-        m|nm|mac|native-mac)   source "${HERE}/../develop/target/nativeMac.sh" ; start_development_native_mac ;;
-        w|nw|win|native-win)   source "${HERE}/../develop/target/nativeWin.sh" ; start_development_native_win ;;
-        d|dc|docker|docker-compose) source "${HERE}/../develop/target/dockerOnly.sh" ; start_development_docker_only ;;
-        k|kc|k8s|kubernetes)          source "${HERE}/../develop/target/k8sCluster.sh" ; start_development_k8s_cluster ;;
-        *) echo "Bad --target"; exit ${ERROR_USAGE} ;;
-    esac
+    execute_for_target "$TARGET" "start_development_" || exit "${ERROR_USAGE}"
 
     success "✅ Development environment started." 
 }

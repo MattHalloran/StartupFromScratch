@@ -7,6 +7,7 @@ KEYSTORE_PATH="${HERE}/../../upload-keystore.jks"
 KEYSTORE_ALIAS="upload"
 KEYSTORE_PASSWORD="${GOOGLE_PLAY_KEYSTORE_PASSWORD}"
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Check for keytool and install JDK if it's not available. This is
@@ -69,15 +70,13 @@ create_assetlinks_file() {
         header "Creating dist/.well-known/assetlinks.json file so Google can verify the app with the website..."
         # Export the PEM file from keystore
         PEM_PATH="${HERE}/../upload_certificate.pem"
-        keytool -export -rfc -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -file "${PEM_PATH}" -storepass "${KEYSTORE_PASSWORD}"
-        if [ $? -ne 0 ]; then
+        if ! keytool -export -rfc -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -file "${PEM_PATH}" -storepass "${KEYSTORE_PASSWORD}"; then
             warning "PEM file could not be generated. The app cannot be uploaded to the Google Play store without it."
             return 1
         fi
 
         # Extract SHA-256 fingerprint
-        GOOGLE_PLAY_FINGERPRINT=$(keytool -list -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -storepass "${KEYSTORE_PASSWORD}" -v | grep "SHA256:" | awk '{ print $2 }')
-        if [ $? -ne 0 ]; then
+        if ! GOOGLE_PLAY_FINGERPRINT=$(keytool -list -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -storepass "${KEYSTORE_PASSWORD}" -v | grep "SHA256:" | awk '{ print $2 }'); then
             warning "SHA-256 fingerprint could not be extracted. The app cannot be uploaded to the Google Play store without it."
             return 1
         else
@@ -85,29 +84,28 @@ create_assetlinks_file() {
         fi
 
         # Create assetlinks.json file for Google Play Store
-        if [ -z "${GOOGLE_PLAY_FINGERPRINT}" ]; then
-            warning "GOOGLE_PLAY_FINGERPRINT is not set. Not creating dist/.well-known/assetlinks.json file for Google Play Trusted Web Activity (TWA)."
-        else
+        if [ -n "${GOOGLE_PLAY_FINGERPRINT}" ]; then
             info "Creating dist/.well-known/assetlinks.json file for Google Play Trusted Web Activity (TWA)..."
-            mkdir -p ${HERE}/../packages/ui/dist/.well-known
-            cd ${HERE}/../packages/ui/dist/.well-known
-            echo "[{" >assetlinks.json
-            echo "    \"relation\": [\"delegate_permission/common.handle_all_urls\"]," >>assetlinks.json
-            echo "    \"target\": {" >>assetlinks.json
-            echo "      \"namespace\": \"android_app\"," >>assetlinks.json
-            echo "      \"package_name\": \"com.vrooli.twa\"," >>assetlinks.json
-            # Check if the GOOGLE_PLAY_DOMAIN_FINGERPRINT variable is set and append it to the array
-            if [ ! -z "${GOOGLE_PLAY_DOMAIN_FINGERPRINT}" ]; then
-                echo "      \"sha256_cert_fingerprints\": [" >>assetlinks.json
-                echo "          \"${GOOGLE_PLAY_FINGERPRINT}\"," >>assetlinks.json
-                echo "          \"${GOOGLE_PLAY_DOMAIN_FINGERPRINT}\"" >>assetlinks.json
-                echo "      ]" >>assetlinks.json
-            else
-                echo "      \"sha256_cert_fingerprints\": [\"${GOOGLE_PLAY_FINGERPRINT}\"]" >>assetlinks.json
-            fi
-            echo "    }" >>assetlinks.json
-            echo "}]" >>assetlinks.json
-            cd ${HERE}/..
+            mkdir -p "${HERE}/../packages/ui/dist/.well-known"
+            cd "${HERE}/../packages/ui/dist/.well-known"
+            {
+              echo "[{"
+              echo "    \"relation\": [\"delegate_permission/common.handle_all_urls\"],"
+              echo "    \"target\": {"
+              echo "      \"namespace\": \"android_app\","   
+              echo "      \"package_name\": \"com.vrooli.twa\","   
+              if [ -n "${GOOGLE_PLAY_DOMAIN_FINGERPRINT}" ]; then
+                echo "      \"sha256_cert_fingerprints\": ["
+                echo "          \"${GOOGLE_PLAY_FINGERPRINT}\","
+                echo "          \"${GOOGLE_PLAY_DOMAIN_FINGERPRINT}\""
+                echo "      ]"
+              else
+                echo "      \"sha256_cert_fingerprints\": [\"${GOOGLE_PLAY_FINGERPRINT}\"]"
+              fi
+              echo "    }"
+              echo "}]"
+            } >assetlinks.json
+            cd "${HERE}/.."
         fi
     fi
 }

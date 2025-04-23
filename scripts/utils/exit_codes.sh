@@ -19,11 +19,14 @@ set -euo pipefail
 : "${ERROR_ENV_FILE_MISSING:=66}"
 : "${DESC_ERROR_ENV_FILE_MISSING:=Environment file missing}"
 
+: "${ERROR_FUNCTION_NOT_FOUND:=67}"
+: "${DESC_ERROR_FUNCTION_NOT_FOUND:=Function not found}"
+
 # Helper function to generate exit codes display for usage
 print_exit_codes() {
     local var_name code desc_var description
     echo "Exit Codes:"
-    for var_name in EXIT_SUCCESS ERROR_DEFAULT ERROR_USAGE ERROR_NO_INTERNET ERROR_ENV_FILE_MISSING; do
+    for var_name in EXIT_SUCCESS ERROR_DEFAULT ERROR_USAGE ERROR_NO_INTERNET ERROR_ENV_FILE_MISSING ERROR_FUNCTION_NOT_FOUND; do
         code=${!var_name}
         desc_var="DESC_${var_name}"
         description=${!desc_var}

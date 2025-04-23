@@ -6,7 +6,9 @@ ROOT_DIR=$(cd "$HERE"/../.. && pwd)
 ENV_DEV_FILE="$ROOT_DIR/.env-dev"
 ENV_PROD_FILE="$ROOT_DIR/.env-prod"
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/logging.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../utils/exit_codes.sh"
 
 # Load secrets from an environment file
@@ -17,16 +19,17 @@ load_env_file() {
         [dD]*) ENV_FILE="$ENV_DEV_FILE" ;;
         [pP]*) ENV_FILE="$ENV_PROD_FILE" ;;
         *) error "Invalid environment: $ENVIRONMENT"
-            exit ${ERROR_USAGE}
+            exit "${ERROR_USAGE}"
             ;;
     esac
 
     if [ ! -f "$ENV_FILE" ]; then
         error "Error: Environment file $ENV_FILE does not exist."
-        exit ${ERROR_ENV_FILE_MISSING}
+        exit "${ERROR_ENV_FILE_MISSING}"
     fi
 
     info "Sourcing environment file $ENV_FILE"
+    # shellcheck source=/dev/null
     . "$ENV_FILE"
 }
 
@@ -43,7 +46,7 @@ load_secrets() {
         e|env|environment|f|file) load_env_file ;;
         v|vault|hashicorp|hashicorp-vault) load_vault_secrets ;;
         *) error "Invalid secrets source: $SECRETS_SOURCE"
-            exit ${ERROR_USAGE}
+            exit "${ERROR_USAGE}"
             ;;
     esac
 }

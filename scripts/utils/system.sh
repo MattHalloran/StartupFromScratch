@@ -4,6 +4,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/logging.sh"
 
 # Default timeout for system installs (in seconds)
@@ -15,13 +16,13 @@ install_system_package() {
     header "📦 Installing system package: $pkg"
     if command -v apt-get >/dev/null 2>&1; then
         # Perform a quiet update with a timeout to avoid hangs
-        timeout --kill-after=10s ${SYSTEM_INSTALL_TIMEOUT}s sudo apt-get update -qq
+        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s sudo apt-get update -qq
         # Perform non-interactive install with a timeout to avoid hangs
-        timeout --kill-after=10s ${SYSTEM_INSTALL_TIMEOUT}s sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "$pkg"
+        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "$pkg"
         success "$pkg installed via apt-get"
     elif command -v brew >/dev/null 2>&1; then
         # Perform Homebrew install with a timeout to prevent hangs
-        timeout --kill-after=10s ${SYSTEM_INSTALL_TIMEOUT}s brew install "$pkg"
+        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s brew install "$pkg"
         success "$pkg installed via Homebrew"
     else
         error "No supported package manager found to install $pkg"
@@ -60,8 +61,10 @@ system_upgrade() {
 should_run_system_update() {
     if command -v apt-get >/dev/null 2>&1; then
         # Use apt list timestamp to throttle updates
-        local last_update=$(stat -c %Y /var/lib/apt/lists/)
-        local current_time=$(date +%s)
+        local last_update
+        last_update=$(stat -c %Y /var/lib/apt/lists/)
+        local current_time
+        current_time=$(date +%s)
         local update_interval=$((24 * 60 * 60))
         if ((current_time - last_update > update_interval)); then
             return 0
@@ -81,8 +84,10 @@ should_run_system_update() {
 should_run_system_upgrade() {
     if command -v apt-get >/dev/null 2>&1; then
         # Use dpkg status timestamp to throttle upgrades
-        local last_upgrade=$(stat -c %Y /var/lib/dpkg/status)
-        local current_time=$(date +%s)
+        local last_upgrade
+        last_upgrade=$(stat -c %Y /var/lib/dpkg/status)
+        local current_time
+        current_time=$(date +%s)
         local upgrade_interval=$((7 * 24 * 60 * 60))
         if ((current_time - last_upgrade > upgrade_interval)); then
             return 0

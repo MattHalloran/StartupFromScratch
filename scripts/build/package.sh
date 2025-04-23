@@ -4,6 +4,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PACKAGES_DIR="${HERE}/../../packages"
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Cleans previous build artifacts

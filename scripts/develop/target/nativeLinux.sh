@@ -5,6 +5,7 @@ ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 COMPOSE_DIR=$(cd "$HERE"/../../.. && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../../utils/index.sh"
 
 start_development_native_linux() {

@@ -1,29 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
+# Changed to export since it's used in other scripts
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/setScriptPermissions.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/time.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/checkInternet.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/clean.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/setupFirewall.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/setupBats.sh"
+# shellcheck disable=SC1091
 source "${HERE}/../setup/setupShellcheck.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/target/nativeLinux.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/target/nativeMac.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/target/nativeWin.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/target/dockerOnly.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/target/k8sCluster.sh"
 
 # ——— Default values ——— #
 # How the app will be run
 TARGET="native-linux"
 # Where to load secrets/env variables from
-SECRETS_SOURCE="env"
+export SECRETS_SOURCE="env"
 # Remove previous artefacts (volumes, ~/.pnpm‑store, etc.)
 CLEAN="NO"
 # Skip prompts, avoid tools not needed in CI
-CI="NO"
+export CI="NO"
 # Force "yes" to every confirmation
-YES="NO"
+export YES="NO"
 # The environment to run the setup for
 ENVIRONMENT=${NODE_ENV:-development}
 
@@ -99,7 +117,10 @@ main() {
     load_secrets
 
     # Determine where this script is running (local or remote)
-    export SERVER_LOCATION=$("${HERE}/domainCheck.sh" $SITE_IP $API_URL | tail -n 1)
+    # Fix SC2155 by separating declaration and assignment
+    local server_location
+    server_location=$("${HERE}/domainCheck.sh" "$SITE_IP" "$API_URL" | tail -n 1)
+    export SERVER_LOCATION="$server_location"
 
     setup_firewall
 
@@ -116,14 +137,7 @@ main() {
     # fi
 
     # Run the setup script for the target
-    case "$TARGET" in
-        l|nl|linux|native-linux) source "${HERE}/../setup/target/nativeLinux.sh" ; setup_native_linux ;;
-        m|nm|mac|native-mac)   source "${HERE}/../setup/target/nativeMac.sh" ; setup_native_mac ;;
-        w|nw|win|native-win)   source "${HERE}/../setup/target/nativeWin.sh" ; setup_native_win ;;
-        d|dc|docker|docker-compose) source "${HERE}/../setup/target/dockerOnly.sh" ; setup_docker_only ;;
-        k|kc|k8s|kubernetes)          source "${HERE}/../setup/target/k8sCluster.sh" ; setup_k8s_cluster ;;
-        *) echo "Bad --target"; exit ${ERROR_USAGE} ;;
-    esac
+    execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE}"
     success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'" 
 }
 

@@ -2,9 +2,9 @@
 # Posix-compliant script to make sure they keyless ssh login is enabled
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # enable PasswordAuthentication for ssh

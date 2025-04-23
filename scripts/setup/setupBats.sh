@@ -4,10 +4,11 @@ set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+BATS_DEPENDENCIES_DIR="${HERE}/../__tests/helpers"
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
-BATS_DEPENDENCIES_DIR="${HERE}/../__tests/helpers"
 
 # Function to create directory to store bats core and dependencies
 create_bats_dependencies_dir() {

@@ -5,7 +5,12 @@
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Ensure BATS helper libraries are discoverable by bats_load_library
 export BATS_LIB_PATH="${HERE}/helpers:${BATS_LIB_PATH-}"
+
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
+
+# Disable exit on error to allow handling test failures manually
+set +e
 
 SCRIPTS_DIR=$(dirname "${HERE}")
 
@@ -21,7 +26,7 @@ while IFS= read -r test_file; do
     exit_code=$?
 
     # If the bats command failed, consider it a failure
-    if [ $exit_code -ne ${EXIT_SUCCESS} ] && ! echo "${output}" | grep -q "^not ok"; then
+    if [ "$exit_code" -ne "${EXIT_SUCCESS}" ] && ! echo "${output}" | grep -q "^not ok"; then
         error "Failed to run test: ${test_file}. Got exit code: ${exit_code}"
         total_failures=$((total_failures + 1))
         continue
@@ -42,15 +47,15 @@ done < <(find "${SCRIPTS_DIR}" -path "${SCRIPTS_DIR}/__tests/helpers" -prune -o 
 # Print summary
 echo ""
 info "Total tests run: ${total_tests}"
-if [ ${total_failures} -eq ${EXIT_SUCCESS} ]; then
+if [ "${total_failures}" -eq "${EXIT_SUCCESS}" ]; then
     success "All tests passed successfully!"
 else
     error "Total failures: ${total_failures}"
 fi
 
 # Exit with appropriate code
-if [ ${total_failures} -eq ${EXIT_SUCCESS} ]; then
-    exit ${EXIT_SUCCESS}
+if [ "${total_failures}" -eq "${EXIT_SUCCESS}" ]; then
+    exit "${EXIT_SUCCESS}"
 else
-    exit ${ERROR_DEFAULT}
+    exit "${ERROR_DEFAULT}"
 fi

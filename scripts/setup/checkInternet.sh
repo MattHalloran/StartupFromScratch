@@ -2,9 +2,9 @@
 # Posix-compliant script to check if host has internet access
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Check if host has internet access. Exits with error if no access.
@@ -14,6 +14,6 @@ check_internet() {
         success "Host internet access: OK"
     else
         error "Host internet access: FAILED"
-        exit ${ERROR_NO_INTERNET}
+        exit "${ERROR_NO_INTERNET}"
     fi
 }

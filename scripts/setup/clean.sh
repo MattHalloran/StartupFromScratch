@@ -3,9 +3,9 @@
 # When complete, you should be able to set up the project from a clean slate.
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Clear node_modules at the root and in all project subdirectories without descending into them

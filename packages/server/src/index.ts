@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -9,9 +8,6 @@ import { getSsoConfig } from './db/sso-config.js';
 // Determine __dirname equivalent in ES module scope
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load environment variables (.env-dev / .env-prod)
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 4000;

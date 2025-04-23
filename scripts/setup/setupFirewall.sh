@@ -2,9 +2,9 @@
 # Posix-compliant script to setup the firewall
 set -euo pipefail
 
-ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
 # Check if host has internet access. Exits with error if no access.
