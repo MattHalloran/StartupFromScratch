@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname \"${BASH_SOURCE[0]}\")" && pwd)
 ROOT_DIR=$(cd "$HERE"/../../.. && pwd)
+
 source "${HERE}/../../utils/index.sh"
 
 start_development_docker_only() {

@@ -2,6 +2,7 @@
 # index.sh
 # Sources all .sh scripts in this directory for easy single-line inclusion.
 # Usage: source "/path/to/utils/index.sh"
+set -euo pipefail
 
 # Determine this script's directory
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

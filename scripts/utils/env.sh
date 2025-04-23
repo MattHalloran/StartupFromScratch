@@ -1,32 +1,51 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd "$HERE"/../.. && pwd)
+ENV_DEV_FILE="$ROOT_DIR/.env-dev"
+ENV_PROD_FILE="$ROOT_DIR/.env-prod"
+
 source "${HERE}/../utils/logging.sh"
+source "${HERE}/../utils/exit_codes.sh"
 
+# Load secrets from an environment file
 load_env_file() {
-    info "Loading environment variables for $ENVIRONMENT..."
 
-    HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    ENV_FILE=""
+    case "$ENVIRONMENT" in
+        [dD]*) ENV_FILE="$ENV_DEV_FILE" ;;
+        [pP]*) ENV_FILE="$ENV_PROD_FILE" ;;
+        *) error "Invalid environment: $ENVIRONMENT"
+            exit ${ERROR_USAGE}
+            ;;
+    esac
 
-    local environment=$1
-    local env_file="$ROOT_DIR/.env-dev"
-
-    if [ "$environment" != "development" ] && [ "$environment" != "production" ]; then
-        error "Error: Environment must be either development or production."
-        exit ${ERROR_USAGE}
-    fi
-
-    if [ "$environment" = "production" ]; then
-        env_file="$ROOT_DIR/.env-prod"
-    fi
-
-    if [ ! -f "$env_file" ]; then
-        error "Error: Environment file $env_file does not exist."
+    if [ ! -f "$ENV_FILE" ]; then
+        error "Error: Environment file $ENV_FILE does not exist."
         exit ${ERROR_ENV_FILE_MISSING}
     fi
 
-    . "$env_file"
+    info "Sourcing environment file $ENV_FILE"
+    . "$ENV_FILE"
+}
+
+# Load secrets from a vault
+load_vault_secrets() {
+    #TODO
+    echo "TODO"
+}
+
+load_secrets() {
+    header "🔑 Loading secrets..."
+
+    case "$SECRETS_SOURCE" in
+        e|env|environment|f|file) load_env_file ;;
+        v|vault|hashicorp|hashicorp-vault) load_vault_secrets ;;
+        *) error "Invalid secrets source: $SECRETS_SOURCE"
+            exit ${ERROR_USAGE}
+            ;;
+    esac
 }
 
 is_running_in_ci() {

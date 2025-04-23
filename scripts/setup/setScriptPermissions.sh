@@ -1,7 +1,9 @@
 #!/bin/bash
 # Posix-compliant script to make all scripts in the scripts directory (including subdirectories) executable
+set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 source "${HERE}/../utils/index.sh"
 
 # Makes every script in the scripts directory (including subdirectories) executable

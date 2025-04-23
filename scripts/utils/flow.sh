@@ -1,4 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 source "${HERE}/../utils/logging.sh"
 
 # One-line confirmation prompt

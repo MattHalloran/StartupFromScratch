@@ -3,9 +3,8 @@ set -euo pipefail
 
 ORIGINAL_DIR="$(pwd)"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
-source "${HERE}/../utils/index.sh"
 
-# Load build scripts for clean, build, and zip functions
+source "${HERE}/../utils/index.sh"
 source "${HERE}/../build/package.sh"
 source "${HERE}/../build/zip.sh"
 

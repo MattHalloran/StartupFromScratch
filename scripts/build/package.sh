@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PACKAGES_DIR="${HERE}/../../packages"
+
 source "${HERE}/../utils/index.sh"
 
 # Cleans previous build artifacts

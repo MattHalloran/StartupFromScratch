@@ -1,7 +1,5 @@
 #!/bin/bash
-
-# Exit codes
-E_NO_TPUT=1
+set -euo pipefail
 
 # Set default terminal type if not set
 export TERM=${TERM:-xterm}

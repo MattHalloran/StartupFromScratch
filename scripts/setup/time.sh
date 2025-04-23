@@ -2,9 +2,11 @@
 # Posix-compliant script to fix system clock. 
 # An accurate system clock is often needed for installing/updating packages, and can 
 # occasionally be set incorrectly.
+set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 source "${HERE}/../utils/index.sh"
 
 # Fix the system clock

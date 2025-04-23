@@ -2,6 +2,7 @@
 # exit_codes.sh
 # Central definitions of global exit codes for scripts and tests.
 # These use default assignments so tests or callers can override them by exporting beforehand.
+set -euo pipefail
 
 : "${EXIT_SUCCESS:=0}"
 : "${DESC_EXIT_SUCCESS:=Success}"

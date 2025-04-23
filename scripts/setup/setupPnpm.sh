@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Enable Corepack, activate pnpm, install dependencies, and generate the Prisma client.
+set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 source "${HERE}/../utils/index.sh"
 
 # Function to enable Corepack, install pnpm dependencies, and generate Prisma client

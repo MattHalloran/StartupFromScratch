@@ -12,6 +12,7 @@
     "build": "bash scripts/main/build.sh",
     "deploy": "bash scripts/main/deploy.sh",
     "lint": "eslint . --ext .ts,.tsx",
+    "lint:shell": "shellcheck -x scripts/**/*.sh",
     "test": "pnpm -r test"
   },
   "devDependencies": {

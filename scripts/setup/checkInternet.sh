@@ -1,8 +1,10 @@
 #!/bin/bash
 # Posix-compliant script to check if host has internet access
+set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 source "${HERE}/../utils/index.sh"
 
 # Check if host has internet access. Exits with error if no access.

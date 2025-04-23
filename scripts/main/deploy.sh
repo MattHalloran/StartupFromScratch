@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-source "${HERE}/../utils/index.sh"
 
-# Load deployment scripts
+source "${HERE}/../utils/index.sh"
 source "$HERE/../deploy/docker.sh"
 source "$HERE/../deploy/k8s.sh"
 source "$HERE/../deploy/vps.sh"
