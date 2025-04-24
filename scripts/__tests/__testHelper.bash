@@ -5,7 +5,7 @@ bats_require_minimum_version 1.5.0
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Set up the stub directory and PATH based on test file directory
-export BATS_TMPDIR="${BATS_TEST_DIRNAME}/tmp" # WARNING: We use `rm -rf "$BATS_TMPDIR"` in teardown. Make sure it's safe to delete!
+export BATS_TMPDIR="$(mktemp -d)" # WARNING: We use `rm -rf "$BATS_TMPDIR"` in teardown; using mktemp keeps it outside helpers
 export BATS_MOCK_BINDIR="${BATS_TMPDIR}/bin"
 mkdir -p "$BATS_MOCK_BINDIR"
 export PATH="$BATS_MOCK_BINDIR:$PATH"
