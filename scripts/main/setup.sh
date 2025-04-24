@@ -29,7 +29,15 @@ export SERVER_LOCATION=""
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") --target <env> [-h | --help] [--clean] [--ci-cd] [--secrets-source <env|vault>] [--prod] [-y | --yes] [--location | --server-location <local|remote>]
+Usage: $(basename "$0") \
+  [-t|--target <env>] \
+  [-h|--help] \
+  [--clean] \
+  [--ci-cd] \
+  [--secrets-source <env|vault>] \
+  [--prod] \
+  [-y|--yes] \
+  [--location|--server-location <local|remote>]
 
 Prepares the project for development or production.
 
