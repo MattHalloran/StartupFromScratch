@@ -14,18 +14,20 @@ source "${HERE}/../setup/target/index.sh"
 # ——— Default values ——— #
 # How the app will be run
 TARGET="native-linux"
-# Where to load secrets/env variables from
-export SECRETS_SOURCE="env"
 # Remove previous artefacts (volumes, ~/.pnpm‑store, etc.)
 CLEAN="NO"
+# The environment to run the setup for
+ENVIRONMENT=${NODE_ENV:-development}
+# Where to load secrets/env variables from
+export SECRETS_SOURCE="env"
 # Skip prompts, avoid tools not needed in CI
 export CI="NO"
 # Force "yes" to every confirmation
 export YES="NO"
-# The environment to run the setup for
-ENVIRONMENT=${NODE_ENV:-development}
 # Server location override (local|remote), determined if not set
 export SERVER_LOCATION=""
+# What to do when encountering sudo commands without elevated privileges
+export SUDO_MODE="error"
 
 usage() {
     cat <<EOF
@@ -35,6 +37,7 @@ Usage: $(basename "$0") \
   [--clean] \
   [--ci-cd] \
   [--secrets-source <env|vault>] \
+  [--sudo-mode <error|skip>] \
   [--prod] \
   [-y|--yes] \
   [--location|--server-location <local|remote>]
@@ -47,6 +50,7 @@ Options:
   --clean:                        Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
   --ci-cd:                        Configure the system for CI/CD (via GitHub Actions)
   --secrets-source:               (env|vault) Where to load secrets/env variables from
+  --sudo-mode:                    (error|skip) What to do when encountering sudo commands without elevated privileges
   -p, --prod:                     Skips development-only steps and uses production environment variables
   -y, --yes:                      Automatically answer yes to all confirmation prompts
   --location, --server-location:  (local|remote) Override automatic server location detection
@@ -63,6 +67,7 @@ parse_arguments() {
             --clean)                      CLEAN="YES";      shift ;;
             --ci)                         CI="YES";         shift ;;
             --secrets-source)             SECRETS_SOURCE="$2"; shift 2 ;;
+            --sudo-mode)                  SUDO_MODE="$2";   shift 2 ;;
             -p|--prod)                    ENVIRONMENT="production"; shift ;;
             -y|--yes)                     YES="YES";        shift ;;
             --location|--server-location) SERVER_LOCATION="$2"; shift 2 ;;

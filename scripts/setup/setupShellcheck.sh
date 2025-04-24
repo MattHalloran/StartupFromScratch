@@ -24,6 +24,29 @@ install_shellcheck() {
         warning "Package manager install failed or timed out, falling back to GitHub releases"
     fi
 
+    # Determine the installation directory and command prefix based on sudo availability
+    INSTALL_DIR="/usr/local/bin"
+    MV_CMD="sudo mv"
+    CHMOD_CMD="sudo chmod"
+
+    if ! can_run_sudo; then
+        warning "Sudo not available or skipped. Installing ShellCheck to user directory."
+        INSTALL_DIR="$HOME/.local/bin"
+        MV_CMD="mv"
+        CHMOD_CMD="chmod"
+
+        # Ensure the local bin directory exists
+        mkdir -p "$INSTALL_DIR"
+
+        # Ensure the local bin directory is in PATH
+        if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+            export PATH="$INSTALL_DIR:$PATH"
+            info "Added $INSTALL_DIR to PATH for current session."
+            # Consider adding this to shell profile (e.g., ~/.bashrc or ~/.profile) for persistence
+            # echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc # Example for bash
+        fi
+    fi
+
     # Determine architecture for static binary
     case "$(uname -m)" in
         x86_64) arch="x86_64" ;;
@@ -38,10 +61,11 @@ install_shellcheck() {
         tmpdir=$(mktemp -d)
         if curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${version}/shellcheck-v${version}.linux.${arch}.tar.xz" \
                | tar -xJ -C "$tmpdir"; then
-            sudo mv "$tmpdir/shellcheck-v${version}/shellcheck" /usr/local/bin/shellcheck
-            sudo chmod +x /usr/local/bin/shellcheck
+            # Move and make executable using determined command and path
+            ${MV_CMD} "$tmpdir/shellcheck-v${version}/shellcheck" "${INSTALL_DIR}/shellcheck"
+            ${CHMOD_CMD} +x "${INSTALL_DIR}/shellcheck"
             rm -rf "$tmpdir"
-            success "ShellCheck v${version} installed from GitHub releases"
+            success "ShellCheck v${version} installed to ${INSTALL_DIR}"
             return
         else
             warning "Download of ShellCheck v${version} failed, trying next version"

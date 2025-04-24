@@ -14,9 +14,8 @@ source "${HERE}/../utils/index.sh"
 # used for signing the app in the Google Play store
 install_jdk() {
     if ! command -v keytool &>/dev/null; then
-        header "Installing JDK for keytool"
-        sudo apt update
-        sudo DEBIAN_FRONTEND=noninteractive apt install -y default-jdk
+        should_run_system_update && system_update
+        install_system_package "default-jdk"
         success "JDK installed. keytool should now be available."
     else
         info "keytool is already installed"

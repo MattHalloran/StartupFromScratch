@@ -62,3 +62,33 @@ is_yes() {
         ;;
     esac
 }
+
+# ------------------------------------------------------------------------------
+# can_run_sudo: Checks if sudo can be invoked according to SUDO_MODE.
+# Returns 0 if sudo operations should proceed, 1 if they should be skipped.
+# Exits with error if SUDO_MODE is 'error' and sudo is unavailable.
+# ------------------------------------------------------------------------------
+can_run_sudo() {
+    local sudo_mode=${SUDO_MODE:-error}
+    case "$sudo_mode" in
+        skip)
+            info "SUDO_MODE=skip: skipping privileged operations"
+            return 1
+            ;;
+        error)
+            if sudo -n true 2>/dev/null; then
+                return 0
+            else
+                exit_with_error "Privileged operations require sudo access, but unable to run sudo" "$ERROR_DEFAULT"
+            fi
+            ;;
+        *)
+            warning "Unrecognized SUDO_MODE='$sudo_mode', defaulting to error"
+            if sudo -n true 2>/dev/null; then
+                return 0
+            else
+                exit_with_error "Privileged operations require sudo access, but unable to run sudo" "$ERROR_DEFAULT"
+            fi
+            ;;
+    esac
+}

@@ -9,6 +9,10 @@ source "${HERE}/../utils/index.sh"
 
 # Check if host has internet access. Exits with error if no access.
 setup_firewall() {
+    if ! can_run_sudo; then
+        warning "Skipping firewall setup due to sudo mode"
+        return
+    fi
     header "🔥🧱 Setting up firewall in $ENVIRONMENT environment..."
     
     # Track if any changes were made
