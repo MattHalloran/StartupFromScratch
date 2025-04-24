@@ -3,13 +3,15 @@
 A monorepo for the Vrooli deployment-from-scratch experiment.
 
 This project demonstrates:
-- A Yarn v4 workspace setup
+- A PNPM workspace setup
 - Docker Compose for local development with Postgres (pgvector) and Redis
 - TypeScript 5.4.5 for all packages (server, jobs, Prisma DB, Redis DB, shared, UI)
 - Vite-powered React UI with MUI
 - Co‑located Mocha/Chai/Sinon tests
 - Lifecycle scripts (`setup`, `develop`, `build`, `deploy`)
 - GitHub Actions CI/CD pipelines for `dev` (staging) and `master` (prod)
+- Flexible deployment strategies
+- Ability to convert build to Windows/Mac/Android/iOS apps
 
 ## Quickstart
 

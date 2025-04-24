@@ -15,15 +15,21 @@ install_system_package() {
     local pkg="$1"
     header "📦 Installing system package: $pkg"
     if command -v apt-get >/dev/null 2>&1; then
-        # Perform a quiet update with a timeout to avoid hangs
-        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s sudo apt-get update -qq
-        # Perform non-interactive install with a timeout to avoid hangs
-        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "$pkg"
-        success "$pkg installed via apt-get"
+        # If we can sudo, prefix apt commands; otherwise run as current user
+        local apt_cmd="apt-get"
+        if can_run_sudo; then
+            apt_cmd="sudo apt-get"
+        else
+            info "No sudo available, running apt-get as current user"
+        fi
+        # Update package list and install
+        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s $apt_cmd update -qq
+        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s $apt_cmd install -y -qq --no-install-recommends "$pkg"
+        success "${pkg} installed via apt-get"
     elif command -v brew >/dev/null 2>&1; then
         # Perform Homebrew install with a timeout to prevent hangs
         timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s brew install "$pkg"
-        success "$pkg installed via Homebrew"
+        success "${pkg} installed via Homebrew"
     else
         error "No supported package manager found to install $pkg"
     fi
@@ -33,7 +39,14 @@ install_system_package() {
 system_update() {
     header "🔄 Updating system package lists"
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update
+        # If we can sudo, prefix apt commands; otherwise run as current user
+        local update_cmd="apt-get"
+        if can_run_sudo; then
+            update_cmd="sudo apt-get"
+        else
+            info "No sudo available, running apt-get update as current user"
+        fi
+        $update_cmd update
         success "apt-get update complete"
     elif command -v brew >/dev/null 2>&1; then
         brew update
@@ -47,7 +60,14 @@ system_update() {
 system_upgrade() {
     header "⬆️ Upgrading system packages"
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get -y upgrade
+        # If we can sudo, prefix apt commands; otherwise run as current user
+        local upgrade_cmd="apt-get"
+        if can_run_sudo; then
+            upgrade_cmd="sudo apt-get"
+        else
+            info "No sudo available, running apt-get upgrade as current user"
+        fi
+        $upgrade_cmd -y upgrade
         success "apt-get upgrade complete"
     elif command -v brew >/dev/null 2>&1; then
         brew upgrade
