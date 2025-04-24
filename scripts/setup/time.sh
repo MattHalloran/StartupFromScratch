@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to fix system clock. 
 # An accurate system clock is often needed for installing/updating packages, and can 
 # occasionally be set incorrectly.

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to make all scripts in the scripts directory (including subdirectories) executable
 set -euo pipefail
 

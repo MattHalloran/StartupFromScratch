@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to clean up volumes, caches, packages, and other build artifacts. 
 # When complete, you should be able to set up the project from a clean slate.
 set -euo pipefail

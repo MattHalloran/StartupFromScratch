@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to setup the firewall
 set -euo pipefail
 

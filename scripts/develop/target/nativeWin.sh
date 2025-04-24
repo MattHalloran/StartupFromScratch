@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script for native Windows development
 set -euo pipefail
 
@@ -14,7 +14,7 @@ start_development_native_win() {
     if [[ "$(uname)" != *"NT"* ]]; then
         error "This script must be run on Windows"
         exit 1
-    }
+    fi
 
     # Ensure correct Node.js version is active
     info "Verifying Node.js version..."

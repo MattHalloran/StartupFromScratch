@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to make sure they keyless ssh login is enabled
 set -euo pipefail
 

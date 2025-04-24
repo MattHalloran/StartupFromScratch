@@ -31,10 +31,10 @@ Usage: $(basename "$0") --target <env> [-h | --help] [--prod] [-y | --yes]
 Starts the development environment for the Vrooli project.
 
 Options:
-  --target:                (native-linux|native-macos|docker|k8s) The environment to develop in
-  -h, --help:              Show this help message
-  --prod:                  Skips development-only steps and uses production environment variables
-  -y, --yes:               Automatically answer yes to all confirmation prompts
+  -t, --target:                (native-linux|native-macos|docker|k8s) The environment to develop in
+  -h, --help:                  Show this help message
+  -p, --prod:                  Skips development-only steps and uses production environment variables
+  -y, --yes:                   Automatically answer yes to all confirmation prompts
 
 EOF
 
@@ -44,8 +44,8 @@ EOF
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --target) TARGET="$2"; shift 2 ;;
-            --prod)   ENVIRONMENT="production"; shift ;;
+            -t|--target) TARGET="$2"; shift 2 ;;
+            -p|--prod)   ENVIRONMENT="production"; shift ;;
             -y|--yes)    YES="YES";        shift ;;
             -h|--help)
                 usage
@@ -72,15 +72,15 @@ main() {
     parse_arguments "$@"
 
     # Run the setup script for the target and environment
-    SETUP_ARGS="--target $TARGET"
+    SETUP_ARGS=("--target" "$TARGET") # Use an array
     if is_yes "$YES"; then
-        SETUP_ARGS="$SETUP_ARGS -y"
+        SETUP_ARGS+=("-y")
     fi
     if [ "$ENVIRONMENT" = "production" ]; then
-        SETUP_ARGS="$SETUP_ARGS --prod"
+        SETUP_ARGS+=("--prod")
     fi
     # shellcheck disable=SC1091
-    source "${HERE}/../main/setup.sh" "$SETUP_ARGS"
+    source "${HERE}/../main/setup.sh" "${SETUP_ARGS[@]}" # Pass array elements as separate arguments
 
     # Run the development script for the target
     execute_for_target "$TARGET" "start_development_" || exit "${ERROR_USAGE}"

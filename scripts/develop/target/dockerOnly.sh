@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ORIGINAL_DIR=$(pwd)
-HERE=$(cd "$(dirname \"${BASH_SOURCE[0]}\")" && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd "$HERE"/../../.. && pwd)
 
 # shellcheck disable=SC1091

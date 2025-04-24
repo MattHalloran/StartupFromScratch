@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to setup the project for Kubernetes cluster development/production
 set -euo pipefail
 

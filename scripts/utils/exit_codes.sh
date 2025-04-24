@@ -22,6 +22,18 @@ set -euo pipefail
 : "${ERROR_FUNCTION_NOT_FOUND:=67}"
 : "${DESC_ERROR_FUNCTION_NOT_FOUND:=Function not found}"
 
+: "${ERROR_DOMAIN_RESOLVE:=68}"
+: "${DESC_ERROR_DOMAIN_RESOLVE:=Failed to resolve domain}"
+
+: "${ERROR_INVALID_SITE_IP:=69}"
+: "${DESC_ERROR_INVALID_SITE_IP:=Invalid site IP}"
+
+: "${ERROR_CURRENT_IP_FAIL:=70}"
+: "${DESC_ERROR_CURRENT_IP_FAIL:=Failed to retrieve current IP}"
+
+: "${ERROR_SITE_IP_MISMATCH:=71}"
+: "${DESC_ERROR_SITE_IP_MISMATCH:=Site IP mismatch}"
+
 # Helper function to generate exit codes display for usage
 print_exit_codes() {
     local var_name code desc_var description

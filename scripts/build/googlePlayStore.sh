@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to setup and build everything needed to publish to the Google Play Store
 set -euo pipefail
 

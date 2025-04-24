@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Runs all *.bats files in the scripts directory and subdirectories and provides a summary
 
 # Determine this script directory and set up library path for BATS

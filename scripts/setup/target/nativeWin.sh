@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Posix-compliant script to setup the project for native Windows development/production
 set -euo pipefail
 
@@ -14,19 +14,19 @@ setup_native_win() {
     if [[ "$(uname)" != *"NT"* ]]; then
         error "This script must be run on Windows"
         exit 1
-    }
+    fi
 
     # Check if nvm-windows is installed
     if ! command -v nvm &> /dev/null; then
         info "Installing nvm-windows..."
         # Download and install nvm-windows
         powershell -Command "
-            $nvmUrl = 'https://github.com/coreybutler/nvm-windows/releases/latest/download/nvm-setup.exe'
-            $nvmInstaller = '$env:TEMP\nvm-setup.exe'
-            Invoke-WebRequest -Uri $nvmUrl -OutFile $nvmInstaller
-            Start-Process -FilePath $nvmInstaller -Wait
+            $nvmUrl = 'https://github.com/coreybutler/nvm-windows/releases/latest/download/nvm-setup.exe';
+            $nvmInstaller = [System.IO.Path]::Combine($env:TEMP, 'nvm-setup.exe');
+            Invoke-WebRequest -Uri $nvmUrl -OutFile $nvmInstaller;
+            Start-Process -FilePath $nvmInstaller -Wait;
         "
-    }
+    fi
 
     # Install Node.js LTS version
     info "Installing Node.js LTS version..."
