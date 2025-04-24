@@ -7,29 +7,9 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../setup/setScriptPermissions.sh"
+source "${HERE}/../setup/index.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../setup/time.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/checkInternet.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/clean.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/setupFirewall.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/setupBats.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/setupShellcheck.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/target/nativeLinux.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/target/nativeMac.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/target/nativeWin.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/target/dockerOnly.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/target/k8sCluster.sh"
+source "${HERE}/../setup/target/index.sh"
 
 # ——— Default values ——— #
 # How the app will be run
@@ -44,21 +24,24 @@ export CI="NO"
 export YES="NO"
 # The environment to run the setup for
 ENVIRONMENT=${NODE_ENV:-development}
+# Server location override (local|remote), determined if not set
+export SERVER_LOCATION=""
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") --target <env> [-h | --help] [--clean] [--ci-cd] [--secrets-source <env|vault>] [--prod] [-y | --yes]
+Usage: $(basename "$0") --target <env> [-h | --help] [--clean] [--ci-cd] [--secrets-source <env|vault>] [--prod] [-y | --yes] [--location | --server-location <local|remote>]
 
 Prepares the project for development or production.
 
 Options:
-  --target:                (native-linux|native-macos|docker|k8s) The environment to run the setup for
-  -h, --help:              Show this help message
-  --clean:                 Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
-  --ci-cd:                 Configure the system for CI/CD (via GitHub Actions)
-  --secrets-source:        (env|vault) Where to load secrets/env variables from
-  --prod:                  Skips development-only steps and uses production environment variables
-  -y, --yes:               Automatically answer yes to all confirmation prompts
+  -t, --target:                   (native-linux|native-macos|docker|k8s) The environment to run the setup for
+  -h, --help:                     Show this help message
+  --clean:                        Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
+  --ci-cd:                        Configure the system for CI/CD (via GitHub Actions)
+  --secrets-source:               (env|vault) Where to load secrets/env variables from
+  -p, --prod:                     Skips development-only steps and uses production environment variables
+  -y, --yes:                      Automatically answer yes to all confirmation prompts
+  --location, --server-location:  (local|remote) Override automatic server location detection
 
 EOF
 
@@ -68,12 +51,13 @@ EOF
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --target) TARGET="$2"; shift 2 ;;
-            --clean)  CLEAN="YES";      shift ;;
-            --ci)     CI="YES";         shift ;;
-            --secrets-source) SECRETS_SOURCE="$2"; shift 2 ;;
-            --prod)   ENVIRONMENT="production"; shift ;;
-            -y|--yes)    YES="YES";        shift ;;
+            -t|--target)                  TARGET="$2"; shift 2 ;;
+            --clean)                      CLEAN="YES";      shift ;;
+            --ci)                         CI="YES";         shift ;;
+            --secrets-source)             SECRETS_SOURCE="$2"; shift 2 ;;
+            -p|--prod)                    ENVIRONMENT="production"; shift ;;
+            -y|--yes)                     YES="YES";        shift ;;
+            --location|--server-location) SERVER_LOCATION="$2"; shift 2 ;;
             -h|--help)
                 usage
                 exit "$ERROR_USAGE"
@@ -115,12 +99,7 @@ main() {
     fi
 
     load_secrets
-
-    # Determine where this script is running (local or remote)
-    # Fix SC2155 by separating declaration and assignment
-    local server_location
-    server_location=$("${HERE}/domainCheck.sh" "$SITE_IP" "$API_URL" | tail -n 1)
-    export SERVER_LOCATION="$server_location"
+    check_location_if_not_set
 
     setup_firewall
 
