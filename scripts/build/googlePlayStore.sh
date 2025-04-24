@@ -57,7 +57,8 @@ setup_keystore() {
                 read -n1 -r -s
             fi
 
-            run_step "Generating keystore file for Google Play Store" "keytool -genkey -v -keystore \"${KEYSTORE_PATH}\" -alias \"${KEYSTORE_ALIAS}\" -keyalg RSA -keysize 2048 -validity 10000 -storepass \"${KEYSTORE_PASSWORD}\""
+            info "Generating keystore file for Google Play Store"
+            keytool -genkey -v -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -keyalg RSA -keysize 2048 -validity 10000 -storepass "${KEYSTORE_PASSWORD}"
         fi
     fi
 }

@@ -56,6 +56,9 @@ importers:
       mocha:
         specifier: ^10.2.0
         version: 10.8.2
+      npm-run-all:
+        specifier: ^4.1.5
+        version: 4.1.5
       pkg:
         specifier: ^5.8.0
         version: 5.8.1

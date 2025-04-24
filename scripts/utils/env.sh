@@ -42,6 +42,8 @@ load_vault_secrets() {
 load_secrets() {
     header "🔑 Loading secrets..."
 
+    : "${SECRETS_SOURCE:?Required environment variable SECRETS_SOURCE is not set}"
+
     case "$SECRETS_SOURCE" in
         e|env|environment|f|file) load_env_file ;;
         v|vault|hashicorp|hashicorp-vault) load_vault_secrets ;;

@@ -14,7 +14,7 @@ setup_pnpm() {
     corepack prepare pnpm@latest --activate
 
     info "Installing dependencies via pnpm..."
-    pnpm install
+    { unset CI; pnpm install; }
 
     info "Generating Prisma client..."
     pnpm --filter @vrooli/prisma run generate

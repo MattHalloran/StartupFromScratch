@@ -1,61 +1,120 @@
 #!/usr/bin/env bash
+# Deploys specified build artifacts to the specified destinations.
+# This script is meant to be run on the production server
 set -euo pipefail
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 # shellcheck disable=SC1091
-source "$HERE/../deploy/docker.sh"
+source "${HERE}/../deploy/docker.sh"
 # shellcheck disable=SC1091
-source "$HERE/../deploy/k8s.sh"
+source "${HERE}/../deploy/k8s.sh"
 # shellcheck disable=SC1091
-source "$HERE/../deploy/vps.sh"
+source "${HERE}/../deploy/vps.sh"
 
-# Default target
-target="staging"
+# Default values
+SOURCES=()
+DEST="local"
+TARGET="staging"
 
-# Parse arguments
-while [[ "$#" -gt 0 ]]; do
-  case "$1" in
-    staging|prod)
-      target="$1"; shift;;
-    --type)
-      deploy_type="$2"; shift 2;;
-    *)
-      error "Unknown argument: $1"
-      exit "${ERROR_USAGE}"
-      ;;
-  esac
-done
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [--source|-s <TYPE>]... [--dest|-d <local|remote>] [--target|-t <staging|prod>] [-h|--help]
 
-# Determine env file based on target
-ENV_FILE=".env-dev" # Default for staging
-if [ "$target" = "prod" ]; then
-  ENV_FILE=".env-prod"
-fi
-export ENV_FILE
+Deploys specified artifacts for the Vrooli project.
 
-info "Starting deployment to $target (Type: ${deploy_type:-auto-detect}) using $ENV_FILE..."
+Options:
+  -s, --source                (local|remote) Where to find the build artifacts
+  -d, --dest                  pecify artifact location: local (default) or remote
+  -t, --target <staging|prod> Specify deployment target environment
+  -h, --help                  Show this help message
+EOF
+    print_exit_codes
+}
 
-# Perform build first (assuming build artifacts are needed)
-# Consider adding a flag to skip build if desired
-info "Running build before deployment..."
-"$SCRIPT_DIR/build.sh" "${target:+ -p}"
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--source)
+                SOURCES+=("$2"); shift 2;;
+            -d|--dest)
+                DEST="$2"; shift 2;;
+            -t|--target)
+                TARGET="$2"; shift 2;;
+            staging|prod)
+                TARGET="$1"; shift;;
+            -h|--help)
+                usage; exit "$EXIT_SUCCESS";;
+            *)
+                error "Unknown argument: $1"; usage; exit "$ERROR_USAGE";;
+        esac
+    done
+}
 
-info "Executing deployment logic..."
+main() {
+    header "🚀 Starting deployment to $TARGET (sources: ${SOURCES[*]:-all}, dest: $DEST)..."
+    parse_arguments "$@"
 
-# Deployment logic (determine based on type or environment)
-if [ "$deploy_type" = "docker" ]; then
-  deploy_docker "$target"
-elif [ "$deploy_type" = "k8s" ]; then
-  deploy_k8s "$target"
-elif [ "$deploy_type" = "vps" ]; then
-  deploy_vps "$target"
-else
-  # Auto-detect or default logic (add based on project needs)
-  warn "Deployment type not specified or auto-detection not implemented. Defaulting (example: VPS)."
-  deploy_vps "$target"
-fi
+    # Determine env file based on target
+    if [ "$TARGET" = "prod" ]; then
+        ENV_FILE=".env-prod"
+    else
+        ENV_FILE=".env-dev"
+    fi
+    export ENV_FILE
 
-success "Deployment to $target completed." 
+    # Default to all sources if none specified
+    if [ ${#SOURCES[@]} -eq 0 ]; then
+        SOURCES=("all")
+    fi
+
+    for src in "${SOURCES[@]}"; do
+        # Determine artifact directory for local
+        if [ "$DEST" = "local" ]; then
+            version=$(node -p "require('../../package.json').version")
+            srcdir="${HERE}/../../dist/${src}/${version}"
+            if [ ! -d "$srcdir" ]; then
+                error "Artifacts not found for $src at $srcdir"
+                continue
+            fi
+            info "Using local artifacts at $srcdir"
+        else
+            warn "Remote source not implemented for $src"
+        fi
+
+        case "$src" in
+            all)
+                for svc in docker k8s vps; do
+                    info "Deploying $svc using artifacts..."
+                    deploy_${svc} "$TARGET"
+                done
+                ;;
+            docker)
+                info "Deploying Docker artifacts..."
+                deploy_docker "$TARGET"
+                ;;
+            k8s)
+                info "Deploying Kubernetes artifacts..."
+                deploy_k8s "$TARGET"
+                ;;
+            vps)
+                info "Deploying VPS artifacts..."
+                deploy_vps "$TARGET"
+                ;;
+            windows)
+                info "Deploying Windows binary (stub) from $srcdir"
+                ;;
+            android)
+                info "Deploying Android package (stub) from $srcdir"
+                ;;
+            *)
+                warn "Unknown source type: $src";;
+        esac
+    done
+
+    success "✅ Deployment completed for $TARGET."
+}
+
+main "$@" 
