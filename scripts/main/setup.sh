@@ -12,15 +12,15 @@ CLEAN="NO"
 # The environment to run the setup for
 ENVIRONMENT=${NODE_ENV:-development}
 # Where to load secrets/env variables from
-export SECRETS_SOURCE="env"
+SECRETS_SOURCE="env"
 # Skip prompts, avoid tools not needed in CI
-export CI="NO"
+CI="NO"
 # Force "yes" to every confirmation
-export YES="NO"
+YES="NO"
 # Server location override (local|remote), determined if not set
-export SERVER_LOCATION=""
+SERVER_LOCATION=""
 # What to do when encountering sudo commands without elevated privileges
-export SUDO_MODE="error"
+SUDO_MODE="error"
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
@@ -34,11 +34,11 @@ usage() {
 Usage: $(basename "$0") \
   [-t|--target <env>] \
   [-h|--help] \
-  [--clean] \
-  [--ci-cd] \
-  [--secrets-source <env|vault>] \
-  [--sudo-mode <error|skip>] \
-  [--prod] \
+  [-c|--clean] \
+  [-d|--ci-cd] \
+  [-s|--secrets-source <env|vault>] \
+  [-m|--sudo-mode <error|skip>] \
+  [-p|--prod] \
   [-y|--yes] \
   [--location|--server-location <local|remote>]
 
@@ -64,11 +64,11 @@ parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -t|--target)                  TARGET="$2"; shift 2 ;;
-            --clean)                      CLEAN="YES";      shift ;;
-            --ci)                         CI="YES";         shift ;;
-            --secrets-source)             SECRETS_SOURCE="$2"; shift 2 ;;
-            --sudo-mode)                  SUDO_MODE="$2";   shift 2 ;;
-            -p|--prod)                    ENVIRONMENT="production"; shift ;;
+            -c|--clean)                    CLEAN="YES";      shift ;;
+            -d|--ci-cd)                    CI="YES";         shift ;;
+            -s|--secrets-source)           SECRETS_SOURCE="$2"; shift 2 ;;
+            -m|--sudo-mode)                SUDO_MODE="$2";   shift 2 ;;
+            -p|--prod)                     ENVIRONMENT="production"; shift ;;
             -y|--yes)                     YES="YES";        shift ;;
             --location|--server-location) SERVER_LOCATION="$2"; shift 2 ;;
             -h|--help)
@@ -101,14 +101,29 @@ main() {
     header "🔨 Starting project setup..."
     parse_arguments "$@"
 
+    # Export variables AFTER parsing arguments so they reflect user input
+    export TARGET
+    export CLEAN
+    export ENVIRONMENT
+    export SECRETS_SOURCE
+    export CI
+    export YES
+    export SERVER_LOCATION
+    export SUDO_MODE
+
     set_script_permissions
     fix_system_clock
     check_internet
     run_system_update_and_upgrade
 
     # Clean up volumes & caches
-    if is_yes "$CLEAN" && confirm "Prune volumes, caches, and other build artifacts?"; then
+    if is_yes "$CLEAN"; then
+      # Conditionally add -f to docker prune based on YES
+      if is_yes "$YES" || confirm "Prune Docker system (images, containers, volumes, networks)?"; then
         clean
+      else
+        info "Skipping cleanup."
+      fi
     fi
 
     load_secrets
@@ -130,7 +145,7 @@ main() {
 
     # Run the setup script for the target
     execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE}"
-    success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'" 
+    success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
 }
 
 main "$@"

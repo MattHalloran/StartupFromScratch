@@ -7,7 +7,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
 # ——— Default values ——— #
 # Where to load secrets/env variables from
-export SECRETS_SOURCE="env"
+SECRETS_SOURCE="env"
 # The environment to run the build for
 ENVIRONMENT="development"
 # Which bundle types to generate
@@ -24,13 +24,19 @@ TEST=YES
 LINT=NO
 # The version of the project
 VERSION=""
+# What to do when encountering sudo commands without elevated privileges
+SUDO_MODE="error"
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../build/package.sh"
+source "${HERE}/../build/index.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../build/zip.sh"
+source "${HERE}/../build/artifacts/index.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../build/binaries/index.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../build/bundles/index.sh"
 
 usage() {
     cat <<EOF
@@ -44,6 +50,7 @@ Usage: $(basename "$0") \
   [-l|--lint] \
   [-v|--version <version>] \
   [-s|--secrets-source <env|vault>] \
+  [-m|--sudo-mode <error|skip>] \
   [-h|--help]
 
 Builds specified artifacts for the Vrooli project.
@@ -58,6 +65,7 @@ Options:
   -l, --lint       <Y/n>                             Run linting before building (default: false)
   -v, --version    <version>                         Set the version of the project (defaults to current version)
   -s, --secrets-source <env|vault>                   Where to load secrets/env variables from (default: env)
+  -m, --sudo-mode  <error|skip>                      What to do when encountering sudo commands without elevated privileges (default: error)
   -h, --help                                         Show this help message
 EOF
     print_exit_codes
@@ -84,6 +92,8 @@ parse_arguments() {
                 VERSION="$2"; shift 2;;
             -s|--secrets-source)
                 SECRETS_SOURCE="$2"; shift 2;;
+            -m|--sudo-mode)
+                SUDO_MODE="$2"; shift 2;;
             -h|--help)
                 usage; exit "$EXIT_SUCCESS";;
             *)
@@ -95,6 +105,10 @@ parse_arguments() {
 main() {
     header "🔨 Starting build for ${ENVIRONMENT} environment..."
     parse_arguments "$@"
+
+    # Export variables AFTER parsing arguments so they reflect user input
+    export SECRETS_SOURCE
+    export SUDO_MODE
 
     # Default bundles to all if none or "all" specified
     if [ ${#BUNDLES[@]} -eq 0 ] || [[ " ${BUNDLES[*]} " =~ " all " ]]; then
@@ -125,6 +139,23 @@ main() {
     fi
 
     set_project_version "$VERSION"
+
+    # Determine if any binary/desktop builds are requested
+    local build_desktop=NO
+    if [ ${#BINARIES[@]} -gt 0 ]; then
+      build_desktop=YES
+    fi
+
+    # Build Electron main/preload scripts if building desktop app
+    if is_yes "$build_desktop"; then
+      header "Building Electron scripts..."
+      # Ensure a tsconfig for electron exists (e.g., tsconfig.electron.json)
+      # Adjust the output dir (-outDir) if needed, this puts it in dist/electron
+      npx tsc --project tsconfig.electron.json --outDir dist/electron || {
+        error "Failed to build Electron scripts. Ensure tsconfig.electron.json is configured."; exit "$ERROR_BUILD_FAILED";
+      }
+      success "Electron scripts built."
+    fi
 
     # Process bundle types
     for b in "${BUNDLES[@]}"; do
@@ -184,38 +215,63 @@ main() {
         fi
     done
 
-    # Process platform binaries
+    # Process platform binaries (now Desktop Apps)
     for c in "${BINARIES[@]}"; do
+        local target_platform=""
         case "$c" in
             windows)
-                info "Building Windows binary (stub)"
-                # TODO: Add Windows build logic
+                info "Building Windows Desktop App (Electron)..."
+                # Ensure Wine is installed using the robust method
+                install_wine_robustly
+                target_platform="--win --x64"
                 ;;
             mac)
-                info "Building macOS binary (stub)"
-                # TODO: Add macOS build logic
+                info "Building macOS Desktop App (Electron)..."
+                target_platform="--mac --x64"
                 ;;
             linux)
-                info "Building Linux binary (stub)"
-                # TODO: Add Linux build logic
+                info "Building Linux Desktop App (Electron)..."
+                target_platform="--linux --x64"
                 ;;
+            # android/ios are likely mobile builds, not desktop - keeping stubs
             android)
                 info "Building Android package..."
                 bash "${HERE}/../build/googlePlayStore.sh"
+                continue # Skip electron-builder for android
                 ;;
             ios)
                 info "Building iOS package (stub)"
                 # TODO: Add iOS build logic
+                continue # Skip electron-builder for ios
                 ;;
             *)
-                warn "Unknown binary type: $c";
+                warn "Unknown binary/desktop type: $c";
+                continue
                 ;;
         esac
-        if [ "$DEST" = "local" ]; then
-            warn "Local copy for binary $c not implemented"
-        else
-            warn "Remote destination not implemented for binary $c"
+
+        if [ -n "$target_platform" ]; then
+            info "Running electron-builder for $c..."
+            # Pass platform and arch flags separately
+            npx electron-builder $target_platform || {
+              error "Electron build failed for $c."; exit "$ERROR_BUILD_FAILED";
+            }
+            success "Electron build completed for $c. Output in dist/electron/"
+
+            # Copying logic (optional, adjust as needed)
+            if [ "$DEST" = "local" ]; then
+              local dest_dir="${HERE}/../../dist/desktop/${c}/${VERSION}"
+              local source_dir="${HERE}/../../dist/electron"
+              mkdir -p "${dest_dir}"
+              # Copy specific installer/package file(s)
+              # This is an example, glob patterns might need adjustment
+              find "${source_dir}" -maxdepth 1 -name "Vrooli*.$([ "$c" == "windows" ] && echo "exe" || ([ "$c" == "mac" ] && echo "dmg" || echo "AppImage"))" -exec cp {} "${dest_dir}/" \;
+              success "Copied $c desktop artifact to ${dest_dir}"
+            else
+                warn "Remote destination not implemented for desktop app $c"
+            fi
         fi
+
     done
 
     success "✅ Build process completed for ${ENVIRONMENT} environment."

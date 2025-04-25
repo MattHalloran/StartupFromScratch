@@ -3,9 +3,18 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-KEYSTORE_PATH="${HERE}/../../upload-keystore.jks"
-KEYSTORE_ALIAS="upload"
-KEYSTORE_PASSWORD="${GOOGLE_PLAY_KEYSTORE_PASSWORD}"
+
+get_env_vars() {
+    if [ -z "${KEYSTORE_PATH:-}" ]; then
+        KEYSTORE_PATH="${HERE}/../../upload-keystore.jks"
+    fi
+    if [ -z "${KEYSTORE_ALIAS:-}" ]; then
+        KEYSTORE_ALIAS="upload"
+    fi
+    if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
+        KEYSTORE_PASSWORD="${GOOGLE_PLAY_KEYSTORE_PASSWORD}"
+    fi
+}
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
@@ -24,6 +33,8 @@ install_jdk() {
 
 # Sets up the keystore file for the Google Play Store
 setup_keystore() {
+    get_env_vars
+
     # Check if keystore file exists
     if [ ! -f "${KEYSTORE_PATH}" ]; then
         if is_yes "$SKIP_CONFIRMATIONS"; then
@@ -65,6 +76,8 @@ setup_keystore() {
 
 
 create_assetlinks_file() {
+    get_env_vars
+
     # Create assetlinks.json file for Google Play Store
     if [ -f "${KEYSTORE_PATH}" ]; then
         header "Creating dist/.well-known/assetlinks.json file so Google can verify the app with the website..."
