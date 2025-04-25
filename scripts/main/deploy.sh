@@ -5,6 +5,9 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ——— Default values ——— #
+export ENV_FILE=""
+
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 # shellcheck disable=SC1091
@@ -63,7 +66,6 @@ main() {
     else
         ENV_FILE=".env-dev"
     fi
-    export ENV_FILE
 
     # Default to all sources if none specified
     if [ ${#SOURCES[@]} -eq 0 ]; then

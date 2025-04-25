@@ -4,13 +4,6 @@ set -euo pipefail
 # Changed to export since it's used in other scripts
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-# shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/index.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../setup/target/index.sh"
-
 # ——— Default values ——— #
 # How the app will be run
 TARGET="native-linux"
@@ -28,6 +21,13 @@ export YES="NO"
 export SERVER_LOCATION=""
 # What to do when encountering sudo commands without elevated privileges
 export SUDO_MODE="error"
+
+# shellcheck disable=SC1091
+source "${HERE}/../utils/index.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/index.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../setup/target/index.sh"
 
 usage() {
     cat <<EOF

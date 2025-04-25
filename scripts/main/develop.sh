@@ -3,6 +3,14 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# ——— Default values ——— #
+# How the app will be run
+TARGET="native-linux"
+# Force "yes" to every confirmation
+export YES="NO"
+# The environment to run the setup for
+ENVIRONMENT=${NODE_ENV:-development}
+
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 # shellcheck disable=SC1091
@@ -15,14 +23,6 @@ source "${HERE}/../develop/target/nativeWin.sh"
 source "${HERE}/../develop/target/dockerOnly.sh"
 # shellcheck disable=SC1091
 source "${HERE}/../develop/target/k8sCluster.sh"
-
-# ——— Default values ——— #
-# How the app will be run
-TARGET="native-linux"
-# Force "yes" to every confirmation
-export YES="NO"
-# The environment to run the setup for
-ENVIRONMENT=${NODE_ENV:-development}
 
 usage() {
     cat <<EOF

@@ -5,13 +5,6 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
-# shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../build/package.sh"
-# shellcheck disable=SC1091
-source "${HERE}/../build/zip.sh"
-
 # ——— Default values ——— #
 # Where to load secrets/env variables from
 export SECRETS_SOURCE="env"
@@ -31,6 +24,13 @@ TEST=YES
 LINT=NO
 # The version of the project
 VERSION=""
+
+# shellcheck disable=SC1091
+source "${HERE}/../utils/index.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../build/package.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../build/zip.sh"
 
 usage() {
     cat <<EOF
