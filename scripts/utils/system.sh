@@ -135,3 +135,8 @@ run_system_update_and_upgrade() {
         info "Skipping system upgrade - last upgrade was less than 1 week ago"
     fi
 }
+
+# Purges apt update notifier, which can cause hangs on some systems
+purge_apt_update_notifier() {
+    sudo apt purge update-notifier update-notifier-common
+}

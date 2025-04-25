@@ -24,9 +24,14 @@ clear_apt() {
     fi
     header "Cleaning apt cache and lists"
 
+    # First, kill any hanging apt processes
+    pkill -f apt
+
+    # Clean up apt cache and lists
     apt-get clean
     find /var/lib/apt/lists/ -maxdepth 1 -type f -delete
     sudo rm -f /var/lib/dpkg/lock* /var/cache/apt/archives/lock
+    
     success "Apt cache and lists cleaned."
 }
 

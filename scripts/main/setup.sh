@@ -129,6 +129,10 @@ main() {
     load_secrets
     check_location_if_not_set
 
+    if [[ "$SERVER_LOCATION" == "remote" ]]; then
+        purge_apt_update_notifier
+    fi
+
     setup_firewall
 
     if [[ "$ENVIRONMENT" == "development" ]]; then
