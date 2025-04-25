@@ -70,7 +70,7 @@ is_yes() {
 # ------------------------------------------------------------------------------
 can_run_sudo() {
     # Determine behavior based on SUDO_MODE
-    local mode=${SUDO_MODE:-error}
+    local mode=${SUDO_MODE:-skip}
 
     # skip mode always returns non-zero (no sudo)
     if [[ "$mode" == "skip" ]]; then

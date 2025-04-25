@@ -22,8 +22,8 @@
     "type-check": "cross-env NODE_OPTIONS=--max-old-space-size=6144 tsc --noEmit",
     "start:dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nodemon dist/index.js",
     "start:prod": "node --experimental-modules --experimental-specifier-resolution=node dist/index.js",
-    "prisma:migrate": "prisma migrate deploy",
-    "prisma:generate": "prisma generate"
+    "prisma:migrate": "prisma migrate deploy --schema=src/db/schema.postgres.prisma",
+    "prisma:generate": "prisma generate --schema=src/db/schema.postgres.prisma"
   },
   "dependencies": {
     "@prisma/client": "6.1.0",

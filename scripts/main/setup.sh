@@ -45,15 +45,15 @@ Usage: $(basename "$0") \
 Prepares the project for development or production.
 
 Options:
-  -t, --target:                   (native-linux|native-macos|docker|k8s) The environment to run the setup for
-  -h, --help:                     Show this help message
-  --clean:                        Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
-  --ci-cd:                        Configure the system for CI/CD (via GitHub Actions)
-  --secrets-source:               (env|vault) Where to load secrets/env variables from
-  --sudo-mode:                    (error|skip) What to do when encountering sudo commands without elevated privileges
-  -p, --prod:                     Skips development-only steps and uses production environment variables
-  -y, --yes:                      Automatically answer yes to all confirmation prompts
-  --location, --server-location:  (local|remote) Override automatic server location detection
+  -t, --target:                  <native-linux|native-macos|docker|k8s> The environment to run the setup for
+  -c, --clean:                                                          Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
+  -d, --ci-cd:                                                          Configure the system for CI/CD (via GitHub Actions)
+  -s, --secrets-source:          <env|vault>                            Where to load secrets/env variables from
+  -m, --sudo-mode:               <error|skip>                           What to do when encountering sudo commands without elevated privileges
+  -p, --prod:                                                           Skips development-only steps and uses production environment variables
+  -y, --yes:                                                            Automatically answer yes to all confirmation prompts
+  --location, --server-location: <local|remote>                         Override automatic server location detection
+  -h, --help:                                                           Show this help message
 
 EOF
 

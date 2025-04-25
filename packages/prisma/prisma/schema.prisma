@@ -1,1 +1,1 @@
-../../packages/prisma/prisma/schema.postgres.prisma
+../server/src/db/schema.postgres.prisma

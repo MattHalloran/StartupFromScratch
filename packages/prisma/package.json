@@ -5,17 +5,16 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "prisma migrate dev --schema=prisma/schema.postgres.prisma",
+    "dev": "dotenv -e ../../.env-dev -- prisma migrate dev --schema=../server/src/db/schema.postgres.prisma",
     "build": "tsc -b",
-    "generate": "prisma generate",
-    "postinstall": "prisma generate",
+    "generate": "dotenv -e ../../.env-dev -- prisma generate --schema=../server/src/db/schema.postgres.prisma",
     "test": "echo \"No tests for prisma\""
   },
   "dependencies": {
-    "@prisma/client": "^4.10.1"
+    "@prisma/client": "6.1.0"
   },
   "devDependencies": {
-    "prisma": "^4.10.1",
+    "prisma": "6.1.0",
     "typescript": "5.4.5"
   }
 }
