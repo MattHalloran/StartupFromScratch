@@ -57,8 +57,8 @@
       "buildResources": "platforms/desktop/assets"
     },
     "files": [
-      "dist/desktop/main.js",
-      "dist/desktop/preload.js",
+      "dist/desktop/main.cjs",
+      "dist/desktop/preload.cjs",
       "packages/ui/dist/**/*",
       "packages/server/dist/**/*",
       "packages/server/node_modules/**/*",
@@ -66,7 +66,7 @@
       "node_modules/**/*"
     ],
     "extraMetadata": {
-      "main": "dist/desktop/main.js"
+      "main": "dist/desktop/main.cjs"
     },
     "win": {
       "target": "nsis",
@@ -76,7 +76,7 @@
     "nsis": {
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico",
-      "uninstallDisplayName": "Uninstall Vrooli",
+      "uninstallDisplayName": "Vrooli",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

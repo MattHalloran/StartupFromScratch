@@ -154,7 +154,10 @@ main() {
       npx tsc --project platforms/desktop/tsconfig.json --outDir dist/desktop || {
         error "Failed to build Electron scripts. Ensure platforms/desktop/tsconfig.json is configured."; exit "$ERROR_BUILD_FAILED";
       }
-      success "Electron scripts built."
+      # Rename output to .cjs to explicitly mark as CommonJS
+      mv dist/desktop/main.js dist/desktop/main.cjs || { error "Failed to rename main.js to main.cjs"; exit "$ERROR_BUILD_FAILED"; }
+      mv dist/desktop/preload.js dist/desktop/preload.cjs || { error "Failed to rename preload.js to preload.cjs"; exit "$ERROR_BUILD_FAILED"; }
+      success "Electron scripts built and renamed to .cjs."
     fi
 
     # Process bundle types
