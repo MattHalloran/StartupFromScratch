@@ -106,9 +106,18 @@ main() {
 
     load_secrets
 
+    info "Cleaning previous build artifacts..."
+    clean_build
+
+    # Need to build packages first for tests to run correctly
+    build_packages
+
     if is_yes "$TEST"; then
         header "Running tests..."
-        pnpm run test
+        # Run tests without rebuilding packages
+        pnpm run test:shell
+        pnpm run test:unit
+        pnpm run test:run
     fi
     if is_yes "$LINT"; then
         header "Running linting..."
@@ -117,21 +126,17 @@ main() {
 
     set_project_version "$VERSION"
 
-    info "Cleaning previous build artifacts..."
-    clean_build
-
     # Process bundle types
     for b in "${BUNDLES[@]}"; do
         case "$b" in
             all)
                 info "Building all bundles..."
-                build_packages
                 package_cli
-                zip_artifacts "${ENVIRONMENT}"
+                zip_artifacts "${ENVIRONMENT}" "${VERSION}"
                 ;;
             zip)
                 info "Building ZIP bundle..."
-                zip_artifacts "${ENVIRONMENT}"
+                zip_artifacts "${ENVIRONMENT}" "${VERSION}"
                 ;;
             cli)
                 info "Building CLI executables..."
@@ -143,11 +148,15 @@ main() {
         esac
 
         if [ "$DEST" = "local" ]; then
-            version=$(node -p "require('../../package.json').version")
-            local dest_dir="${HERE}/../../dist/bundles/${b}/${version}"
+            local dest_dir="${HERE}/../../dist/bundles/${b}/${VERSION}"
             mkdir -p "${dest_dir}"
-            cp -r "/var/tmp/${version}"/* "${dest_dir}/"
-            success "Copied bundle ${b} to ${dest_dir}"
+            local source_dir="/var/tmp/${VERSION}"
+            if [ -d "${source_dir}" ]; then
+              cp -r "${source_dir}"/* "${dest_dir}/"
+              success "Copied bundle ${b} version ${VERSION} to ${dest_dir}"
+            else
+              warn "Source directory ${source_dir} not found for bundle ${b}. Skipping copy."
+            fi
         else
             warn "Remote destination not implemented for bundle $b"
         fi

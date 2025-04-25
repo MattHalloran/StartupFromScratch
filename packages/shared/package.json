@@ -8,7 +8,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "build:compile": "swc src -d dist --source-maps --ignore \"**/*.test.*\"",
-    "build": "cross-env NODE_ENV=production run-s build:compile",
+    "build": "cross-env NODE_ENV=production run-s clean build:compile",
     "test:compile": "swc src -d dist --source-maps",
     "test:build": "cross-env NODE_ENV=test run-s clean test:compile",
     "test:run": "dotenv -e ../../.env-test -- mocha --file dist/__test/setup.js dist/**/*.test.js",
