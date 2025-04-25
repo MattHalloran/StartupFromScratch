@@ -69,26 +69,36 @@ is_yes() {
 # Exits with error if SUDO_MODE is 'error' and sudo is unavailable.
 # ------------------------------------------------------------------------------
 can_run_sudo() {
-    local sudo_mode=${SUDO_MODE:-error}
-    case "$sudo_mode" in
-        skip)
-            info "SUDO_MODE=skip: skipping privileged operations"
-            return 1
-            ;;
-        error)
-            if sudo -n true 2>/dev/null; then
-                return 0
-            else
-                exit_with_error "Privileged operations require sudo access, but unable to run sudo" "$ERROR_DEFAULT"
-            fi
-            ;;
-        *)
-            warning "Unrecognized SUDO_MODE='$sudo_mode', defaulting to error"
-            if sudo -n true 2>/dev/null; then
-                return 0
-            else
-                exit_with_error "Privileged operations require sudo access, but unable to run sudo" "$ERROR_DEFAULT"
-            fi
-            ;;
-    esac
+    # Determine behavior based on SUDO_MODE
+    local mode=${SUDO_MODE:-error}
+
+    # skip mode always returns non-zero (no sudo)
+    if [[ "$mode" == "skip" ]]; then
+        info "SUDO_MODE=skip: skipping privileged operations"
+        return 1
+    fi
+
+    # If sudo is not installed, skip privileged ops
+    if ! command -v sudo >/dev/null 2>&1; then
+        info "sudo not found: skipping privileged operations"
+        return 1
+    fi
+
+    # Test for passwordless sudo, but don't let 'set -e' kill us
+    set +e
+    sudo -n true >/dev/null 2>&1
+    local status=$?
+    set -e
+
+    if [[ $status -eq 0 ]]; then
+        return 0
+    fi
+
+    # If error mode, abort; otherwise just skip
+    if [[ "$mode" == "error" ]]; then
+        exit_with_error "Privileged operations require sudo access, but unable to run sudo" "$ERROR_DEFAULT"
+    else
+        info "sudo requires password or is blocked, skipping privileged operations"
+        return 1
+    fi
 }
