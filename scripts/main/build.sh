@@ -149,10 +149,10 @@ main() {
     # Build Electron main/preload scripts if building desktop app
     if is_yes "$build_desktop"; then
       header "Building Electron scripts..."
-      # Ensure a tsconfig for electron exists (e.g., tsconfig.electron.json)
-      # Adjust the output dir (-outDir) if needed, this puts it in dist/electron
-      npx tsc --project tsconfig.electron.json --outDir dist/electron || {
-        error "Failed to build Electron scripts. Ensure tsconfig.electron.json is configured."; exit "$ERROR_BUILD_FAILED";
+      # Ensure a tsconfig for electron exists
+      # Adjust the output dir (-outDir) if needed
+      npx tsc --project platforms/desktop/tsconfig.json --outDir dist/desktop || {
+        error "Failed to build Electron scripts. Ensure platforms/desktop/tsconfig.json is configured."; exit "$ERROR_BUILD_FAILED";
       }
       success "Electron scripts built."
     fi
@@ -251,17 +251,17 @@ main() {
         esac
 
         if [ -n "$target_platform" ]; then
-            info "Running electron-builder for $c..."
+            info "Running electron-builder for $c (this may take several minutes)..."
             # Pass platform and arch flags separately
             npx electron-builder $target_platform || {
               error "Electron build failed for $c."; exit "$ERROR_BUILD_FAILED";
             }
-            success "Electron build completed for $c. Output in dist/electron/"
+            success "Electron build completed for $c. Output in dist/desktop/"
 
             # Copying logic (optional, adjust as needed)
             if [ "$DEST" = "local" ]; then
               local dest_dir="${HERE}/../../dist/desktop/${c}/${VERSION}"
-              local source_dir="${HERE}/../../dist/electron"
+              local source_dir="${HERE}/../../dist/desktop"
               mkdir -p "${dest_dir}"
               # Copy specific installer/package file(s)
               # This is an example, glob patterns might need adjustment

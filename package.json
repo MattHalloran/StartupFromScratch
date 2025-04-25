@@ -53,12 +53,12 @@
     "appId": "com.vrooli.app",
     "productName": "Vrooli",
     "directories": {
-      "output": "dist/electron",
-      "buildResources": "assets/electron"
+      "output": "dist/desktop",
+      "buildResources": "platforms/desktop/assets"
     },
     "files": [
-      "dist/electron/main.js",
-      "dist/electron/preload.js",
+      "dist/desktop/main.js",
+      "dist/desktop/preload.js",
       "packages/ui/dist/**/*",
       "packages/server/dist/**/*",
       "packages/server/node_modules/**/*",
@@ -66,7 +66,7 @@
       "node_modules/**/*"
     ],
     "extraMetadata": {
-      "main": "dist/electron/main.js"
+      "main": "dist/desktop/main.js"
     },
     "win": {
       "target": "nsis",
