@@ -8,7 +8,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${HERE}/../utils/logging.sh"
 
 # Default timeout for system installs (in seconds)
-SYSTEM_INSTALL_TIMEOUT=${SYSTEM_INSTALL_TIMEOUT:-60}
+SYSTEM_INSTALL_TIMEOUT=${SYSTEM_INSTALL_TIMEOUT:-240}
 
 # Install a package by selecting the correct package manager
 install_system_package() {

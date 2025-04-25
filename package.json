@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "author": "Vrooli Development Team",
   "workspaces": [
     "packages/*"
   ],
@@ -69,15 +70,26 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "assets/electron/icon.ico"
+      "icon": "icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "uninstallDisplayName": "Uninstall Vrooli",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "menuCategory": true
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/electron/icon.icns"
+      "icon": "icon.icns"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/electron/icon.png"
+      "icon": "icon.png"
     }
   }
 }

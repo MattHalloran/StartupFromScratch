@@ -34,6 +34,9 @@ set -euo pipefail
 : "${ERROR_SITE_IP_MISMATCH:=71}"
 : "${DESC_ERROR_SITE_IP_MISMATCH:=Site IP mismatch}"
 
+: "${ERROR_BUILD_FAILED:=72}"
+: "${DESC_ERROR_BUILD_FAILED:=Build failed}"
+
 # Helper function to generate exit codes display for usage
 print_exit_codes() {
     local var_name code desc_var description
