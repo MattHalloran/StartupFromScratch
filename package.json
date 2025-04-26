@@ -59,11 +59,15 @@
     "files": [
       "dist/desktop/main.cjs",
       "dist/desktop/preload.cjs",
-      "packages/ui/dist/**/*",
-      "packages/server/dist/**/*",
-      "packages/server/node_modules/**/*",
-      "packages/server/package.json",
-      "node_modules/**/*"
+      "packages/server/dist",
+      "!packages/server/dist/**/*.map",
+      {
+        "from": "packages/server/package.json",
+        "to": "packages/server/package.json"
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/*.node"
     ],
     "extraMetadata": {
       "main": "dist/desktop/main.cjs"
