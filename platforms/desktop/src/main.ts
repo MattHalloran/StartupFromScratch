@@ -205,6 +205,35 @@ function startServer() {
   }
 }
 
+// --- Menu Template ---
+const menuTemplate: (Electron.MenuItemConstructorOptions | Electron.MenuItem)[] = [
+    // { role: 'appMenu' } // On macOS
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+    {
+        role: 'fileMenu'
+        // Example customization:
+        // label: 'File',
+        // submenu: [
+        //     process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' }
+        // ]
+    },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+    {
+        role: 'help',
+        submenu: [
+            {
+                label: 'Learn More',
+                click: async () => {
+                    await shell.openExternal('https://github.com/RustyTheBoyRobot/StartupFromScratch') // Replace with your actual URL
+                }
+            }
+            // Add other help items like 'About' here
+        ]
+    }
+];
+
 // --- Single Instance Lock ---
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -235,6 +264,12 @@ if (!gotTheLock) {
   // Some APIs can only be used after this event occurs.
   app.whenReady().then(async () => {
     console.log('[Electron Main] App is ready.');
+
+    // Build and set the application menu
+    const menu = Menu.buildFromTemplate(menuTemplate);
+    Menu.setApplicationMenu(menu);
+    console.log('[Electron Main] Application menu set.');
+
     createSplashWindow(); // Show splash screen ASAP
     startServer(); // Start the backend server in parallel
     // Create the main window but don't wait for it to finish loading here
