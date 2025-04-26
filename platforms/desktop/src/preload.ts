@@ -6,6 +6,13 @@
  * Learn more about the Electron preload script and context isolation:
  * https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
  */
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Expose a function to trigger the file open dialog and read the file
+  openFile: () => ipcRenderer.invoke('dialog:openFile')
+  // Add other APIs you want to expose here
+});
 
 window.addEventListener('DOMContentLoaded', () => {
   console.log('[Electron Preload] DOM content loaded.');
