@@ -59,6 +59,7 @@
     "files": [
       "dist/desktop/main.cjs",
       "dist/desktop/preload.cjs",
+      "platforms/desktop/src/splash.html",
       "packages/server/dist",
       "!packages/server/dist/**/*.map",
       {
