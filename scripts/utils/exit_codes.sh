@@ -37,6 +37,15 @@ set -euo pipefail
 : "${ERROR_BUILD_FAILED:=72}"
 : "${DESC_ERROR_BUILD_FAILED:=Build failed}"
 
+: "${ERROR_PROXY_CONTAINER_START_FAILED:=73}"
+: "${DESC_ERROR_PROXY_CONTAINER_START_FAILED:=Proxy containers failed to start}"
+
+: "${ERROR_PROXY_LOCATION_NOT_FOUND:=74}"
+: "${DESC_ERROR_PROXY_LOCATION_NOT_FOUND:=Proxy location not found or is invalid}"
+
+: "${ERROR_PROXY_CLONE_FAILED:=75}"
+: "${DESC_ERROR_PROXY_CLONE_FAILED:=Proxy clone and setup failed}"
+
 # Helper function to generate exit codes display for usage
 print_exit_codes() {
     local var_name code desc_var description

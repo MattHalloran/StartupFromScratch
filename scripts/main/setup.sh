@@ -18,7 +18,7 @@ CI="NO"
 # Force "yes" to every confirmation
 YES="NO"
 # Server location override (local|remote), determined if not set
-SERVER_LOCATION=""
+LOCATION=""
 # What to do when encountering sudo commands without elevated privileges
 SUDO_MODE="error"
 
@@ -40,20 +40,20 @@ Usage: $(basename "$0") \
   [-m|--sudo-mode <error|skip>] \
   [-p|--prod] \
   [-y|--yes] \
-  [--location|--server-location <local|remote>]
+  [-l|--location <local|remote>]
 
 Prepares the project for development or production.
 
 Options:
-  -t, --target:                  <native-linux|native-macos|docker|k8s> The environment to run the setup for
-  -c, --clean:                                                          Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
-  -d, --ci-cd:                                                          Configure the system for CI/CD (via GitHub Actions)
-  -s, --secrets-source:          <env|vault>                            Where to load secrets/env variables from
-  -m, --sudo-mode:               <error|skip>                           What to do when encountering sudo commands without elevated privileges
-  -p, --prod:                                                           Skips development-only steps and uses production environment variables
-  -y, --yes:                                                            Automatically answer yes to all confirmation prompts
-  --location, --server-location: <local|remote>                         Override automatic server location detection
-  -h, --help:                                                           Show this help message
+  -t, --target:          <native-linux|native-macos|docker|k8s> The environment to run the setup for
+  -c, --clean:                                                  Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
+  -d, --ci-cd:                                                  Configure the system for CI/CD (via GitHub Actions)
+  -s, --secrets-source:  <env|vault>                            Where to load secrets/env variables from
+  -m, --sudo-mode:       <error|skip>                           What to do when encountering sudo commands without elevated privileges
+  -p, --prod:                                                   Skips development-only steps and uses production environment variables
+  -y, --yes:                                                    Automatically answer yes to all confirmation prompts
+  -l, --location:        <local|remote>                         Override automatic server location detection
+  -h, --help:                                                   Show this help message
 
 EOF
 
@@ -63,14 +63,14 @@ EOF
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -t|--target)                  TARGET="$2"; shift 2 ;;
-            -c|--clean)                    CLEAN="YES";      shift ;;
-            -d|--ci-cd)                    CI="YES";         shift ;;
-            -s|--secrets-source)           SECRETS_SOURCE="$2"; shift 2 ;;
-            -m|--sudo-mode)                SUDO_MODE="$2";   shift 2 ;;
-            -p|--prod)                     ENVIRONMENT="production"; shift ;;
-            -y|--yes)                     YES="YES";        shift ;;
-            --location|--server-location) SERVER_LOCATION="$2"; shift 2 ;;
+            -t|--target)            TARGET="$2";              shift 2 ;;
+            -c|--clean)             CLEAN="YES";              shift ;;
+            -d|--ci-cd)             CI="YES";                 shift ;;
+            -s|--secrets-source)    SECRETS_SOURCE="$2";      shift 2 ;;
+            -m|--sudo-mode)         SUDO_MODE="$2";           shift 2 ;;
+            -p|--prod)              ENVIRONMENT="production"; shift ;;
+            -y|--yes)               YES="YES";                shift ;;
+            -l|--location)          LOCATION="$2";            shift 2 ;;
             -h|--help)
                 usage
                 exit "$ERROR_USAGE"
@@ -108,7 +108,7 @@ main() {
     export SECRETS_SOURCE
     export CI
     export YES
-    export SERVER_LOCATION
+    export LOCATION
     export SUDO_MODE
 
     set_script_permissions
@@ -129,7 +129,7 @@ main() {
     load_secrets
     check_location_if_not_set
 
-    if [[ "$SERVER_LOCATION" == "remote" ]]; then
+    if [[ "$LOCATION" == "remote" ]]; then
         purge_apt_update_notifier
     fi
 

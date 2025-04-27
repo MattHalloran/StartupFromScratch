@@ -129,18 +129,18 @@ check_location() {
 }
 
 check_location_if_not_set() {
-    if [[ -n "$SERVER_LOCATION" ]]; then
-        # If SERVER_LOCATION was set via argument, validate it
-        if [[ "$SERVER_LOCATION" != "local" && "$SERVER_LOCATION" != "remote" ]]; then
-            echo "Invalid value for --server-location: $SERVER_LOCATION. Must be 'local' or 'remote'."
+    if [[ -n "$LOCATION" ]]; then
+        # If LOCATION was set via argument, validate it
+        if [[ "$LOCATION" != "local" && "$LOCATION" != "remote" ]]; then
+            echo "Invalid value for --server-location: $LOCATION. Must be 'local' or 'remote'."
             usage
             exit "$ERROR_USAGE"
         fi
-        info "Using specified server location: $SERVER_LOCATION"
+        info "Using specified server location: $LOCATION"
     else
         # Otherwise, detect it
         info "Detecting server location..."
-        SERVER_LOCATION=$(check_location | tail -n 1)
-        info "Detected server location: $SERVER_LOCATION"
+        LOCATION=$(check_location | tail -n 1)
+        info "Detected server location: $LOCATION"
     fi
 }

@@ -24,15 +24,21 @@ TARGET="staging"
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--source|-s <TYPE>]... [--dest|-d <local|remote>] [--target|-t <staging|prod>] [-h|--help]
+Usage: $(basename "$0") \
+  [--source|-s <TYPE>]... \
+  [--dest|-d <local|remote>] \
+  [--target|-t <staging|prod>] \
+  [-l|--location <local|remote>] \
+  [-h|--help]
 
 Deploys specified artifacts for the Vrooli project.
 
 Options:
-  -s, --source                (local|remote) Where to find the build artifacts
-  -d, --dest                  pecify artifact location: local (default) or remote
-  -t, --target <staging|prod> Specify deployment target environment
-  -h, --help                  Show this help message
+  -s, --source                  (local|remote) Where to find the build artifacts
+  -d, --dest                    Specify artifact location: local (default) or remote
+  -t, --target   <staging|prod> Specify deployment target environment
+  -l, --location <local|remote> Override automatic server location detection
+  -h, --help                    Show this help message
 EOF
     print_exit_codes
 }
@@ -46,6 +52,8 @@ parse_arguments() {
                 DEST="$2"; shift 2;;
             -t|--target)
                 TARGET="$2"; shift 2;;
+            -l|--location)
+                LOCATION="$2"; shift 2;;
             staging|prod)
                 TARGET="$1"; shift;;
             -h|--help)
@@ -70,6 +78,13 @@ main() {
     # Default to all sources if none specified
     if [ ${#SOURCES[@]} -eq 0 ]; then
         SOURCES=("all")
+    fi
+
+    load_secrets
+    check_location_if_not_set
+
+    if [[ "$LOCATION" == "remote" ]]; then
+        setup_proxy
     fi
 
     for src in "${SOURCES[@]}"; do

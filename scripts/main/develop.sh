@@ -10,6 +10,8 @@ TARGET="native-linux"
 export YES="NO"
 # The environment to run the setup for
 ENVIRONMENT=${NODE_ENV:-development}
+# Server location override (local|remote), determined if not set
+LOCATION=""
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
@@ -26,7 +28,12 @@ source "${HERE}/../develop/target/k8sCluster.sh"
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") --target <env> [-h | --help] [--prod] [-y | --yes]
+Usage: $(basename "$0") \
+  [-t|--target <env>] \
+  [-h|--help] \
+  [-p|--prod] \
+  [-y|--yes] \
+  [-l|--location <local|remote>]
 
 Starts the development environment for the Vrooli project.
 
@@ -35,7 +42,7 @@ Options:
   -h, --help:                  Show this help message
   -p, --prod:                  Skips development-only steps and uses production environment variables
   -y, --yes:                   Automatically answer yes to all confirmation prompts
-
+  -l, --location:              <local|remote> Override automatic server location detection
 EOF
 
     print_exit_codes
@@ -47,6 +54,7 @@ parse_arguments() {
             -t|--target) TARGET="$2"; shift 2 ;;
             -p|--prod)   ENVIRONMENT="production"; shift ;;
             -y|--yes)    YES="YES";        shift ;;
+            -l|--location) LOCATION="$2"; shift 2 ;;
             -h|--help)
                 usage
                 exit "$ERROR_USAGE"
@@ -81,6 +89,13 @@ main() {
     fi
     # shellcheck disable=SC1091
     source "${HERE}/../main/setup.sh" "${SETUP_ARGS[@]}" # Pass array elements as separate arguments
+
+    load_secrets
+    check_location_if_not_set
+
+    if [[ "$LOCATION" == "remote" ]]; then
+        setup_proxy
+    fi
 
     # Run the development script for the target
     execute_for_target "$TARGET" "start_development_" || exit "${ERROR_USAGE}"
