@@ -125,6 +125,7 @@ main() {
 
     # Need to build packages first for tests to run correctly
     build_packages
+    verify_build
 
     if is_yes "$TEST"; then
         header "Running tests..."

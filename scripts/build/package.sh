@@ -34,6 +34,44 @@ build_packages() {
   pnpm --filter @vrooli/jobs run build
 }
 
+# Verifies that packages were built successfully
+verify_build() {
+  info "Verifying packages were built successfully..."
+  local build_success=true
+
+  # Check server package
+  if [ ! -d "${PACKAGES_DIR}/server/dist" ]; then
+    error "Server package build failed: dist directory not found"
+    build_success=false
+  fi
+
+  # Check UI package
+  if [ ! -d "${PACKAGES_DIR}/ui/dist" ]; then
+    error "UI package build failed: dist directory not found"
+    build_success=false
+  fi
+
+  # Check shared package
+  if [ ! -d "${PACKAGES_DIR}/shared/dist" ]; then
+    error "Shared package build failed: dist directory not found"
+    build_success=false
+  fi
+
+  # Check jobs package
+  if [ ! -d "${PACKAGES_DIR}/jobs/dist" ]; then
+    error "Jobs package build failed: dist directory not found"
+    build_success=false
+  fi
+
+  if [ "$build_success" = false ]; then
+    error "Build verification failed"
+    return 1
+  else
+    success "All packages built successfully"
+    return 0
+  fi
+}
+
 # Packages CLI executables (placeholder)
 package_cli() {
   info "Packaging CLI executables (placeholder)..."
