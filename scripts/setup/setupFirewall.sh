@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Posix-compliant script to setup the firewall
 set -euo pipefail
+DESCRIPTION="Sets up the firewall to safely allow traffic to the server"
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -9,6 +9,7 @@ source "${HERE}/../utils/index.sh"
 
 # Check if host has internet access. Exits with error if no access.
 setup_firewall() {
+    parse_arguments "$@"
     if ! can_run_sudo; then
         warning "Skipping firewall setup due to sudo mode"
         return

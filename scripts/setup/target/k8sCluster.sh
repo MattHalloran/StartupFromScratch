@@ -15,25 +15,27 @@ INSTALL_CMD="sudo install" # Using install for minikube
 CHMOD_CMD="sudo chmod"
 NEEDS_PATH_UPDATE="NO"
 
-# Check if sudo is available and adjust paths/commands if not
-if ! can_run_sudo; then
-    warning "Sudo not available or skipped. Installing k8s tools to user directory."
-    INSTALL_DIR="$HOME/.local/bin"
-    MV_CMD="mv"
-    INSTALL_CMD="install" # 'install' might work without sudo if target is writable
-    CHMOD_CMD="chmod"
-    NEEDS_PATH_UPDATE="YES"
+adjust_paths() {
+    # Check if sudo is available and adjust paths/commands if not
+    if ! can_run_sudo; then
+        warning "Sudo not available or skipped. Installing k8s tools to user directory."
+        INSTALL_DIR="$HOME/.local/bin"
+        MV_CMD="mv"
+        INSTALL_CMD="install" # 'install' might work without sudo if target is writable
+        CHMOD_CMD="chmod"
+        NEEDS_PATH_UPDATE="YES"
 
-    # Ensure the local bin directory exists
-    mkdir -p "$INSTALL_DIR"
+        # Ensure the local bin directory exists
+        mkdir -p "$INSTALL_DIR"
 
-    # Ensure the local bin directory is in PATH for the current session
-    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        export PATH="$INSTALL_DIR:$PATH"
-        info "Added $INSTALL_DIR to PATH for current session."
-        # Consider suggesting adding this to shell profile (e.g., ~/.bashrc)
+        # Ensure the local bin directory is in PATH for the current session
+        if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+            export PATH="$INSTALL_DIR:$PATH"
+            info "Added $INSTALL_DIR to PATH for current session."
+            # Consider suggesting adding this to shell profile (e.g., ~/.bashrc)
+        fi
     fi
-fi
+}
 
 # Install kubectl, which is used to manage the Kubernetes cluster
 install_kubectl() {
@@ -152,6 +154,7 @@ install_minikube() {
 }
 
 install_kubernetes() {
+    adjust_paths
     install_kubectl
     install_helm
 

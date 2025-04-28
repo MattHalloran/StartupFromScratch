@@ -1,6 +1,7 @@
 #!/bin/bash
 # Sets up reverse proxy for a remote server
 set -euo pipefail
+DESCRIPTION="Sets up reverse proxy for a remote server."
 
 ORIGINAL_DIR=$(pwd)
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -10,58 +11,7 @@ source "${HERE}/../utils/logging.sh"
 
 DEFAULT_PROXY_LOCATION="/root/NginxSSLReverseProxy"
 PROXY_REPO_URL="https://github.com/MattHalloran/NginxSSLReverseProxy.git"
-
-ENVIRONMENT="development" # Default environment
-LOCATION="local"   # Default server location
-
-usage() {
-    cat <<EOF
-Usage: $(basename "$0") [-n PROXY_LOCATION] [-p PROD] [-h]
-
-Sets up reverse proxy for a remote server.
-
-Options:
-  -n, --nginx-location:  Nginx proxy location (e.g. "/root/NginxSSLReverseProxy")
-  -p, --production:      Set environment to production
-  -h, --help             Show this help message
-
-Exit Codes:
-  0                                   Success
-  $ERROR_USAGE                        Command line usage error
-  $ERROR_PROXY_CONTAINER_START_FAILED Proxy containers failed to start
-  $ERROR_PROXY_LOCATION_NOT_FOUND     Proxy location not found or is invalid
-  $ERROR_PROXY_CLONE_FAILED           Proxy clone and setup failed
-
-EOF
-}
-
 PROXY_LOCATION="$DEFAULT_PROXY_LOCATION"
-parse_arguments() {
-    while [[ $# -gt 0 ]]; do
-        key="$1"
-        case $key in
-        -n | --nginx-location)
-            if [ -z "$2" ] || [[ "$2" == -* ]]; then
-                error "Option $key requires an argument."
-                usage
-                exit $ERROR_USAGE
-            fi
-            echo "Setting PROXY_LOCATION to $2"
-            PROXY_LOCATION="$2"
-            shift # past argument
-            shift # past value
-            ;;
-        -p | --prod)
-            ENVIRONMENT="production"
-            shift # past argument
-            ;;
-        -h | --help)
-            usage
-            exit 0
-            ;;
-        esac
-    done
-}
 
 is_proxy_location_valid() {
     # Check if PROXY_LOCATION is set
@@ -204,10 +154,16 @@ setup_proxy_repo() {
 }
 
 setup_proxy() {
-    parse_arguments "$@"
-
-    load_env_file $ENVIRONMENT
-    LOCATION=$("${HERE}/domainCheck.sh" $SITE_IP $API_URL | tail -n 1)
+    # Get values from parsed arguments or environment
+    local location="${1:-}"
+    if [[ -z "$location" ]]; then
+        location="$LOCATION"
+    fi
+    
+    # Check required parameters 
+    if [[ -z "$location" ]]; then
+        exit_with_error "Required parameter: LOCATION" "$ERROR_USAGE"
+    fi
 
     # Get proxy location
     get_proxy_location

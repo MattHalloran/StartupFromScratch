@@ -1,26 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+DESCRIPTION="Prepares the project for development or production."
 
 # Changed to export since it's used in other scripts
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-
-# ——— Default values ——— #
-# How the app will be run
-TARGET="native-linux"
-# Remove previous artefacts (volumes, ~/.pnpm‑store, etc.)
-CLEAN="NO"
-# The environment to run the setup for
-ENVIRONMENT=${NODE_ENV:-development}
-# Where to load secrets/env variables from
-SECRETS_SOURCE="env"
-# Skip prompts, avoid tools not needed in CI
-CI="NO"
-# Force "yes" to every confirmation
-YES="NO"
-# Server location override (local|remote), determined if not set
-LOCATION=""
-# What to do when encountering sudo commands without elevated privileges
-SUDO_MODE="error"
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
@@ -29,88 +12,56 @@ source "${HERE}/../setup/index.sh"
 # shellcheck disable=SC1091
 source "${HERE}/../setup/target/index.sh"
 
-usage() {
-    cat <<EOF
-Usage: $(basename "$0") \
-  [-t|--target <env>] \
-  [-h|--help] \
-  [-c|--clean] \
-  [-d|--ci-cd] \
-  [-s|--secrets-source <env|vault>] \
-  [-m|--sudo-mode <error|skip>] \
-  [-p|--prod] \
-  [-y|--yes] \
-  [-l|--location <local|remote>]
-
-Prepares the project for development or production.
-
-Options:
-  -t, --target:          <native-linux|native-macos|docker|k8s> The environment to run the setup for
-  -c, --clean:                                                  Remove previous artefacts (volumes, ~/.pnpm-store, etc.)
-  -d, --ci-cd:                                                  Configure the system for CI/CD (via GitHub Actions)
-  -s, --secrets-source:  <env|vault>                            Where to load secrets/env variables from
-  -m, --sudo-mode:       <error|skip>                           What to do when encountering sudo commands without elevated privileges
-  -p, --prod:                                                   Skips development-only steps and uses production environment variables
-  -y, --yes:                                                    Automatically answer yes to all confirmation prompts
-  -l, --location:        <local|remote>                         Override automatic server location detection
-  -h, --help:                                                   Show this help message
-
-EOF
-
-    print_exit_codes
-}
-
 parse_arguments() {
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -t|--target)            TARGET="$2";              shift 2 ;;
-            -c|--clean)             CLEAN="YES";              shift ;;
-            -d|--ci-cd)             CI="YES";                 shift ;;
-            -s|--secrets-source)    SECRETS_SOURCE="$2";      shift 2 ;;
-            -m|--sudo-mode)         SUDO_MODE="$2";           shift 2 ;;
-            -p|--prod)              ENVIRONMENT="production"; shift ;;
-            -y|--yes)               YES="YES";                shift ;;
-            -l|--location)          LOCATION="$2";            shift 2 ;;
-            -h|--help)
-                usage
-                exit "$ERROR_USAGE"
-                ;;
-            *)
-                echo "Unknown flag $1"
-                usage
-                exit "$ERROR_USAGE"
-                ;;
-        esac
-    done
-    # Ensure TARGET is set
-    if [[ -z "$TARGET" ]]; then
-        usage
-        exit "$ERROR_USAGE"
-    fi
-    # Return success to prevent set -e from aborting on non-zero test
-    return 0
-}
+    arg_reset
 
-# Setup steps only needed during development
-setup_dev() {
-    install_bats
-    install_shellcheck
+    arg_register_help
+    arg_register_secrets_source
+    arg_register_sudo_mode
+    arg_register_yes
+    arg_register_location
+    arg_register_environment
+    arg_register_target
+
+    arg_register \
+        --name "clean" \
+        --flag "c" \
+        --desc "Remove previous artefacts (volumes, ~/.pnpm-store, etc.)" \
+        --type "value" \
+        --options "yes|no" \
+        --default "no"
+
+    arg_register \
+        --name "ci-cd" \
+        --flag "d" \
+        --desc "Configure the system for CI/CD (via GitHub Actions)" \
+        --type "value" \
+        --options "yes|no" \
+        --default "no"
+
+    if is_asking_for_help "$@"; then
+        arg_usage "$DESCRIPTION"
+        print_exit_codes
+        exit 0
+    fi
+
+    arg_parse "$@" >/dev/null
+    
+    export TARGET=$(arg_get "target")
+    export CLEAN=$(arg_get "clean")
+    export CI=$(arg_get "ci-cd")
+    export SECRETS_SOURCE=$(arg_get "secrets-source")
+    export SUDO_MODE=$(arg_get "sudo-mode")
+    export YES=$(arg_get "yes")
+    export LOCATION=$(arg_get "location")
+    export ENVIRONMENT=$(arg_get "environment")
 }
 
 main() {
-    header "🔨 Starting project setup..."
     parse_arguments "$@"
+    header "🔨 Starting project setup..."
 
-    # Export variables AFTER parsing arguments so they reflect user input
-    export TARGET
-    export CLEAN
-    export ENVIRONMENT
-    export SECRETS_SOURCE
-    export CI
-    export YES
-    export LOCATION
-    export SUDO_MODE
-
+    # Prepare the system
     set_script_permissions
     fix_system_clock
     check_internet
@@ -118,12 +69,7 @@ main() {
 
     # Clean up volumes & caches
     if is_yes "$CLEAN"; then
-      # Conditionally add -f to docker prune based on YES
-      if is_yes "$YES" || confirm "Prune Docker system (images, containers, volumes, networks)?"; then
         clean
-      else
-        info "Skipping cleanup."
-      fi
     fi
 
     load_secrets
@@ -136,16 +82,9 @@ main() {
     setup_firewall
 
     if [[ "$ENVIRONMENT" == "development" ]]; then
-        setup_dev
+        install_bats
+        install_shellcheck
     fi
-
-    # info "Copying environment variables file..."
-    # if [ ! -f .env-dev ]; then
-    # cp .env-example .env-dev
-    # info "Created .env-dev from .env-example"
-    # else
-    # info ".env-dev already exists, skipping copy"
-    # fi
 
     # Run the setup script for the target
     execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE}"

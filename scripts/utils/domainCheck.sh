@@ -70,14 +70,24 @@ validate_url() {
 
 # Returns "remote" if the domain resolves to the current IP address, or "local" otherwise
 check_location() {
-    : "${SITE_IP:?Required environment variable SITE_IP is not set}"
-    : "${API_URL:?Required environment variable API_URL is not set}"
-   
-    # Read from environment variables instead
-    # shellcheck disable=SC2153
-    local site_ip="$SITE_IP"
-    # shellcheck disable=SC2153
-    local server_url="$API_URL"
+    # Get values from parsed arguments or environment
+    local site_ip="${1:-}"
+    local server_url="${2:-}"
+    if [[ -z "$site_ip" ]]; then
+        site_ip="$SITE_IP"
+    fi
+    if [[ -z "$server_url" ]]; then
+        server_url="$API_URL"
+    fi
+    
+    # Check required parameters 
+    if [[ -z "$site_ip" ]]; then
+        exit_with_error "Required parameter: SITE_IP" "$ERROR_USAGE"
+    fi
+    
+    if [[ -z "$server_url" ]]; then
+        exit_with_error "Required parameter: SERVER_URL" "$ERROR_USAGE"
+    fi
 
     validate_ip "$site_ip"
     validate_url "$server_url"
@@ -119,28 +129,34 @@ check_location() {
 
     if echo "$current_ips" | grep -q "^$site_ip$"; then
         echo "remote"
-        # exit 0 - Removed exit
         return 0 # Return success status
     else
         echo "local"
-        # exit 0 - Removed exit
         return 0 # Return success status
     fi
 }
 
+is_location_valid() {
+    local server_location="$1"
+    if [[ "$server_location" != "local" && "$server_location" != "remote" ]]; then
+        return 1
+    fi
+    echo "Location is valid: $server_location"
+    return 0
+}
+
 check_location_if_not_set() {
-    if [[ -n "$LOCATION" ]]; then
-        # If LOCATION was set via argument, validate it
-        if [[ "$LOCATION" != "local" && "$LOCATION" != "remote" ]]; then
-            echo "Invalid value for --server-location: $LOCATION. Must be 'local' or 'remote'."
-            usage
-            exit "$ERROR_USAGE"
-        fi
-        info "Using specified server location: $LOCATION"
-    else
-        # Otherwise, detect it
+    # Get values from parsed arguments or environment
+    local server_location="${1:-}"
+    if [[ -z "$server_location" ]]; then
+        server_location="$LOCATION"
+    fi
+
+    # Detect location if not set or invalid
+    if ! is_location_valid "$server_location"; then
         info "Detecting server location..."
         LOCATION=$(check_location | tail -n 1)
+        export LOCATION
         info "Detected server location: $LOCATION"
     fi
 }

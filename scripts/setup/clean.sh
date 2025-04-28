@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Posix-compliant script to clean up volumes, caches, packages, and other build artifacts. 
-# When complete, you should be able to set up the project from a clean slate.
 set -euo pipefail
+DESCRIPTION="Cleans up volumes, caches, packages, and other build artifacts. When complete, you should be able to set up the project from a clean slate."
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -44,7 +43,12 @@ prune_docker() {
     fi
 
     header "Pruning Docker system (images, containers, volumes, networks)"
-    local docker_command="docker system prune --all --volumes --force"
+    local force_flag=""
+    echo "Checking if we should force prune. YES is $YES. Args are $@"
+    if is_yes "$YES"; then
+        force_flag="--force"
+    fi
+    local docker_command="docker system prune --all --volumes $force_flag"
 
     # Execute the command
     if $docker_command; then
