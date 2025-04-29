@@ -38,7 +38,7 @@ match_target() {
             return 0
             ;;
         *)
-            error "Bad --target" >&2
+            error "Bad --target: $1" >&2
             return 1
             ;;
     esac

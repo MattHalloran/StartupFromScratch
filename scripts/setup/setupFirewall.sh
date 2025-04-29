@@ -9,12 +9,17 @@ source "${HERE}/../utils/index.sh"
 
 # Check if host has internet access. Exits with error if no access.
 setup_firewall() {
-    parse_arguments "$@"
+    # Use argument or environment variable
+    local environment="${1:-$ENVIRONMENT}"
+    if [[ -z "$environment" ]]; then
+        exit_with_error "Environment is required to setup firewall" "$ERROR_USAGE"
+    fi
+
     if ! can_run_sudo; then
         warning "Skipping firewall setup due to sudo mode"
         return
     fi
-    header "🔥🧱 Setting up firewall in $ENVIRONMENT environment..."
+    header "🔥🧱 Setting up firewall in $environment environment..."
     
     # Track if any changes were made
     local changes_made=false
@@ -48,7 +53,7 @@ setup_firewall() {
 
     # 3) Only open required ports using a loop to minimize status calls
     local ports=("80/tcp" "443/tcp" "22/tcp")
-    if [ "$ENVIRONMENT" = "development" ]; then
+    if [[ "$environment" = "development" ]]; then
         ports+=("3000/tcp" "4000/tcp")
     fi
 

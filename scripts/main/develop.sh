@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+DESCRIPTION="Starts the development environment."
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -40,8 +41,8 @@ parse_arguments() {
 }
 
 main() {
-    header "🏃 Starting development environment..."
     parse_arguments "$@"
+    header "🏃 Starting development environment for $(match_target "$TARGET")"
 
     source "${HERE}/../main/setup.sh" "$@"
 
@@ -51,7 +52,6 @@ main() {
             trap 'info "Tearing down Caddy reverse proxy..."; stop_reverse_proxy' EXIT INT TERM
         fi
     fi
-
     execute_for_target "$TARGET" "start_development_" || exit "${ERROR_USAGE}"
 
     success "✅ Development environment started." 

@@ -59,7 +59,7 @@ parse_arguments() {
 
 main() {
     parse_arguments "$@"
-    header "🔨 Starting project setup..."
+    header "🔨 Starting project setup for $(match_target "$TARGET")..."
 
     # Prepare the system
     set_script_permissions
@@ -71,17 +71,22 @@ main() {
     if is_yes "$CLEAN"; then
         clean
     fi
-
     load_secrets
     check_location_if_not_set
 
     if [[ "$LOCATION" == "remote" ]]; then
         purge_apt_update_notifier
+        # Check and free necessary ports to avoid port-in-use errors on remote
+        # (Postgres 5432, Redis 6379, UI 3000, Server 4000)
+        check_and_free_port 5432
+        check_and_free_port 6379
+        check_and_free_port 3000
+        check_and_free_port 4000
         setup_reverse_proxy
     fi
 
     setup_firewall
-
+    echo "target f: $TARGET"
     if [[ "$ENVIRONMENT" == "development" ]]; then
         install_bats
         install_shellcheck
