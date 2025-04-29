@@ -17,7 +17,7 @@ export default ({ mode }: { mode: string }) => {
       alias: { '@': path.resolve(__dirname, 'src') },
     },
     server: {
-      port: 3000,
+      port: env.VITE_PORT_UI || 3000,
       open: false,
     },
     define: {
