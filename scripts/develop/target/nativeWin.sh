@@ -31,7 +31,9 @@ start_development_native_win() {
         kill $TYPE_CHECK_PID $LINT_PID
         exit 0
     }
-    trap cleanup SIGINT SIGTERM
+    if ! is_yes "$DETACHED"; then
+        trap cleanup SIGINT SIGTERM
+    fi
 
     # Run TypeScript type checking in watch mode in background
     info "Starting TypeScript type checking in watch mode..."

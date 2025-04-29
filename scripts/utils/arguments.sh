@@ -397,3 +397,14 @@ arg_register_environment() {
         --options "development|production" \
         --default "${NODE_ENV:-development}"
 }
+
+# Registers --detached flag for skipping teardown in reverse proxy setup
+arg_register_detached() {
+    arg_register \
+        --name "detached" \
+        --flag "x" \
+        --desc "Run in detached mode. Frees the terminal and disables teardown events" \
+        --type "value" \
+        --options "yes|no" \
+        --default "no"
+}

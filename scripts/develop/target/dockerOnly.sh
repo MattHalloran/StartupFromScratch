@@ -19,7 +19,9 @@ start_development_docker_only() {
         cd "$ORIGINAL_DIR"
         exit 0
     }
-    trap cleanup SIGINT SIGTERM
+    if ! is_yes "$DETACHED"; then
+        trap cleanup SIGINT SIGTERM
+    fi
     info "Starting all services in detached mode (Postgres, Redis, server, jobs, UI)..."
     docker-compose up -d
 

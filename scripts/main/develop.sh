@@ -20,6 +20,7 @@ parse_arguments() {
     arg_register_location
     arg_register_environment
     arg_register_target
+    arg_register_detached
 
     if is_asking_for_help "$@"; then
         arg_usage "$DESCRIPTION"
@@ -35,6 +36,7 @@ parse_arguments() {
     export YES=$(arg_get "yes")
     export LOCATION=$(arg_get "location")
     export ENVIRONMENT=$(arg_get "environment")
+    export DETACHED=$(arg_get "detached")
 }
 
 main() {
@@ -45,6 +47,9 @@ main() {
 
     if [[ "$LOCATION" == "remote" ]]; then
         setup_reverse_proxy
+        if ! is_yes "$DETACHED"; then
+            trap 'info "Tearing down Caddy reverse proxy..."; stop_reverse_proxy' EXIT INT TERM
+        fi
     fi
 
     execute_for_target "$TARGET" "start_development_" || exit "${ERROR_USAGE}"

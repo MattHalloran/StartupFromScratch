@@ -29,7 +29,8 @@ Usage: $(basename "$0") \
   [--dest|-d <local|remote>] \
   [--target|-t <staging|prod>] \
   [-l|--location <local|remote>] \
-  [-h|--help]
+  [--detached|-x <yes|no>]        Skip teardown of reverse proxy on script exit (default: no) \
+  [-h|--help]                    Show this help message
 
 Deploys specified artifacts for the Vrooli project.
 
@@ -38,6 +39,7 @@ Options:
   -d, --dest                    Specify artifact location: local (default) or remote
   -t, --target   <staging|prod> Specify deployment target environment
   -l, --location <local|remote> Override automatic server location detection
+  -x, --detached <yes|no>        Skip teardown of reverse proxy on script exit
   -h, --help                    Show this help message
 EOF
     print_exit_codes
@@ -54,6 +56,8 @@ parse_arguments() {
                 TARGET="$2"; shift 2;;
             -l|--location)
                 LOCATION="$2"; shift 2;;
+            -x|--detached)
+                DETACHED="$2"; shift 2;;
             staging|prod)
                 TARGET="$1"; shift;;
             -h|--help)
@@ -66,6 +70,8 @@ parse_arguments() {
 
 main() {
     header "🚀 Starting deployment to $TARGET (sources: ${SOURCES[*]:-all}, dest: $DEST)..."
+    # Default to not detached; teardown proxy when exiting
+    DETACHED="no"
     parse_arguments "$@"
 
     # Determine env file based on target
@@ -86,6 +92,10 @@ main() {
     if [[ "$LOCATION" == "remote" ]]; then
         header "Configuring Caddy reverse proxy for deployment..."
         setup_reverse_proxy
+        # Teardown reverse proxy on script exit unless detached
+        if ! is_yes "$DETACHED"; then
+            trap 'info "Tearing down Caddy reverse proxy..."; stop_reverse_proxy' EXIT INT TERM
+        fi
     fi
 
     for src in "${SOURCES[@]}"; do
