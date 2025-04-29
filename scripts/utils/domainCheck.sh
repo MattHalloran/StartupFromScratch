@@ -71,20 +71,13 @@ validate_url() {
 # Returns "remote" if the domain resolves to the current IP address, or "local" otherwise
 check_location() {
     # Get values from parsed arguments or environment
-    local site_ip="${1:-}"
-    local server_url="${2:-}"
-    if [[ -z "$site_ip" ]]; then
-        site_ip="$SITE_IP"
-    fi
-    if [[ -z "$server_url" ]]; then
-        server_url="$API_URL"
-    fi
+    local site_ip="${1:-$SITE_IP}"
+    local server_url="${2:-$API_URL}"
     
     # Check required parameters 
     if [[ -z "$site_ip" ]]; then
         exit_with_error "Required parameter: SITE_IP" "$ERROR_USAGE"
     fi
-    
     if [[ -z "$server_url" ]]; then
         exit_with_error "Required parameter: SERVER_URL" "$ERROR_USAGE"
     fi

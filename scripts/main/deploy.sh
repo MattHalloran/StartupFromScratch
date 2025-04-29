@@ -84,7 +84,8 @@ main() {
     check_location_if_not_set
 
     if [[ "$LOCATION" == "remote" ]]; then
-        setup_proxy
+        header "Configuring Caddy reverse proxy for deployment..."
+        setup_reverse_proxy
     fi
 
     for src in "${SOURCES[@]}"; do

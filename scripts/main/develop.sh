@@ -44,10 +44,9 @@ main() {
     source "${HERE}/../main/setup.sh" "$@"
 
     if [[ "$LOCATION" == "remote" ]]; then
-        setup_proxy
+        setup_reverse_proxy
     fi
 
-    # Run the development script for the target
     execute_for_target "$TARGET" "start_development_" || exit "${ERROR_USAGE}"
 
     success "✅ Development environment started." 

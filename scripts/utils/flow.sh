@@ -102,3 +102,11 @@ can_run_sudo() {
         return 1
     fi
 }
+
+maybe_run_sudo() {
+    if can_run_sudo; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}

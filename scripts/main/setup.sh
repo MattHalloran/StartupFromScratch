@@ -77,6 +77,7 @@ main() {
 
     if [[ "$LOCATION" == "remote" ]]; then
         purge_apt_update_notifier
+        setup_reverse_proxy
     fi
 
     setup_firewall

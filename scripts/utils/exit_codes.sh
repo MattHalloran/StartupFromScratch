@@ -64,6 +64,10 @@ EXIT_CODES+=("ERROR_PROXY_LOCATION_NOT_FOUND")
 : "${DESC_ERROR_PROXY_CLONE_FAILED:=Proxy clone and setup failed}"
 EXIT_CODES+=("ERROR_PROXY_CLONE_FAILED")
 
+: "${ERROR_INSTALLATION_FAILED:=76}"
+: "${DESC_ERROR_INSTALLATION_FAILED:=Installation failed}"
+EXIT_CODES+=("ERROR_INSTALLATION_FAILED")
+
 # Helper function to generate exit codes display for usage
 print_exit_codes() {
     local var_name code desc_var description

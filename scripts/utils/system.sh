@@ -6,9 +6,11 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
 source "${HERE}/../utils/logging.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../utils/flow.sh"
 
 # Default timeout for system installs (in seconds)
-SYSTEM_INSTALL_TIMEOUT=${SYSTEM_INSTALL_TIMEOUT:-240}
+SYSTEM_INSTALL_TIMEOUT=${SYSTEM_INSTALL_TIMEOUT:-420}
 
 # Install a package by selecting the correct package manager
 install_system_package() {
@@ -138,5 +140,11 @@ run_system_update_and_upgrade() {
 
 # Purges apt update notifier, which can cause hangs on some systems
 purge_apt_update_notifier() {
-    sudo apt purge update-notifier update-notifier-common
+    if command -v apt-get &> /dev/null; then
+        info "Purging apt update-notifier packages (if present)..."
+        maybe_run_sudo apt-get purge -y update-notifier update-notifier-common || info "Update notifier not present or already purged."
+        success "Finished attempting to purge update-notifier."
+    else
+        info "Not an apt-based system, skipping update-notifier purge."
+    fi
 }
