@@ -87,8 +87,7 @@ setup_reverse_proxy() {
     else
         exit_with_error "Either DOMAIN or API_URL environment variable must be set for reverse proxy setup." "$ERROR_CONFIGURATION"
     fi
-    # Determine port: use PORT env if set, otherwise default to 4000
-    local proxy_port="${PORT:-4000}"
+    local proxy_port="${PORT_SERVER:-5329}"
     # Start or reload the reverse proxy configuration for the application
     start_reverse_proxy "$target_domain" "$proxy_port"
 }

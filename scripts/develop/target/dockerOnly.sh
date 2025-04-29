@@ -10,6 +10,7 @@ source "${HERE}/../../utils/index.sh"
 
 start_development_docker_only() {
     local detached=${DETACHED:-No}
+    local env_file=${ENV_FILE:-.env-dev}
 
     header "🚀 Starting Docker only development environment..."
     cd "$ROOT_DIR"
@@ -17,7 +18,7 @@ start_development_docker_only() {
     cleanup() {
         info "🔧 Cleaning up development environment at $ROOT_DIR..."
         cd "$ROOT_DIR"
-        docker-compose down
+        docker-compose --env-file "${env_file}" down
         cd "$ORIGINAL_DIR"
         exit 0
     }
@@ -26,9 +27,9 @@ start_development_docker_only() {
     fi
     info "Starting all services in detached mode (Postgres, Redis, server, jobs, UI)..."
     if is_yes "$detached"; then
-        docker-compose up -d
+        docker-compose --env-file "${env_file}" up -d
     else
-        docker-compose up
+        docker-compose --env-file "${env_file}" up
     fi
 
     success "✅ Docker only development environment started successfully."

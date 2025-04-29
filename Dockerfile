@@ -51,7 +51,7 @@ ENV NODE_ENV=production
 WORKDIR /usr/src/app
 COPY --from=base /usr/src/app/node_modules ./node_modules
 COPY --from=base /usr/src/app/packages/server/dist ./packages/server/dist
-EXPOSE 4000
+EXPOSE ${PORT_SERVER}
 CMD ["node", "packages/server/dist/index.js"]
 
 
@@ -60,13 +60,15 @@ FROM node:18-slim AS jobs
 WORKDIR /usr/src/app
 COPY --from=base /usr/src/app/node_modules ./node_modules
 COPY --from=base /usr/src/app/packages/jobs/dist ./packages/jobs/dist
+EXPOSE ${PORT_JOBS}
 CMD ["node", "packages/jobs/dist/index.js"]
 
 
-### UI development image: run Vite dev server
-FROM node:18-slim AS ui-dev
+### UI development image: run Vite dev server (inherits pnpm from base)
+FROM base AS ui-dev
 WORKDIR /usr/src/app
 COPY --from=base /usr/src/app/node_modules ./node_modules
 COPY --from=base /usr/src/app .
-EXPOSE 3000
-CMD ["pnpm", "--filter", "@vrooli/ui", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"] 
+EXPOSE ${PORT_UI}
+RUN corepack enable && corepack prepare pnpm@latest --activate
+CMD ["pnpm", "--filter", "@vrooli/ui", "run", "dev", "--", "--host", "0.0.0.0", "--port", "${PORT_UI}"] 

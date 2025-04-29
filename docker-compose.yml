@@ -2,10 +2,11 @@ version: '3.8'
 
 services:
   postgres:
+    container_name: db
     image: ankane/pgvector:v0.4.4
     restart: always
     ports:
-      - "5432:5432"
+      - "${PORT_DB}:${PORT_DB}"
     env_file:
       - ${ENV_FILE:-.env-dev}
     environment:
@@ -14,20 +15,22 @@ services:
       POSTGRES_DB: startupdb
 
   redis:
+    container_name: redis
     image: redis:7.4.0-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "${PORT_REDIS}:${PORT_REDIS}"
     env_file:
       - ${ENV_FILE:-.env-dev}
 
   server:
+    container_name: server
     build:
       context: .
       dockerfile: Dockerfile
       target: server
     ports:
-      - "4000:4000"
+      - "${PORT_SERVER}:${PORT_SERVER}"
     env_file:
       - ${ENV_FILE:-.env-dev}
     depends_on:
@@ -35,6 +38,7 @@ services:
       - redis
 
   jobs:
+    container_name: jobs
     build:
       context: .
       dockerfile: Dockerfile
@@ -44,14 +48,17 @@ services:
     depends_on:
       - postgres
       - redis
+    ports:
+      - "${PORT_JOBS}:${PORT_JOBS}"
 
   ui:
+    container_name: ui
     build:
       context: .
       dockerfile: Dockerfile
       target: ui-dev
     ports:
-      - "3000:3000"
+      - "${PORT_UI}:${PORT_UI}"
     env_file:
       - ${ENV_FILE:-.env-dev}
     depends_on:

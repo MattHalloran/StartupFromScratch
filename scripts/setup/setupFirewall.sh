@@ -54,7 +54,7 @@ setup_firewall() {
     # 3) Only open required ports using a loop to minimize status calls
     local ports=("80/tcp" "443/tcp" "22/tcp")
     if [[ "$environment" = "development" ]]; then
-        ports+=("3000/tcp" "4000/tcp")
+        ports+=("${PORT_UI:-3000}/tcp" "${PORT_SERVER:-5329}/tcp")
     fi
 
     # Cache plain status for rule checks
