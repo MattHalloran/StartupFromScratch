@@ -44,7 +44,6 @@ prune_docker() {
 
     header "Pruning Docker system (images, containers, volumes, networks)"
     local force_flag=""
-    echo "Checking if we should force prune. YES is $YES. Args are $@"
     if is_yes "$YES"; then
         force_flag="--force"
     fi
