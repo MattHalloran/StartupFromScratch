@@ -59,9 +59,18 @@ EOF
     success "Generated Caddy snippet: $APP_CADDY_SNIPPET"
 }
 
+# Removes any auto_https off directive so that Caddy can manage TLS automatically
+ensure_auto_https_enabled() {
+    if maybe_run_sudo grep -q "auto_https off" "$CADDY_MAIN_CONFIG_FILE"; then
+        info "Enabling automatic HTTPS by removing 'auto_https off' directive"
+        maybe_run_sudo sed -i '/auto_https off/d' "$CADDY_MAIN_CONFIG_FILE"
+    fi
+}
+
 # Starts or reloads the Caddy service
 start_or_reload_caddy() {
     ensure_caddy_import_configured
+    ensure_auto_https_enabled
 
     info "Attempting to start/reload Caddy service..."
     if systemctl is-active --quiet caddy; then

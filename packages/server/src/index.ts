@@ -11,11 +11,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT_SERVER || 5329;
+const isDev = process.env.NODE_ENV !== 'production';
 
 // Serve static assets: in development/test serve from `src`, in production from `dist`
 const serverRoot = __dirname;
 const uiPackageRoot = path.resolve(serverRoot, '../../../packages/ui');
-const clientDist = process.env.NODE_ENV !== 'production'
+const clientDist = isDev
   ? path.join(uiPackageRoot, 'src')
   : path.join(uiPackageRoot, 'dist');
 
