@@ -46,20 +46,19 @@ RUN pnpm --filter @vrooli/server run build:shared \
 
 
 ### Server image: run compiled server code
-FROM node:18-slim AS server
+FROM base AS server
 ENV NODE_ENV=production
 WORKDIR /usr/src/app
-COPY --from=base /usr/src/app/node_modules ./node_modules
-COPY --from=base /usr/src/app/packages/server/dist ./packages/server/dist
+# Inherit all built code and dependencies from base
 EXPOSE ${PORT_SERVER}
 CMD ["node", "packages/server/dist/index.js"]
 
 
 ### Jobs image: run compiled jobs code
-FROM node:18-slim AS jobs
+FROM base AS jobs
+ENV NODE_ENV=production
 WORKDIR /usr/src/app
-COPY --from=base /usr/src/app/node_modules ./node_modules
-COPY --from=base /usr/src/app/packages/jobs/dist ./packages/jobs/dist
+# Inherit all built code and dependencies from base
 EXPOSE ${PORT_JOBS}
 CMD ["node", "packages/jobs/dist/index.js"]
 
