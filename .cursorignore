@@ -1,6 +1,10 @@
+# This is for the Cursor editor. It tells the editor to ignore certain files and directories 
+# when indexing the project. Indexing allows the editor to provide relevant context to the AI 
+# for better code completions and suggestions.
+# NOTE: Currently identical to the `.gitignore` file. If you change one, consider changing the other
+
 # Created by https://www.toptal.com/developers/gitignore/api/react,node
 # Edit at https://www.toptal.com/developers/gitignore?templates=react,node
-# NOTE: Currently identical to the `.cursorignore` file. If you change one, consider changing the other
 
 # Zipped files
 *.tar
