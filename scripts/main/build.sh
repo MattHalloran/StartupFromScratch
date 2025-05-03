@@ -5,28 +5,6 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
-# ——— Default values ——— #
-# Where to load secrets/env variables from
-SECRETS_SOURCE="env"
-# The environment to run the build for
-ENVIRONMENT="development"
-# Which bundle types to generate
-BUNDLES=()
-# Which container artifacts to include in the bundles
-ARTIFACTS=()
-# Which platform binaries to build
-BINARIES=()
-# Where to save bundles
-DEST="local"
-# Run tests before building
-TEST=YES
-# Run linting before building
-LINT=NO
-# The version of the project
-VERSION=""
-# What to do when encountering sudo commands without elevated privileges
-SUDO_MODE="error"
-
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 # shellcheck disable=SC1091
@@ -38,85 +16,116 @@ source "${HERE}/../build/binaries/index.sh"
 # shellcheck disable=SC1091
 source "${HERE}/../build/bundles/index.sh"
 
-usage() {
-    cat <<EOF
-Usage: $(basename "$0") \
-  [-b|--bundles <all|zip|cli>]… \
-  [-a|--artifacts <docker|k8s>]… \
-  [-c|--binaries <windows|mac|linux|android|ios>]… \
-  [-d|--dest <local|remote>] \
-  [-p|--production] \
-  [-t|--test] \
-  [-l|--lint] \
-  [-v|--version <version>] \
-  [-s|--secrets-source <env|vault>] \
-  [-m|--sudo-mode <error|skip>] \
-  [-h|--help]
-
-Builds specified artifacts for the Vrooli project.
-
-Options:
-  -b, --bundles    <all|zip|cli>                     Which bundle types to generate (repeatable; default: all)
-  -a, --artifacts  <docker|k8s>                      Which container artifacts to include in the bundles (repeatable)
-  -c, --binaries   <windows|mac|linux|android|ios>   Which platform binaries to build (repeatable)
-  -d, --dest       <local|remote>                    Where to save bundles (default: local)
-  -p, --production                                   Build in production mode (uses .env-prod)
-  -t, --test       <Y/n>                             Run tests before building (default: true)
-  -l, --lint       <Y/n>                             Run linting before building (default: false)
-  -v, --version    <version>                         Set the version of the project (defaults to current version)
-  -s, --secrets-source <env|vault>                   Where to load secrets/env variables from (default: env)
-  -m, --sudo-mode  <error|skip>                      What to do when encountering sudo commands without elevated privileges (default: error)
-  -h, --help                                         Show this help message
-EOF
-    print_exit_codes
-}
-
 parse_arguments() {
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -b|--bundles)
-                BUNDLES+=("$2"); shift 2;;
-            -a|--artifacts)
-                ARTIFACTS+=("$2"); shift 2;;
-            -c|--binaries)
-                BINARIES+=("$2"); shift 2;;
-            -d|--dest|--destination)
-                DEST="$2"; shift 2;;
-            -p|--prod|--production)
-                ENVIRONMENT="production"; shift;;
-            -t|--test)
-                TEST="$2"; shift 2;;
-            -l|--lint)
-                LINT="$2"; shift 2;;
-            -v|--version)
-                VERSION="$2"; shift 2;;
-            -s|--secrets-source)
-                SECRETS_SOURCE="$2"; shift 2;;
-            -m|--sudo-mode)
-                SUDO_MODE="$2"; shift 2;;
-            -h|--help)
-                usage; exit "$EXIT_SUCCESS";;
-            *)
-                echo "Unknown flag: $1"; usage; exit "$ERROR_USAGE";;
-        esac
-    done
-}
+    arg_reset
 
-main() {
-    header "🔨 Starting build for ${ENVIRONMENT} environment..."
-    parse_arguments "$@"
+    arg_register_help
+    arg_register_secrets_source
+    arg_register_sudo_mode
+    arg_register_yes
+    arg_register_environment
 
-    # Export variables AFTER parsing arguments so they reflect user input
-    export SECRETS_SOURCE
-    export SUDO_MODE
+    arg_register \
+        --name "bundles" \
+        --flag "b" \
+        --desc "Which bundle types to generate, separated by commas without spaces (default: zip)" \
+        --type "value" \
+        --options "all|zip|cli" \
+        --default "all"
+    
+    arg_register \
+        --name "artifacts" \
+        --flag "a" \
+        --desc "Which container artifacts to include in the bundles, separated by commas without spaces (default: docker)" \
+        --type "value" \
+        --options "all|docker|k8s" \
+        --default "all"
 
-    # Default bundles to all if none or "all" specified
-    if [ ${#BUNDLES[@]} -eq 0 ] || [[ " ${BUNDLES[*]} " =~ " all " ]]; then
-        BUNDLES=("all")
+    arg_register \
+        --name "binaries" \
+        --flag "c" \
+        --desc "Which platform binaries to build, separated by commas without spaces (default: none)" \
+        --type "value" \
+        --options "all|windows|mac|linux|android|ios" \
+        --default "all"
+
+    arg_register \
+        --name "dest" \
+        --flag "d" \
+        --desc "Where to save bundles (default: local)" \
+        --type "value" \
+        --options "local|remote" \
+        --default "local"
+
+    arg_register \
+        --name "test" \
+        --flag "t" \
+        --desc "Run tests before building (default: true)" \
+        --type "value" \
+        --options "yes|no" \
+        --default "yes"
+    
+    arg_register \
+        --name "lint" \
+        --flag "l" \
+        --desc "Run linting before building (default: true)" \
+        --type "value" \
+        --options "yes|no" \
+        --default "no"
+    
+    arg_register \
+        --name "version" \
+        --flag "v" \
+        --desc "The version of the project (defaults to current version set in package.json)" \
+        --type "value" \
+        --default ""
+
+    if is_asking_for_help "$@"; then
+        arg_usage "$DESCRIPTION"
+        print_exit_codes
+        exit 0
+    fi
+
+    arg_parse "$@" >/dev/null
+    
+    export SECRETS_SOURCE=$(arg_get "secrets-source")
+    export SUDO_MODE=$(arg_get "sudo-mode")
+    export YES=$(arg_get "yes")
+    export ENVIRONMENT=$(arg_get "environment")
+    export BUNDLES=$(arg_get "bundles")
+    export ARTIFACTS=$(arg_get "artifacts")
+    export BINARIES=$(arg_get "binaries")
+    export DEST=$(arg_get "dest")
+    export TEST=$(arg_get "test")
+    export LINT=$(arg_get "lint")
+    export VERSION=$(arg_get "version")
+
+    if [ -z "$BUNDLES" ]; then
+        BUNDLES="zip"
+    fi
+    if [ -z "$ARTIFACTS" ]; then
+        ARTIFACTS="docker"
+    fi
+    if [ -z "$BINARIES" ]; then
+        BINARIES=""
+    fi
+    if [ -z "$DEST" ]; then
+        DEST="local"
+    fi
+    if [ -z "$TEST" ]; then
+        TEST="yes"
+    fi
+    if [ -z "$LINT" ]; then
+        LINT="yes"
     fi
     if [ -z "$VERSION" ]; then
         VERSION=$(get_project_version)
     fi
+}
+
+main() {
+    parse_arguments "$@"
+    header "🔨 Starting build for ${ENVIRONMENT} environment..."
 
     load_secrets
 
