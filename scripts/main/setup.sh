@@ -67,6 +67,10 @@ main() {
     check_internet
     run_system_update_and_upgrade
 
+    # Setup tools
+    setup_common_deps
+    setup_vault_client_deps
+
     # Clean up volumes & caches
     if is_yes "$CLEAN"; then
         clean
@@ -93,7 +97,7 @@ main() {
     fi
 
     # Run the setup script for the target
-    execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE}"
+    execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE:-1}"
     success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
 }
 

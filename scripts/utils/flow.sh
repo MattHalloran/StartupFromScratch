@@ -103,6 +103,16 @@ can_run_sudo() {
     fi
 }
 
+# Helper function to check if a command exists in the system PATH.
+# Arguments:
+#   $1: Command name to check
+# Returns:
+#   0 if command exists, 1 otherwise.
+check_command_exists() {
+    # Using 'command -v' is generally preferred and more portable than 'which'
+    command -v "$1" >/dev/null 2>&1
+}
+
 maybe_run_sudo() {
     if can_run_sudo; then
         sudo "$@"
