@@ -34,34 +34,57 @@ load_env_file() {
 }
 
 # Authenticates to Vault using the token method.
-# Requires VAULT_TOKEN to be set.
 authenticate_with_token() {
-    echo "TODO vault setup: authenticate_with_token"
-    # TODO: Implement token authentication
+    : "${VAULT_TOKEN:?Required environment variable VAULT_TOKEN is not set}"
+    info "Authenticating to Vault using token"
+    export VAULT_TOKEN
     return 0
 }
 
 # Authenticates to Vault using the AppRole method.
-# Requires VAULT_ROLE_ID and VAULT_SECRET_ID to be set.
 authenticate_with_approle() {
-    echo "TODO vault setup: authenticate_with_approle"
-    # TODO: Implement AppRole authentication
+    : "${VAULT_ROLE_ID:?Required environment variable VAULT_ROLE_ID is not set}"
+    : "${VAULT_SECRET_ID:?Required environment variable VAULT_SECRET_ID is not set}"
+    info "Authenticating to Vault using AppRole"
+    local resp
+    resp=$(vault write -format=json auth/approle/login role_id="$VAULT_ROLE_ID" secret_id="$VAULT_SECRET_ID")
+    VAULT_TOKEN=$(echo "$resp" | jq -r '.auth.client_token')
+    export VAULT_TOKEN
+    success "Authenticated to Vault with AppRole"
     return 0
 }
 
 # Authenticates to Vault using the Kubernetes method.
-# Requires VAULT_K8S_ROLE and access to the service account JWT.
 authenticate_with_kubernetes() {
-    echo "TODO vault setup: authenticate_with_kubernetes"
-    # TODO: Implement Kubernetes authentication
+    : "${VAULT_K8S_ROLE:?Required environment variable VAULT_K8S_ROLE is not set}"
+    : "${K8S_JWT_PATH:?Required environment variable K8S_JWT_PATH is not set}"
+    info "Authenticating to Vault using Kubernetes auth"
+    local jwt
+    jwt=$(cat "$K8S_JWT_PATH")
+    local resp
+    resp=$(vault write -format=json auth/kubernetes/login role="$VAULT_K8S_ROLE" jwt="$jwt")
+    VAULT_TOKEN=$(echo "$resp" | jq -r '.auth.client_token')
+    export VAULT_TOKEN
+    success "Authenticated to Vault with Kubernetes"
     return 0
 }
 
 # Fetches secrets from the configured Vault path after successful authentication.
-# Exports secrets as environment variables.
 fetch_secrets_from_vault() {
-    echo "TODO vault setup: fetch_secrets_from_vault"
-    # TODO: Implement secret fetching using helper functions
+    info "Fetching secrets from Vault at path: $VAULT_SECRET_PATH"
+    check_vault_dependencies
+    local endpoint="${VAULT_ADDR}/v1/${VAULT_SECRET_PATH}"
+    local resp
+    resp=$(curl -s -H "X-Vault-Token: $VAULT_TOKEN" -k -w "\n%{http_code}" "$endpoint")
+    local status
+    status=$(echo "$resp" | tail -n1)
+    local body
+    body=$(echo "$resp" | sed '$d')
+    validate_vault_response "$status" "$body"
+    local secret_json
+    secret_json=$(handle_kv_version "$body" "$VAULT_SECRET_PATH")
+    extract_secrets "$secret_json"
+    success "Secrets fetched and exported from Vault"
     return 0
 }
 
@@ -79,7 +102,8 @@ load_vault_secrets() {
         exit "${ERROR_VAULT_CONNECTION_FAILED:-30}"
     fi
 
-    echo "TODO vault setup: load_vault_secrets"
+    # Orchestrate authentication and fetching of secrets
+
     # 2. Check required base Vault env vars (VAULT_SECRET_PATH)
     : "${VAULT_SECRET_PATH:?Required environment variable VAULT_SECRET_PATH is not set}"
 
@@ -130,7 +154,6 @@ load_vault_secrets() {
 load_secrets() {
     header "🔑 Loading secrets..."
 
-    : "${SECRETS_SOURCE:?Required environment variable SECRETS_SOURCE is not set}"
     : "${ENVIRONMENT:?Required environment variable ENVIRONMENT is not set}"
 
     # Determine Node Env
@@ -159,6 +182,8 @@ load_secrets() {
         # In containerized environments, the file might not exist, relying solely on injected vars
         info "Base environment file not found: $env_file_to_source. Relying on existing environment variables."
     fi
+
+    : "${SECRETS_SOURCE:?Required environment variable SECRETS_SOURCE is not set}"
 
     # Now, load secrets based on the source type
     case "$(echo "$SECRETS_SOURCE" | tr '[:upper:]' '[:lower:]')" in

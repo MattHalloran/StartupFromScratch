@@ -16,7 +16,6 @@ parse_arguments() {
     arg_reset
 
     arg_register_help
-    arg_register_secrets_source
     arg_register_sudo_mode
     arg_register_yes
     arg_register_location
@@ -50,7 +49,6 @@ parse_arguments() {
     export TARGET=$(arg_get "target")
     export CLEAN=$(arg_get "clean")
     export CI=$(arg_get "ci-cd")
-    export SECRETS_SOURCE=$(arg_get "secrets-source")
     export SUDO_MODE=$(arg_get "sudo-mode")
     export YES=$(arg_get "yes")
     export LOCATION=$(arg_get "location")

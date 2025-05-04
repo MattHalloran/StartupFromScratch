@@ -337,16 +337,6 @@ arg_register_help() {
         --no-value "yes" 
 }
 
-arg_register_secrets_source() {
-    arg_register \
-        --name "secrets-source" \
-        --flag "s" \
-        --desc "Where to load secrets/env variables from" \
-        --type "value" \
-        --options "env|vault" \
-        --default "${SECRETS_SOURCE:-env}"
-}
-
 arg_register_sudo_mode() {  
     arg_register \
         --name "sudo-mode" \

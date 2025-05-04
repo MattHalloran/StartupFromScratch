@@ -2,7 +2,7 @@
 # Manages a LOCAL Vault instance for development purposes.
 # WARNING: This script is NOT for production Vault management.
 set -euo pipefail
-DESCRIPTION="Manages a LOCAL Vault instance (start/stop/status) for DEVELOPMENT ONLY."
+DESCRIPTION="Manages a LOCAL Vault instance (start/stop/status), with AppRole setup and optional dev secret seeding for DEVELOPMENT ONLY."
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -127,6 +127,39 @@ stop_local_vault() {
     return 0
 }
 
+# Seeds default development credentials into Vault's KV engine at the 'secret/vrooli/dev' path.
+seed_local_dev_secrets() {
+    header "🌱 Seeding .env-dev variables into Vault KV at 'secret/vrooli/dev'..."
+    local env_file="$HERE/../../.env-dev"
+    if [ ! -f "$env_file" ]; then
+        warning "No .env-dev file found at $env_file; skipping seeding."
+        return 0
+    fi
+    info "Loading environment variables from $env_file"
+    # Export all .env-dev variables into this shell for computation
+    set -a
+    # shellcheck disable=SC1091
+    . "$env_file"
+    set +a
+    # Collect key=value pairs, skipping Vault-specific and source keys
+    mapfile -t kv_pairs < <(
+        grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$env_file" \
+        | grep -v -E '^(VAULT_|SECRETS_SOURCE)'
+    )
+    # Compute derived URLs and append them
+    local computed_db_url="DB_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${PORT_DB:-5432}"
+    local computed_redis_url="REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${PORT_REDIS:-6379}"
+    kv_pairs+=("$computed_db_url" "$computed_redis_url")
+    if [ ${#kv_pairs[@]} -eq 0 ]; then
+        warning "No variables found to seed in $env_file"
+        return 0
+    fi
+    info "Seeding ${#kv_pairs[@]} entries to Vault path: secret/vrooli/dev"
+    # Write all collected pairs including computed URLs using the root token
+    VAULT_TOKEN="$VAULT_DEV_ROOT_TOKEN_ID" vault kv put secret/vrooli/dev "${kv_pairs[@]}"
+    success "Seeded ${#kv_pairs[@]} variables (including DB_URL and REDIS_URL) to Vault successfully."
+}
+
 # --- Placeholder/TODO Functions ---
 
 # Basic setup for AppRole (useful for local dev)
@@ -231,7 +264,6 @@ setup_local_approle_dev() {
     secret_id_accessor=$(echo "$secret_id_data" | jq -r .data.secret_id_accessor)
     if [ -z "$secret_id" ] || [ "$secret_id" == "null" ]; then
         error "Failed to parse SecretID from Vault response."
-        debug "Raw SecretID response: $secret_id_data"
         return 1
     fi
     success "Generated new SecretID."
@@ -296,19 +328,14 @@ parse_arguments() {
             ACTION="status"
             shift
             ;;
-        --setup-dev-approle)
-            ACTION="setup-dev-approle"
-            shift
-            ;;
         -h | --help)
             echo "Usage: $0 [ACTION]"
             echo "Manages a LOCAL Vault server for DEVELOPMENT purposes only."
             echo ""
             echo "Actions:"
-            echo "  --start-dev          Start Vault in dev mode (-dev). (Default if no action)"
+            echo "  --start-dev          Start Vault in dev mode, perform AppRole setup, and seed default dev credentials (requires running Vault & root login). (Default if no action)"
             echo "  --stop               Stop the running local Vault instance."
             echo "  --status             Check the status of the local Vault instance."
-            echo "  --setup-dev-approle  Perform basic AppRole setup (requires running Vault & root login). [TODO]"
             echo "  -h, --help           Show this help message."
             echo ""
             echo "Environment Variables:"
@@ -332,15 +359,14 @@ main() {
     case "$ACTION" in
         start-dev)
             start_local_vault_dev
+            setup_local_approle_dev
+            seed_local_dev_secrets
             ;;
         stop)
             stop_local_vault
             ;;
         status)
             check_vault_status
-            ;;
-        setup-dev-approle)
-            setup_local_approle_dev
             ;;
         *)
             error "Invalid action specified: $ACTION"
