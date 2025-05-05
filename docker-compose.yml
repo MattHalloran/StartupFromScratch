@@ -228,7 +228,4 @@ services:
     command: /bin/sh -c "exec php -S [::]:8080 -t /var/www/html/"
 
 networks:
-  proxy:
-    name: nginx-proxy
-    external: true
   app:
