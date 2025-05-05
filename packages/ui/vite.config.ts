@@ -6,6 +6,19 @@ export default ({ mode }: { mode: string }) => {
   // Load environment variables prefixed with VITE_
   const env = loadEnv(mode, process.cwd(), 'VITE_');
 
+  // Extract hostname from VITE_API_URL
+  let apiHost = 'localhost'; // Default fallback
+  let doOriginHost = 'localhost';
+  try {
+    if (env.VITE_API_URL) {
+      const apiUrl = new URL(env.VITE_API_URL);
+      apiHost = apiUrl.hostname; // e.g., rustyisthebest.com
+      doOriginHost = `do-origin.${apiHost}`; // e.g., do-origin.rustyisthebest.com
+    }
+  } catch (error) {
+    console.error('Error parsing VITE_API_URL for allowedHosts:', error);
+  }
+
   return defineConfig({
     // Root directory for dev server and build
     root: path.resolve(__dirname, 'src'),
@@ -17,8 +30,17 @@ export default ({ mode }: { mode: string }) => {
       alias: { '@': path.resolve(__dirname, 'src') },
     },
     server: {
-      port: env.VITE_PORT_UI || 3000,
+      host: '0.0.0.0',
+      port: parseInt(env.VITE_PORT_UI || '3000', 10), // Ensure port is a number
       open: false,
+      allowedHosts: [
+        // Dynamically allow the host derived from VITE_API_URL
+        apiHost,
+        // Allow the corresponding do-origin host
+        doOriginHost,
+        // Keep localhost and default IP addresses allowed
+        'localhost',
+      ],
     },
     define: {
       __API_URL__: JSON.stringify(env.VITE_API_URL),

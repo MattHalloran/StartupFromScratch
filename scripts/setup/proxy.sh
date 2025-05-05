@@ -88,6 +88,12 @@ setup_reverse_proxy() {
         exit_with_error "Either DOMAIN or API_URL environment variable must be set for reverse proxy setup." "$ERROR_CONFIGURATION"
     fi
     local proxy_port="${PORT_SERVER:-5329}"
+    local ui_port="${PORT_UI:-3000}"
+    # Include do-origin alias for crawler requests
+    local alias_domain="do-origin.${target_domain}"
+    info "Including alias domain for crawler: ${alias_domain}"
+    # Append alias so Caddy will request a cert for both hosts
+    target_domain="${target_domain} ${alias_domain}"
     # Start or reload the reverse proxy configuration for the application
-    start_reverse_proxy "$target_domain" "$proxy_port"
+    start_reverse_proxy "${target_domain}" "${proxy_port}" "${ui_port}"
 }

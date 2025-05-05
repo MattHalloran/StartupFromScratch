@@ -36,20 +36,30 @@ ensure_caddy_import_configured() {
 # Generates a Caddyfile snippet for the application
 # Usage: generate_caddy_snippet <domain> <target_port>
 generate_caddy_snippet() {
-    local domain="${1:?Domain argument required}"
-    local target_port="${2:?Target port argument required}"
+    local domain_list="${1:?Domain list argument required}"
+    local target_port_server="${2:?Target server port argument required}"
+    local target_port_ui="${3:?Target UI port argument required}"
 
     # Ensure the snippets directory exists
     maybe_run_sudo mkdir -p "$CADDY_SNIPPETS_DIR"
 
-    info "Generating Caddy snippet for ${domain} -> localhost:${target_port}"
+    info "Generating Caddy snippet for ${domain_list}: API -> localhost:${target_port_server}, UI -> localhost:${target_port_ui}"
     local snippet_content
     snippet_content=$(cat <<EOF
-${domain} {
-    reverse_proxy localhost:${target_port}
+${domain_list} {
+    # Route API requests to the backend server
+    route /api/* {
+        reverse_proxy localhost:${target_port_server}
+    }
+
+    # Route all other requests to the UI dev server
+    route {
+        reverse_proxy localhost:${target_port_ui}
+    }
+
     # Optional: Add more directives here, like logging, headers, etc.
     # log {
-    #   output file /var/log/caddy/${domain}.log
+    #   output file /var/log/caddy/${domain_list}.log
     # }
 }
 EOF
@@ -117,20 +127,21 @@ check_caddy_status() {
 
 start_reverse_proxy() {
     local domain="${1:-}"
-    local port="${2:-}"
+    local port_server="${2:-}"
+    local port_ui="${3:-}"
 
     if [[ -z "$domain" ]]; then
         exit_with_error "Domain is required" "$ERROR_USAGE"
     fi
-    if [[ -z "$port" ]]; then
-        exit_with_error "Port is required" "$ERROR_USAGE"
+    if [[ -z "$port_server" || -z "$port_ui" ]]; then
+        exit_with_error "Both Server and UI Ports are required" "$ERROR_USAGE"
     fi
 
-    header "Starting reverse proxy for $domain:$port"
+    header "Starting reverse proxy for $domain (API: $port_server, UI: $port_ui)"
     ensure_caddy_import_configured
-    generate_caddy_snippet "$domain" "$port"
+    generate_caddy_snippet "$domain" "$port_server" "$port_ui"
     start_or_reload_caddy
-    success "Reverse proxy started for $domain:$port"
+    success "Reverse proxy started for $domain (API: $port_server, UI: $port_ui)"
 }
 
 stop_reverse_proxy() {
