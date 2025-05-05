@@ -1,94 +1,56 @@
-import express, { Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { getSsoConfig } from './db/sso-config.js';
-// No longer using entry-server render helper (simplified routes)
+import cookie from "cookie";
+import cors from "cors";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import { SERVER_PORT, SERVER_URL, server } from "./server.js";
+import { logger } from "./events/logger.js";
+import { app } from "./app.js";
 
-// Determine __dirname equivalent in ES module scope
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const port = process.env.PORT_SERVER || 5329;
-const isDev = process.env.NODE_ENV !== 'production';
+async function main() {
+    logger.info("Starting server...");
 
-// Serve static assets: in development/test serve from `src`, in production from `dist`
-const serverRoot = __dirname;
-const uiPackageRoot = path.resolve(serverRoot, '../../../packages/ui');
-const clientDist = isDev
-  ? path.join(uiPackageRoot, 'src')
-  : path.join(uiPackageRoot, 'dist');
+    // Check for required .env variables
+    const requiredEnvs = [
+        "JWT_PRIV", // Private key for JWT tokens
+        "JWT_PUB", // Public key for JWT tokens
+        "PROJECT_DIR", // Path to the project directory
+        "VITE_SERVER_LOCATION", // Location of the server
+        "LETSENCRYPT_EMAIL", // Email for Let's Encrypt
+        "VAPID_PUBLIC_KEY", // Public key for VAPID
+        "VAPID_PRIVATE_KEY", // Private key for VAPID
+        "WORKER_ID", // Worker ID (e.g. pod ordinal) for Snowflake IDs
+    ];
+    for (const env of requiredEnvs) {
+        if (!process.env[env]) {
+            logger.error(`🚨 ${env} not in environment variables. Stopping server`, { trace: "0007" });
+            process.exit(1);
+        }
+    }
 
-// Health check
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok' });
-});
+    // Unhandled Rejection Handler. This is a last resort for catching errors that were not caught by the application. 
+    // If you see this error, please try to find its source and catch it there.
+    process.on("unhandledRejection", (reason, promise) => {
+        logger.error("🚨 Unhandled Rejection", { trace: "0003", reason, promise });
+    });
 
-// TODO: mount your API and webhook routers before SSR
-// e.g., app.use('/api', apiRouter);
+    // Add health check endpoint
+    app.get("/health", (req, res) => {
+        res.status(200).send("OK");
+    });
 
-// Load HTML template once (fallback to src/index.html in test)
-const templatePath = path.join(clientDist, 'index.html');
-if (!fs.existsSync(templatePath)) {
-  throw new Error(`UI template not found at ${templatePath}`);
-}
-const template = fs.readFileSync(templatePath, 'utf-8');
-
-/**
- * Compose head tags including SSO and OpenGraph metadata.
- */
-function composeHeadTags(
-  sso: { clientId: string; issuer: string },
-  og: { title: string; description?: string; url?: string; image?: string }
-): string {
-  const tags = [
-    `<meta name="sso-client-id" content="${sso.clientId}"/>`,
-    `<meta name="sso-issuer" content="${sso.issuer}"/>`,
-    `<meta property="og:title" content="${og.title}"/>`,
-    og.description ? `<meta property="og:description" content="${og.description}"/>` : '',
-    og.url ? `<meta property="og:url" content="${og.url}"/>` : '',
-    og.image ? `<meta property="og:image" content="${og.image}"/>` : ''
-  ];
-  return tags.filter(Boolean).join('');
+    // Start Express server
+    server.listen(SERVER_PORT);
+    logger.info(`🚀 Server running at ${SERVER_URL}`);
 }
 
-// Simple UI routes with dummy SSO meta for smoke testing
-app.get('/', async (req: Request, res: Response) => {
-  const sso = await getSsoConfig();
-  const headTags = composeHeadTags(sso, {
-    title: 'Home Page',
-    description: 'Welcome to StartupFromScratch!',
-    url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
-  });
-  const homeHtml = template
-    .replace('<!--%HEAD_TAGS%-->', headTags)
-    .replace('<!--app-html-->', '<h2>Home Page</h2>');
-  res.send(homeHtml);
-});
-
-app.get('/about', async (req: Request, res: Response) => {
-  const sso = await getSsoConfig();
-  const headTags = composeHeadTags(sso, {
-    title: 'About Page',
-    description: 'Learn more about StartupFromScratch.',
-    url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
-  });
-  const aboutHtml = template
-    .replace('<!--%HEAD_TAGS%-->', headTags)
-    .replace('<!--app-html-->', '<h2>About Page</h2>');
-  res.send(aboutHtml);
-});
-
-// Serve static assets AFTER specific SSR routes
-app.use(express.static(clientDist));
-
-// Start server unless in test environment
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-  });
+// Only call this from the "server" package when not testing
+if (
+    process.env.npm_package_name === "@local/server" &&
+    process.env.NODE_ENV !== "test"
+) {
+    main();
 }
-
-// Export Express app for testing
-export default app; 

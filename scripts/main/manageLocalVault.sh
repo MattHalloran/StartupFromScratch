@@ -160,8 +160,6 @@ seed_local_dev_secrets() {
     success "Seeded ${#kv_pairs[@]} variables (including DB_URL and REDIS_URL) to Vault successfully."
 }
 
-# --- Placeholder/TODO Functions ---
-
 # Basic setup for AppRole (useful for local dev)
 # Configures the local dev Vault instance with an AppRole auth backend,
 # a basic policy, and a role for the application.

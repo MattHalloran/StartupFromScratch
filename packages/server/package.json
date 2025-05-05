@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "clean": "rimraf dist",
-    "copy": "cpy \"src/**/*.{txt,lua,html,prisma,sql}\" \"src/auth/message_signing/rust/pkg/*.{wasm,json,cjs}\" dist",    
+    "copy": "cpy \"src/**/*.{txt,lua,html,prisma,sql}\" \"src/auth/message_signing/rust/pkg/*.{wasm,json,cjs}\" dist",
     "build:shared": "pnpm --filter @vrooli/shared run build",
     "build:compile": "swc src -d dist --source-maps --ignore \"**/*.test.*\"",
     "build": "cross-env NODE_ENV=production run-s clean build:compile copy",
@@ -28,9 +28,11 @@
   "dependencies": {
     "@prisma/client": "6.1.0",
     "@vrooli/shared": "workspace:*",
+    "cookie": "^0.7.2",
     "cors": "^2.8.5",
     "express": "^5.0.1",
-    "prisma": "6.1.0"
+    "prisma": "6.1.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@swc/cli": "^0.1.63",
