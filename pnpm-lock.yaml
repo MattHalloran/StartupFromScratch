@@ -121,19 +121,6 @@ importers:
         specifier: 5.4.5
         version: 5.4.5
 
-  packages/prisma:
-    dependencies:
-      '@prisma/client':
-        specifier: 6.1.0
-        version: 6.1.0(prisma@6.1.0)
-    devDependencies:
-      prisma:
-        specifier: 6.1.0
-        version: 6.1.0
-      typescript:
-        specifier: 5.4.5
-        version: 5.4.5
-
   packages/redis:
     dependencies:
       dotenv:

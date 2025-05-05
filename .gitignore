@@ -182,6 +182,7 @@ data/postgres*
 data/redis/
 data/stats/
 data/uploads/
+data/schema-hash
 
 #Backups
 backups/
