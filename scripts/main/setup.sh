@@ -96,6 +96,8 @@ main() {
         install_shellcheck
     fi
 
+    setup_docker
+
     # Run the setup script for the target
     execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE:-1}"
     success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
