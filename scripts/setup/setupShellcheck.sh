@@ -17,7 +17,7 @@ install_shellcheck() {
     header "🔍 Installing ShellCheck for shell linting"
 
     # First attempt: install via system package manager
-    if install_system_package shellcheck; then
+    if install_pkg shellcheck; then
         success "ShellCheck installed via package manager"
         return
     else

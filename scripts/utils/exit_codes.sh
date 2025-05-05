@@ -116,6 +116,10 @@ EXIT_CODES+=("ERROR_VAULT_SECRET_FETCH_FAILED")
 : "${DESC_ERROR_MISSING_DEPENDENCIES:=Missing dependencies}"
 EXIT_CODES+=("ERROR_MISSING_DEPENDENCIES")
 
+: "${ERROR_JWT_FILE_MISSING:=89}"
+: "${DESC_ERROR_JWT_FILE_MISSING:=JWT file missing}"
+EXIT_CODES+=("ERROR_JWT_FILE_MISSING")
+
 # Helper function to generate exit codes display for usage
 print_exit_codes() {
     local var_name code desc_var description

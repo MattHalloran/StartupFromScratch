@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Utility for centralized argument handling
+set -euo pipefail
 
 # Array to hold registered arguments
 declare -A ARG_FLAGS=()     # Short flags (-t)

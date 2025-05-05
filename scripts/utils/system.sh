@@ -12,29 +12,99 @@ source "${HERE}/../utils/flow.sh"
 # Default timeout for system installs (in seconds)
 SYSTEM_INSTALL_TIMEOUT=${SYSTEM_INSTALL_TIMEOUT:-420}
 
-# Install a package by selecting the correct package manager
-install_system_package() {
-    local pkg="$1"
-    header "📦 Installing system package: $pkg"
-    if command -v apt-get >/dev/null 2>&1; then
-        # If we can sudo, prefix apt commands; otherwise run as current user
-        local apt_cmd="apt-get"
-        if can_run_sudo; then
-            apt_cmd="sudo apt-get"
-        else
-            info "No sudo available, running apt-get as current user"
-        fi
-        # Update package list and install
-        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s $apt_cmd update -qq
-        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s $apt_cmd install -y -qq --no-install-recommends "$pkg"
-        success "${pkg} installed via apt-get"
-    elif command -v brew >/dev/null 2>&1; then
-        # Perform Homebrew install with a timeout to prevent hangs
-        timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s brew install "$pkg"
-        success "${pkg} installed via Homebrew"
+detect_pm() {
+    if   command -v apt-get  >/dev/null; then echo "apt-get"
+    elif command -v dnf      >/dev/null; then echo "dnf"
+    elif command -v yum      >/dev/null; then echo "yum"
+    elif command -v pacman   >/dev/null; then echo "pacman"
+    elif command -v apk      >/dev/null; then echo "apk"
+    elif command -v brew     >/dev/null; then echo "brew"
     else
-        error "No supported package manager found to install $pkg"
+        error "Unsupported pkg manager; please install dependencies manually."
+        exit 1
     fi
+}
+
+# Given a command name, return the real package to install on this distro.
+get_package_name() {
+    local cmd="$1"
+    local pm
+    pm=$(detect_pm)
+    
+    case "$cmd" in
+        # coreutils commands
+        nproc|mkdir|sed|grep|awk)
+            case "$pm" in
+                apt-get)   echo "coreutils" ;;
+                dnf|yum)   echo "coreutils" ;;
+                pacman)    echo "coreutils" ;;
+                apk)       echo "coreutils" ;;    # Alpine has coreutils
+                brew)      echo "coreutils" ;;    # Homebrew coreutils
+            esac
+            ;;
+        free)
+            case "$pm" in
+              apt-get)   echo "procps" ;;         # Debian/Ubuntu
+              dnf|yum)   echo "procps-ng" ;;      # Fedora/RHEL/CentOS
+              pacman)    echo "procps-ng" ;;      # Arch
+              apk)       echo "procps" ;;
+              brew)      echo "procps" ;;         # Homebrew? usually not needed
+            esac
+            ;;
+        *)
+            # fallback: assume the package has the same name
+            echo "$cmd"
+            ;;
+    esac
+}
+
+install_pkg() {
+    local pkg="$1"
+    local pm prefix
+  
+    header "📦 Installing system package $pkg as $(get_package_name $pkg)"
+    pkg=$(get_package_name $pkg)
+    pm=$(detect_pm)
+  
+    # Brew never needs sudo; others only if allowed
+    if [[ "$pm" == "brew" ]]; then
+        prefix=""
+    elif can_run_sudo; then
+        prefix="sudo"
+    else
+        prefix=""
+        warning "No sudo available; running $pm commands as user"
+    fi
+  
+    case "$pm" in
+        apt-get)
+            # prevent hanging on apt
+            timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s ${prefix} apt-get update -qq
+            timeout --kill-after=10s "${SYSTEM_INSTALL_TIMEOUT}"s ${prefix} apt-get install -y -qq --no-install-recommends "$pkg"
+            ;;
+        dnf)
+            ${prefix} dnf install -y "$pkg"
+            ;;
+        yum)
+            ${prefix} yum install -y "$pkg"
+            ;;
+        pacman)
+            ${prefix} pacman -Syu --noconfirm "$pkg"
+            ;;
+        apk)
+            ${prefix} apk update
+            ${prefix} apk add --no-cache "$pkg"
+          ;;
+        brew)
+            brew install "$pkg"
+            ;;
+        *)
+            error "Unsupported pkg manager: $pm"
+            exit 1
+            ;;
+    esac
+    
+    success "Installed $pkg via $pm"
 }
 
 # Update package lists
@@ -146,5 +216,24 @@ purge_apt_update_notifier() {
         success "Finished attempting to purge update-notifier."
     else
         info "Not an apt-based system, skipping update-notifier purge."
+    fi
+}
+
+check_and_install() {
+    local cmd="$1"
+    info "Checking for $cmd..."
+    if check_command_exists "$cmd"; then
+        success "$cmd is already installed."
+        return 0
+    fi
+  
+    warning "$cmd not found. Installing…"
+    install_pkg "$cmd"
+  
+    if check_command_exists "$cmd"; then
+        success "$cmd installed successfully."
+    else
+        error "Could not install $cmd—please install it manually."
+        exit "${ERROR_DEPENDENCY_MISSING}"
     fi
 }

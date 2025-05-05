@@ -28,10 +28,10 @@ install_caddy() {
     if command -v apt-get &> /dev/null; then
         info "Performing Debian/Ubuntu specific setup for Caddy repository..."
         # Ensure prerequisites are installed
-        install_system_package "debian-keyring"
-        install_system_package "debian-archive-keyring"
-        install_system_package "apt-transport-https"
-        install_system_package "curl"
+        install_pkg "debian-keyring"
+        install_pkg "debian-archive-keyring"
+        install_pkg "apt-transport-https"
+        install_pkg "curl"
 
         # Add Caddy GPG key
         maybe_run_sudo curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | maybe_run_sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -56,7 +56,7 @@ install_caddy() {
     # --- End Specific Setup ---
 
     # Install Caddy using the generic helper
-    install_system_package "caddy"
+    install_pkg "caddy"
 
     if command -v caddy &> /dev/null; then
         success "Caddy installed successfully via package manager."
