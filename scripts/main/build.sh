@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Builds specified artifacts for the Vrooli project, as preparation for deployment.
-# This script is meant to be run on the development machine.
 set -euo pipefail
+DESCRIPTION="Builds specified artifacts for the Vrooli project, as preparation for deployment."
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 

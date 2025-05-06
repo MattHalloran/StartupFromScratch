@@ -24,7 +24,7 @@ source "${HERE}/../utils/index.sh"
 install_jdk() {
     if ! command -v keytool &>/dev/null; then
         should_run_system_update && system_update
-        install_system_package "default-jdk"
+        install_pkg "default-jdk"
         success "JDK installed. keytool should now be available."
     else
         info "keytool is already installed"

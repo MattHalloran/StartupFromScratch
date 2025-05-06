@@ -2,9 +2,9 @@
 bats_require_minimum_version 1.5.0
 
 # Path to the script under test
-SCRIPT_PATH="$BATS_TEST_DIRNAME/setScriptPermissions.sh"
+SCRIPT_PATH="$BATS_TEST_DIRNAME/permissions.sh"
 
-@test "sourcing setScriptPermissions.sh defines set_script_permissions function" {
+@test "sourcing permissions.sh defines set_script_permissions function" {
     run bash -c "source '$SCRIPT_PATH' && declare -f set_script_permissions"
     [ "$status" -eq 0 ]
     [[ "$output" =~ set_script_permissions ]]
