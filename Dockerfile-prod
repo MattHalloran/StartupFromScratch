@@ -1,37 +1,40 @@
 # syntax=docker/dockerfile:1.4
 
-### Base stage: install dependencies and build workspace
+### Base stage for production: install only production dependencies and build workspace
 FROM node:18-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 WORKDIR /usr/src/app
-ENV NODE_ENV=development
+ENV NODE_ENV=production
 
 # Enable Corepack and prepare pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy manifest files and prime cache
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-# Copy workspace package.json files for workspace detection
+# Copy workspace package.json files for production installs
 COPY packages/server/package.json packages/server/package.json
 COPY packages/jobs/package.json packages/jobs/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/shared/package.json packages/shared/package.json
+
+# Fetch dependencies
 RUN --mount=type=cache,id=pnpm-store,target=/usr/local/share/pnpm-store pnpm fetch
 
-# Install all dependencies, including devDependencies, across all workspaces
+# Install dependencies (including devDependencies for build)
 RUN --mount=type=cache,id=pnpm-store,target=/usr/local/share/pnpm-store \
     pnpm install --frozen-lockfile
 
 # Copy full source and build all packages
 COPY . .
-# Generate Prisma client for correct schema
+
+# Generate Prisma client
 RUN pnpm --filter @vrooli/prisma run generate -- --schema=packages/server/src/db/schema.prisma
 
 # Build shared utilities
 RUN pnpm --filter @vrooli/shared run build
 
-# Build UI package (produces dist folder)
+# Build UI package
 RUN pnpm --filter @vrooli/ui run build
 
 # Build jobs package
@@ -42,30 +45,19 @@ RUN pnpm --filter @vrooli/server run build:shared \
     && pnpm --filter @vrooli/server run build:compile \
     && pnpm --filter @vrooli/server run copy
 
-
-### Server image: run compiled server code
+### Production server image
 FROM base AS server
-ENV NODE_ENV=production
 WORKDIR /usr/src/app
-# Inherit all built code and dependencies from base
 EXPOSE ${PORT_SERVER}
 CMD ["node", "packages/server/dist/index.js"]
 
-
-### Jobs image: run compiled jobs code
+### Production jobs image
 FROM base AS jobs
-ENV NODE_ENV=production
 WORKDIR /usr/src/app
-# Inherit all built code and dependencies from base
 EXPOSE ${PORT_JOBS}
 CMD ["node", "packages/jobs/dist/index.js"]
 
-
-### UI development image: run Vite dev server (inherits pnpm from base)
-FROM base AS ui-dev
-WORKDIR /usr/src/app
-COPY --from=base /usr/src/app/node_modules ./node_modules
-COPY --from=base /usr/src/app .
-EXPOSE ${PORT_UI}
-RUN corepack enable && corepack prepare pnpm@latest --activate
-CMD ["pnpm", "--filter", "@vrooli/ui", "run", "dev", "--", "--host", "0.0.0.0", "--port", "${PORT_UI}"] 
+### Production UI image: serve static build with nginx
+FROM nginx:alpine AS ui
+COPY --from=base /usr/src/app/packages/ui/dist /usr/share/nginx/html
+EXPOSE ${PORT_UI} 

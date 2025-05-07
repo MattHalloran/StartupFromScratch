@@ -7,10 +7,15 @@ PACKAGES_DIR="${HERE}/../../packages"
 # shellcheck disable=SC1091
 source "${HERE}/../utils/index.sh"
 
-# Cleans previous build artifacts
+# Removes previous build artifacts by deleting all package dist directories.
 clean_build() {
-  info "Cleaning previous build artifacts..."
-  find "${PACKAGES_DIR}" -maxdepth 2 -type d -name dist -exec rm -rf {} +
+    header "Cleaning previous build artifacts..."
+  
+    # Find and delete all dist directories directly under each package directory
+    # -maxdepth 2 ensures we only look in packages/* and not deeper
+    find "${ROOT_DIR}/packages" -maxdepth 2 -type d -name "dist" -prune -exec rm -rf {} +
+  
+    success "Cleaned previous build artifacts."
 }
 
 # Builds individual packages
@@ -34,42 +39,35 @@ build_packages() {
   pnpm --filter @vrooli/jobs run build
 }
 
-# Verifies that packages were built successfully
+# Ensures each package with a package.json has a dist directory; exits with an error if any are missing.
 verify_build() {
-  info "Verifying packages were built successfully..."
-  local build_success=true
-
-  # Check server package
-  if [ ! -d "${PACKAGES_DIR}/server/dist" ]; then
-    error "Server package build failed: dist directory not found"
-    build_success=false
-  fi
-
-  # Check UI package
-  if [ ! -d "${PACKAGES_DIR}/ui/dist" ]; then
-    error "UI package build failed: dist directory not found"
-    build_success=false
-  fi
-
-  # Check shared package
-  if [ ! -d "${PACKAGES_DIR}/shared/dist" ]; then
-    error "Shared package build failed: dist directory not found"
-    build_success=false
-  fi
-
-  # Check jobs package
-  if [ ! -d "${PACKAGES_DIR}/jobs/dist" ]; then
-    error "Jobs package build failed: dist directory not found"
-    build_success=false
-  fi
-
-  if [ "$build_success" = false ]; then
-    error "Build verification failed"
-    return 1
-  else
-    success "All packages built successfully"
-    return 0
-  fi
+    header "Verifying build output..."
+    local missing=0 pkg pkg_name dist_dir
+  
+    info "Checking for dist directories in packages..."
+    # Iterate over items directly under packages/
+    for pkg in "${ROOT_DIR}/packages"/*; do
+        # Check if it's a directory and contains a package.json (indicating it's a package)
+        if [ -d "$pkg" ] && [ -f "${pkg}/package.json" ]; then
+            pkg_name="$(basename "${pkg}")"
+            dist_dir="${pkg}/dist"
+            # Check if the dist directory *doesn't* exist
+            if [ ! -d "$dist_dir" ]; then
+                error "Build verification failed: Missing dist directory for package '${pkg_name}'"
+                missing=1
+            else
+                info "Found dist directory for package '${pkg_name}'."
+            fi
+        fi
+    done
+  
+    # Check the final status
+    if [ "$missing" -ne 0 ]; then
+        error "Build verification failed due to missing dist directories."
+        exit "$ERROR_BUILD_FAILED" # Use the standard exit code for build failures
+    else
+        success "Build verification succeeded. All packages have dist directories."
+    fi
 }
 
 # Packages CLI executables (placeholder)

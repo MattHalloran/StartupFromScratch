@@ -4,7 +4,8 @@ services:
   ui:
     build:
       context: .
-      dockerfile: ./packages/ui/Dockerfile
+      dockerfile: ./Dockerfile
+      target: ui-dev
       args:
         PROJECT_DIR: "${PROJECT_DIR:-/srv/app}"
     container_name: ui
@@ -29,16 +30,25 @@ services:
     ports:
       - ${PORT_UI:-3000}:${PORT_UI:-3000}
     networks:
-      - proxy
       - app
     volumes:
       - ./packages/ui:${PROJECT_DIR:-/srv/app}/packages/ui:z
       - ./packages/shared:${PROJECT_DIR:-/srv/app}/packages/shared:z
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          node -e "require('http').request({hostname: 'localhost', port: ${PORT_UI:-3000}, path: '/'}, res => { if (res.statusCode >= 200 && res.statusCode < 400) { process.exit(0) } else { process.exit(1) } }).on('error', err => { process.exit(1) }).end()"
+      start_period: 60s
+      interval: 20s
+      timeout: 5s
+      retries: 5
     command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/ui.sh"
   server:
     build:
       context: .
-      dockerfile: ./packages/server/Dockerfile
+      dockerfile: ./Dockerfile
+      target: server
       args:
         PROJECT_DIR: "${PROJECT_DIR:-/srv/app}"
     container_name: server
@@ -83,11 +93,11 @@ services:
       VIRTUAL_PATH: "/api"
       LETSENCRYPT_HOST: "${VIRTUAL_HOST}"
       LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
+      WORKER_ID: "${WORKER_ID}"
     ports:
       - ${PORT_API:-5329}:${PORT_API:-5329}
       - "9229:9229" # For debugger
     networks:
-      - proxy
       - app
     volumes:
       - ./packages/server:${PROJECT_DIR:-/srv/app}/packages/server:z
@@ -110,7 +120,8 @@ services:
   jobs:
     build:
       context: .
-      dockerfile: ./packages/jobs/Dockerfile
+      dockerfile: ./Dockerfile
+      target: jobs
       args:
         PROJECT_DIR: "${PROJECT_DIR:-/srv/app}"
     container_name: jobs
@@ -165,7 +176,7 @@ services:
         condition: service_healthy
     command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/jobs.sh"
   postgres:
-    image: ankane/pgvector:v0.4.4
+    image: pgvector/pgvector:pg15 
     restart: always
     container_name: postgres
     environment:
@@ -179,13 +190,13 @@ services:
       - app
     volumes:
       - ./data/postgres-dev:/var/lib/postgresql/data
-      - ./packages/db/entrypoint:/docker-entrypoint-initdb.d
+      - ./packages/postgres/entrypoint/run-postgres.sh:/usr/local/bin/run-postgres.sh:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-site} && psql -U ${DB_USER:-site} -d postgres -c 'SELECT 1'" ]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: /bin/sh -c "exec docker-entrypoint.sh postgres"
+    entrypoint: ["/usr/local/bin/run-postgres.sh"]
   redis:
     image: redis:7.4.0-alpine
     container_name: redis
@@ -197,7 +208,7 @@ services:
       - app
     volumes:
       - ./data/redis:${PROJECT_DIR:-/srv/app}/data/redis:z
-      - ./scripts/redis:${PROJECT_DIR:-/srv/app}/scripts/redis
+      - ./scripts:${PROJECT_DIR:-/srv/app}/scripts
     expose:
       - ${PORT_REDIS:-6379}
     command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/redis/startRedis.sh"
@@ -214,7 +225,7 @@ services:
     environment:
       ADMINER_PLUGINS: login-env-vars
       ADMINER_DRIVER: pgsql
-      ADMINER_SERVER: db
+      ADMINER_SERVER: postgres
       ADMINER_USERNAME: "${DB_USER:-site}"
       ADMINER_PASSWORD: "${DB_PASSWORD}"
       ADMINER_DB: "${DB_NAME}"
@@ -226,6 +237,31 @@ services:
     ports:
       - 8080:8080
     command: /bin/sh -c "exec php -S [::]:8080 -t /var/www/html/"
+  # # Service for NSFW detection
+  # nsfw-detector:
+  #   image: steelcityamir/safe-content-ai:latest
+  #   container_name: nsfw-detector
+  #   restart: always
+  #   networks:
+  #     - app
+  #   expose:
+  #     - 8000 # Expose port 8000 internally to the app network
+  #   # GPU resources are recommended for this container for performance.
+  #   # Configuration depends on your Docker setup (e.g., deploy.resources.reservations.devices)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+  #   healthcheck:
+  #     # Basic TCP check as the service doesn't have a dedicated health endpoint
+  #     test: ["CMD", "nc", "-z", "localhost", "8000"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 60s # Give it time to download/load the model
 
 networks:
   app:

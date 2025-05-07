@@ -5,7 +5,9 @@ DESCRIPTION="Sets up the firewall to safely allow traffic to the server"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${HERE}/../utils/flow.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../utils/logging.sh"
 
 # Check if host has internet access. Exits with error if no access.
 setup_firewall() {

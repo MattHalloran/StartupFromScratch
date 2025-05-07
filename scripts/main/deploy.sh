@@ -2,6 +2,7 @@
 # Deploys specified build artifacts to the specified destinations.
 # This script is meant to be run on the production server
 set -euo pipefail
+DESCRIPTION="Deploys a specific Vrooli service artifact to the target environment."
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -17,132 +18,194 @@ source "${HERE}/../deploy/k8s.sh"
 # shellcheck disable=SC1091
 source "${HERE}/../deploy/vps.sh"
 
-# Default values
-SOURCES=()
-DEST="local"
-TARGET="staging"
+# Default values set in parse_arguments
+TARGET=""
+SOURCE_TYPE=""
+LOCATION=""
+DETACHED=""
+VERSION=""
+
+# --- Argument Parsing ---
 
 usage() {
-    cat <<EOF
-Usage: $(basename "$0") \
-  [--source|-s <TYPE>]... \
-  [--dest|-d <local|remote>] \
-  [--target|-t <staging|prod>] \
-  [-l|--location <local|remote>] \
-  [--detached|-x <yes|no>]        Skip teardown of reverse proxy on script exit (default: no) \
-  [-h|--help]                    Show this help message
-
-Deploys specified artifacts for the Vrooli project.
-
-Options:
-  -s, --source                  (local|remote) Where to find the build artifacts
-  -d, --dest                    Specify artifact location: local (default) or remote
-  -t, --target   <staging|prod> Specify deployment target environment
-  -l, --location <local|remote> Override automatic server location detection
-  -x, --detached <yes|no>        Skip teardown of reverse proxy on script exit
-  -h, --help                    Show this help message
-EOF
+    arg_usage "$DESCRIPTION"
     print_exit_codes
 }
 
 parse_arguments() {
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -s|--source)
-                SOURCES+=("$2"); shift 2;;
-            -d|--dest)
-                DEST="$2"; shift 2;;
-            -t|--target)
-                TARGET="$2"; shift 2;;
-            -l|--location)
-                LOCATION="$2"; shift 2;;
-            -x|--detached)
-                DETACHED="$2"; shift 2;;
-            staging|prod)
-                TARGET="$1"; shift;;
-            -h|--help)
-                usage; exit "$EXIT_SUCCESS";;
-            *)
-                error "Unknown argument: $1"; usage; exit "$ERROR_USAGE";;
-        esac
-    done
+    arg_reset
+
+    arg_register_help
+    # Register arguments similar to build.sh where applicable
+    arg_register_sudo_mode # Assuming it might be needed by deploy functions
+    arg_register_yes # For non-interactive mode
+    arg_register_environment # To derive TARGET if not specified? Or just use TARGET directly. Let's stick to TARGET.
+
+    arg_register \
+        --name "source" \
+        --flag "s" \
+        --desc "The type of artifact/service to deploy." \
+        --required "true" \
+        --type "value" \
+        --options "docker|k8s|vps|windows|android" # Add other valid types as needed
+
+    arg_register \
+        --name "target" \
+        --flag "t" \
+        --desc "Specify deployment target environment." \
+        --required "true" \
+        --type "value" \
+        --options "staging|prod" \
+        --default "prod"
+
+    arg_register \
+        --name "location" \
+        --flag "l" \
+        --desc "Override automatic server location detection (local|remote)." \
+        --type "value" \
+        --options "local|remote" \
+        --default "" # Let check_location_if_not_set handle default
+
+    arg_register \
+        --name "detached" \
+        --flag "x" \
+        --desc "Skip teardown of reverse proxy on script exit (default: no)." \
+        --type "value" \
+        --options "yes|no" \
+        --default "yes"
+
+    arg_register \
+        --name "version" \
+        --flag "v" \
+        --desc "The version of the project artifacts to deploy (defaults to version in ../../package.json)." \
+        --type "value" \
+        --default ""
+
+    if is_asking_for_help "$@"; then
+        usage
+        exit "$EXIT_SUCCESS"
+    fi
+
+    arg_parse "$@" >/dev/null
+
+    export SUDO_MODE=$(arg_get "sudo-mode")
+    export YES=$(arg_get "yes")
+    export SOURCE_TYPE=$(arg_get "source")
+    export TARGET=$(arg_get "target")
+    export LOCATION=$(arg_get "location")
+    export DETACHED=$(arg_get "detached")
+    export VERSION=$(arg_get "version")
+    export ENVIRONMENT=$(arg_get "environment")
+
+    # Set default version if not provided
+    if [ -z "$VERSION" ]; then
+        VERSION=$(get_project_version "../../package.json") # Assumes get_project_version can take a path
+        if [ -z "$VERSION" ]; then
+          error "Could not determine project version from ../../package.json. Please specify with -v."
+          exit "$ERROR_CONFIGURATION"
+        fi
+        info "Using project version from package.json: $VERSION"
+    fi
 }
 
+# --- Main Deployment Logic ---
+
 main() {
-    header "🚀 Starting deployment to $TARGET (sources: ${SOURCES[*]:-all}, dest: $DEST)..."
-    # Default to not detached; teardown proxy when exiting
-    DETACHED="no"
     parse_arguments "$@"
 
-    # Determine env file based on target
-    if [ "$TARGET" = "prod" ]; then
-        ENV_FILE=".env-prod"
-    else
-        ENV_FILE=".env-dev"
+    header "🚀 Starting deployment of '$SOURCE_TYPE' to '$TARGET' (version: $VERSION, location: $LOCATION)..."
+
+    source "${HERE}/../main/setup.sh" "$@"
+
+    # Determine artifact directory based on location and source type
+    local artifact_dir
+    if [[ "$LOCATION" == "local" ]]; then
+        local project_root_dir
+        project_root_dir="$(cd "${HERE}/../../" && pwd)" # HERE is scripts/main, so ../../ is project root
+
+        case "$SOURCE_TYPE" in
+            docker)
+                artifact_dir="${project_root_dir}/dist/artifacts/docker/${VERSION}"
+                info "Expecting local Docker artifacts in: ${artifact_dir}"
+                ;;
+            k8s)
+                artifact_dir="${project_root_dir}/dist/artifacts/k8s/${VERSION}"
+                info "Expecting local Kubernetes artifacts in: ${artifact_dir}"
+                ;;
+            vps)
+                # Assuming VPS deploys a general purpose bundle, e.g., 'zip' from build.sh bundles
+                artifact_dir="${project_root_dir}/dist/bundles/zip/${VERSION}"
+                info "Expecting local VPS (zip bundle) artifacts in: ${artifact_dir}"
+                ;;
+            windows)
+                artifact_dir="${project_root_dir}/dist/desktop/windows/${VERSION}"
+                info "Expecting local Windows Desktop artifacts in: ${artifact_dir}"
+                ;;
+            android)
+                # This path assumes build.sh (or scripts it calls like googlePlayStore.sh)
+                # will place versioned Android artifacts here for local deployment scenarios.
+                # Current build.sh output for Android might need adjustments to align with this versioned path.
+                artifact_dir="${project_root_dir}/dist/android/${VERSION}"
+                info "Expecting local Android artifacts in: ${artifact_dir}"
+                ;;
+            *)
+                error "Unsupported SOURCE_TYPE '${SOURCE_TYPE}' for local deployment artifact path. Please check configuration."
+                exit "$ERROR_CONFIGURATION"
+                ;;
+        esac
+    else # Assuming remote or other locations
+        artifact_dir="/var/tmp/${VERSION}"
+        info "Expecting remote artifacts in: ${artifact_dir}"
     fi
 
-    # Default to all sources if none specified
-    if [ ${#SOURCES[@]} -eq 0 ]; then
-        SOURCES=("all")
+    # Check if artifacts exist at the determined location
+    if [ ! -d "$artifact_dir" ]; then
+        error "Artifact directory not found: ${artifact_dir}"
+        if [[ "$LOCATION" == "local" ]]; then
+            error "For local deployment, ensure artifacts for SOURCE_TYPE '${SOURCE_TYPE}' (version: ${VERSION}) were correctly built and placed."
+            error "This typically involves 'build.sh --dest local' or equivalent steps for the specific source type."
+        else
+            error "For remote deployment, ensure artifacts were built and copied using 'build.sh --dest remote' to the target server."
+        fi
+        exit "$ERROR_ARTIFACTS_MISSING"
     fi
-
-    load_secrets
-    check_location_if_not_set
+    # Optionally, check for specific files needed by the source_type within artifact_dir
 
     if [[ "$LOCATION" == "remote" ]]; then
-        header "Configuring Caddy reverse proxy for deployment..."
         setup_reverse_proxy
-        # Teardown reverse proxy on script exit unless detached
         if ! is_yes "$DETACHED"; then
             trap 'info "Tearing down Caddy reverse proxy..."; stop_reverse_proxy' EXIT INT TERM
         fi
     fi
 
-    for src in "${SOURCES[@]}"; do
-        # Determine artifact directory for local
-        if [ "$DEST" = "local" ]; then
-            version=$(node -p "require('../../package.json').version")
-            srcdir="${HERE}/../../dist/${src}/${version}"
-            if [ ! -d "$srcdir" ]; then
-                error "Artifacts not found for $src at $srcdir"
-                continue
-            fi
-            info "Using local artifacts at $srcdir"
-        else
-            warn "Remote source not implemented for $src"
-        fi
+    # Execute deployment based on the single source type
+    info "Deploying $SOURCE_TYPE (Version: $VERSION)..."
+    case "$SOURCE_TYPE" in
+        docker)
+            deploy_docker "$TARGET" "$artifact_dir" # Pass artifact dir if needed
+            ;;
+        k8s)
+            deploy_k8s "$TARGET" "$artifact_dir" # Pass artifact dir if needed
+            ;;
+        vps)
+            deploy_vps "$TARGET" "$artifact_dir" # Pass artifact dir if needed
+            ;;
+        windows)
+            info "Deploying Windows binary (stub) from $artifact_dir"
+            # Add actual deployment logic here if needed
+            ;;
+        android)
+            info "Deploying Android package (stub) from $artifact_dir"
+            # Add actual deployment logic here if needed
+            ;;
+        *)
+            # This case should not be reached due to arg_register options
+            error "Unknown source type: $SOURCE_TYPE";
+            exit "$ERROR_USAGE"
+            ;;
+    esac
 
-        case "$src" in
-            all)
-                for svc in docker k8s vps; do
-                    info "Deploying $svc using artifacts..."
-                    deploy_${svc} "$TARGET"
-                done
-                ;;
-            docker)
-                info "Deploying Docker artifacts..."
-                deploy_docker "$TARGET"
-                ;;
-            k8s)
-                info "Deploying Kubernetes artifacts..."
-                deploy_k8s "$TARGET"
-                ;;
-            vps)
-                info "Deploying VPS artifacts..."
-                deploy_vps "$TARGET"
-                ;;
-            windows)
-                info "Deploying Windows binary (stub) from $srcdir"
-                ;;
-            android)
-                info "Deploying Android package (stub) from $srcdir"
-                ;;
-            *)
-                warn "Unknown source type: $src";;
-        esac
-    done
-
-    success "✅ Deployment completed for $TARGET."
+    success "✅ Deployment completed for $SOURCE_TYPE on $TARGET."
 }
 
 main "$@" 

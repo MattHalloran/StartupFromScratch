@@ -5,7 +5,11 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${HERE}/logging.sh"
+# shellcheck disable=SC1091
+source "${HERE}/flow.sh"
+# shellcheck disable=SC1091
+source "${HERE}/system.sh"
 
 is_caddy_installed() {
     if command -v caddy &> /dev/null; then

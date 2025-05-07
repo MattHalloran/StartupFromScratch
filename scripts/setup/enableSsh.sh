@@ -5,7 +5,9 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${HERE}/../utils/flow.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../utils/logging.sh"
 
 # enable PasswordAuthentication for ssh
 enable_password_authentication() {

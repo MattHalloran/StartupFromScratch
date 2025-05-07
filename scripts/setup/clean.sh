@@ -5,7 +5,9 @@ DESCRIPTION="Cleans up volumes, caches, packages, and other build artifacts. Whe
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${HERE}/../utils/flow.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../utils/logging.sh"
 
 # Clear node_modules at the root and in all project subdirectories without descending into them
 clear_node_modules() {

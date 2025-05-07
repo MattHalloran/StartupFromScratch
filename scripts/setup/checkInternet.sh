@@ -5,7 +5,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${HERE}/../utils/logging.sh"
 
 # Check if host has internet access. Exits with error if no access.
 check_internet() {

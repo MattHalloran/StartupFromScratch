@@ -7,7 +7,9 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BATS_DEPENDENCIES_DIR="${HERE}/../__tests/helpers"
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${HERE}/../utils/flow.sh"
+# shellcheck disable=SC1091
+source "${HERE}/../utils/logging.sh"
 
 # Function to determine and export BATS_PREFIX based on environment and sudo mode
 _determine_bats_prefix() {
