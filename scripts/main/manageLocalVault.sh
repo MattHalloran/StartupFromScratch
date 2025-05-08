@@ -4,10 +4,14 @@
 set -euo pipefail
 DESCRIPTION="Manages a LOCAL Vault instance (start/stop/status), with AppRole setup and optional dev secret seeding for DEVELOPMENT ONLY."
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${MAIN_DIR}/../helpers/utils/flow.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/locations.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/logging.sh"
 
 # --- Configuration ---
 # Default Vault address for local dev instance
@@ -130,7 +134,7 @@ stop_local_vault() {
 # Seeds default development credentials into Vault's KV engine at the 'secret/vrooli/dev' path.
 seed_local_dev_secrets() {
     header "🌱 Seeding .env-dev variables into Vault KV at 'secret/vrooli/dev'..."
-    local env_file="$HERE/../../.env-dev"
+    local env_file="$ENV_DEV_FILE"
     if [ ! -f "$env_file" ]; then
         warning "No .env-dev file found at $env_file; skipping seeding."
         return 0

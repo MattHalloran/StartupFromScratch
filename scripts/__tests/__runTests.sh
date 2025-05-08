@@ -2,17 +2,17 @@
 # Runs all *.bats files in the scripts directory and subdirectories and provides a summary
 
 # Determine this script directory and set up library path for BATS
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+TESTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Ensure BATS helper libraries are discoverable by bats_load_library
-export BATS_LIB_PATH="${HERE}/helpers:${BATS_LIB_PATH-}"
+export BATS_LIB_PATH="${TESTS_DIR}/helpers:${BATS_LIB_PATH-}"
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${TESTS_DIR}/../utils/index.sh"
 
 # Disable exit on error to allow handling test failures manually
 set +e
 
-SCRIPTS_DIR=$(dirname "${HERE}")
+SCRIPTS_DIR=$(dirname "${TESTS_DIR}")
 
 total_tests=0
 total_failures=0

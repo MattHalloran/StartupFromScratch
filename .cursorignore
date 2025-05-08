@@ -176,8 +176,8 @@ sketch
 # End of https://www.toptal.com/developers/gitignore/api/react,node
 
 build/
-# But explicity allow scripts/build/
-!scripts/build/
+# But explicity allow build scripts
+!scripts/**/build/
 
 #Database
 *.db

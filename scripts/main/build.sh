@@ -2,18 +2,26 @@
 set -euo pipefail
 DESCRIPTION="Builds specified artifacts for the Vrooli project, as preparation for deployment."
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+MAIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${MAIN_DIR}/../helpers/utils/arguments.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../build/index.sh"
+source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../build/artifacts/index.sh"
+source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../build/binaries/index.sh"
+source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../build/bundles/index.sh"
+source "${MAIN_DIR}/../helpers/utils/logging.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/build/index.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/build/artifacts/index.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/build/binaries/index.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/build/bundles/index.sh"
 
 parse_arguments() {
     arg_reset
@@ -203,9 +211,9 @@ main() {
         esac
 
         if [ "$DEST" = "local" ]; then
-            local dest_dir="${HERE}/../../dist/bundles/${b}/${VERSION}"
+            local dest_dir="${DEST_DIR}/bundles/${b}/${VERSION}"
             mkdir -p "${dest_dir}"
-            local source_dir="/var/tmp/${VERSION}"
+            local source_dir="${REMOTE_DIST_DIR}/${VERSION}"
             if [ -d "${source_dir}" ]; then
               cp -r "${source_dir}"/* "${dest_dir}/"
               success "Copied bundle ${b} version ${VERSION} to ${dest_dir}"
@@ -219,10 +227,10 @@ main() {
 
     # Compress build artifacts for distribution
     info "Compressing build artifacts for Docker deployments..."
-    local out_dir="/var/tmp/${VERSION}"
+    local out_dir="${REMOTE_DIST_DIR}/${VERSION}"
     mkdir -p "$out_dir"
     # Archive package dist directories
-    pushd "${HERE}/../../packages" >/dev/null || { error "Failed to change to packages directory"; exit "$ERROR_BUILD_FAILED"; }
+    pushd "${PACKAGES_DIR}" >/dev/null || { error "Failed to change to packages directory"; exit "$ERROR_BUILD_FAILED"; }
     tar -czf "$out_dir/build.tar.gz" ui/dist server/dist shared/dist 2>/dev/null || {
         popd >/dev/null
         error "Failed to compress build artifacts"
@@ -237,10 +245,10 @@ main() {
             docker)
                 info "Building Docker artifacts..."
                 # Always use docker-compose-prod.yml
-                local compose_file="${HERE}/../../docker-compose-prod.yml"
+                local compose_file="${ROOT_DIR}/docker-compose-prod.yml"
                 info "Using Docker Compose file: $compose_file"
                 # Navigate to project root
-                pushd "${HERE}/../.." >/dev/null || { error "Cannot change to project root"; exit "$ERROR_BUILD_FAILED"; }
+                pushd "${ROOT_DIR}" >/dev/null || { error "Cannot change to project root"; exit "$ERROR_BUILD_FAILED"; }
                 # Build Docker images
                 if command -v docker compose >/dev/null 2>&1; then
                     docker compose -f "$compose_file" build --no-cache --progress=plain
@@ -318,7 +326,7 @@ main() {
             # android/ios are likely mobile builds, not desktop - keeping stubs
             android)
                 info "Building Android package..."
-                bash "${HERE}/../build/googlePlayStore.sh"
+                bash "${MAIN_DIR}/../helpers/build/googlePlayStore.sh"
                 continue # Skip electron-builder for android
                 ;;
             ios)
@@ -342,8 +350,8 @@ main() {
 
             # Copying logic (optional, adjust as needed)
             if [ "$DEST" = "local" ]; then
-              local dest_dir="${HERE}/../../dist/desktop/${c}/${VERSION}"
-              local source_dir="${HERE}/../../dist/desktop"
+              local dest_dir="${DEST_DIR}/desktop/${c}/${VERSION}"
+              local source_dir="${DEST_DIR}/desktop"
               mkdir -p "${dest_dir}"
               # Copy specific installer/package file(s)
               # This is an example, glob patterns might need adjustment
@@ -359,8 +367,8 @@ main() {
     # --- Remote Destination Handling ---
     if [ "$DEST" = "remote" ]; then
         header "🚚 Preparing and copying build artifacts to remote server..."
-        local remote_tmp_dir="/var/tmp"
-        local local_source_dir="/var/tmp/${VERSION}"
+        local remote_tmp_dir="${REMOTE_DIST_DIR}"
+        local local_source_dir="${DEST_DIR}"
         local remote_dest_dir="${remote_tmp_dir}/${VERSION}"
         local tarball_name="vrooli-build-${VERSION}.tar.gz"
         local local_tarball_path="${remote_tmp_dir}/${tarball_name}" # Create tarball locally in /var/tmp
@@ -381,7 +389,7 @@ main() {
         info "Setting up SSH connection to ${SITE_IP}..."
         # Assuming keylessSsh.sh sets up keys correctly. Need to ensure SITE_IP is loaded.
         # shellcheck disable=SC1091
-        source "${HERE}/../utils/keylessSsh.sh"
+        source "${MAIN_DIR}/../helpers/utils/keylessSsh.sh"
         setup_ssh_key "${SITE_IP}" || {
             error "Failed to set up SSH key for ${SITE_IP}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"

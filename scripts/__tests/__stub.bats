@@ -1,17 +1,17 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
 
-HERE="$BATS_TEST_DIRNAME"
+TESTS_DIR="$BATS_TEST_DIRNAME"
 
 # Set up the stub directory and PATH
-export BATS_TMPDIR="${HERE}/tmp" # WARNING: We use `rm -rf "$BATS_TMPDIR"` in teardown. Make sure it's safe to delete!
+export BATS_TMPDIR="${TESTS_DIR}/tmp" # WARNING: We use `rm -rf "$BATS_TMPDIR"` in teardown. Make sure it's safe to delete!
 export BATS_MOCK_BINDIR="${BATS_TMPDIR}/bin"
 mkdir -p "$BATS_MOCK_BINDIR"
 export PATH="$BATS_MOCK_BINDIR:$PATH"
 
-chmod +x "${HERE}/__stub.bash"
-chmod +x "${HERE}/__binstub"
-load "${HERE}/__stub.bash"
+chmod +x "${TESTS_DIR}/__stub.bash"
+chmod +x "${TESTS_DIR}/__binstub"
+load "${TESTS_DIR}/__stub.bash"
 
 # Common exit codes
 ERROR_COMMAND_NOT_FOUND=127

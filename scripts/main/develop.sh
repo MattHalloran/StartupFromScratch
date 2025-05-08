@@ -2,14 +2,22 @@
 set -euo pipefail
 DESCRIPTION="Starts the development environment."
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${MAIN_DIR}/../helpers/utils/arguments.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../develop/index.sh"
+source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../develop/target/index.sh"
+source "${MAIN_DIR}/../helpers/utils/locations.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/logging.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/targetMatcher.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/develop/index.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/develop/target/index.sh"
 
 parse_arguments() {
     arg_reset
@@ -42,7 +50,7 @@ main() {
     parse_arguments "$@"
     header "🏃 Starting development environment for $(match_target "$TARGET")"
 
-    source "${HERE}/../main/setup.sh" "$@"
+    source "${MAIN_DIR}/setup.sh" "$@"
 
     if [[ "$LOCATION" == "remote" ]]; then
         setup_reverse_proxy

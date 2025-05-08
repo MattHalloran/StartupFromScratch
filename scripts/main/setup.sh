@@ -3,14 +3,32 @@ set -euo pipefail
 DESCRIPTION="Prepares the project for development or production."
 
 # Changed to export since it's used in other scripts
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${MAIN_DIR}/../helpers/utils/arguments.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../setup/index.sh"
+source "${MAIN_DIR}/../helpers/utils/domainCheck.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../setup/target/index.sh"
+source "${MAIN_DIR}/../helpers/utils/env.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/flow.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/genJwt.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/locations.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/logging.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/ports.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/proxy.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/targetMatcher.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/setup/index.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/setup/target/index.sh"
 
 parse_arguments() {
     arg_reset
@@ -104,7 +122,7 @@ main() {
 
     # Schedule backups if production .env exists
     if env_prod_file_exists; then
-        "${HERE}/../main/backup.sh"
+        "${HERE}/backup.sh"
     fi
 }
 

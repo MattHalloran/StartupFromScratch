@@ -2,11 +2,14 @@
 # This script periodically backs up the database and essential files from a remote server
 set -euo pipefail
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT_DIR=$(cd "$HERE"/../../.. && pwd)
+MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${MAIN_DIR}/../helpers/utils/env.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/locations.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/logging.sh"
 
 # Default values
 BACKUP_COUNT="5"
@@ -22,18 +25,18 @@ do_backup() {
     info "Remote server: ${remote_server}"
 
     # Fetch the version number from the package.json on the remote server
-    VERSION=$(ssh -i ~/.ssh/id_rsa_${SITE_IP} $remote_server "cat /root/Vrooli/package.json | grep '\"version\":' | head -1 | awk -F: '{ print \$2 }' | sed 's/[\", ]//g'")
+    VERSION=$(ssh -i ~/.ssh/id_rsa_${SITE_IP} $remote_server "cat ${REMOTE_ROOT_DIR}/package.json | grep '\"version\":' | head -1 | awk -F: '{ print \$2 }' | sed 's/[\", ]//g'")
     info "Version number retrieved from remote package.json: ${VERSION}"
 
     # Set the local directory to save the backup files to
-    backup_root_dir="${HERE}/../backups/${SITE_IP}"
+    backup_root_dir="${BACKUPS_DIR}/${SITE_IP}"
     local_dir="${backup_root_dir}/$(date +"%Y%m%d%H%M%S")"
 
     # Create the backup directory
     mkdir -p "${local_dir}"
 
     # Backup the database, data directory, JWT files, and .env* files
-    ssh -i ~/.ssh/id_rsa_${SITE_IP} $remote_server "cd /root/Vrooli && tar -czf - data/postgres-prod jwt_* .env*" >"${local_dir}/backup-$VERSION.tar.gz"
+    ssh -i ~/.ssh/id_rsa_${SITE_IP} $remote_server "cd ${REMOTE_ROOT_DIR} && tar -czf - data/postgres-prod jwt_* .env*" >"${local_dir}/backup-$VERSION.tar.gz"
 
     # Remove old backup directories to keep only the most recent k backups
     ls -t "$backup_root_dir" | tail -n +$((BACKUP_COUNT + 1)) | xargs -I {} rm -r "$backup_root_dir"/{}

@@ -4,19 +4,25 @@
 set -euo pipefail
 DESCRIPTION="Deploys a specific Vrooli service artifact to the target environment."
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ——— Default values ——— #
 export ENV_FILE=""
 
 # shellcheck disable=SC1091
-source "${HERE}/../utils/index.sh"
+source "${MAIN_DIR}/../helpers/utils/arguments.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../deploy/docker.sh"
+source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../deploy/k8s.sh"
+source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
-source "${HERE}/../deploy/vps.sh"
+source "${MAIN_DIR}/../helpers/utils/logging.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/deploy/docker.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/deploy/k8s.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/deploy/vps.sh"
 
 # Default values set in parse_arguments
 TARGET=""
@@ -115,37 +121,34 @@ main() {
 
     header "🚀 Starting deployment of '$SOURCE_TYPE' to '$TARGET' (version: $VERSION, location: $LOCATION)..."
 
-    source "${HERE}/../main/setup.sh" "$@"
+    source "${MAIN_DIR}/setup.sh" "$@"
 
     # Determine artifact directory based on location and source type
     local artifact_dir
     if [[ "$LOCATION" == "local" ]]; then
-        local project_root_dir
-        project_root_dir="$(cd "${HERE}/../../" && pwd)" # HERE is scripts/main, so ../../ is project root
-
         case "$SOURCE_TYPE" in
             docker)
-                artifact_dir="${project_root_dir}/dist/artifacts/docker/${VERSION}"
+                artifact_dir="${DEST_DIR}/artifacts/docker/${VERSION}"
                 info "Expecting local Docker artifacts in: ${artifact_dir}"
                 ;;
             k8s)
-                artifact_dir="${project_root_dir}/dist/artifacts/k8s/${VERSION}"
+                artifact_dir="${DEST_DIR}/artifacts/k8s/${VERSION}"
                 info "Expecting local Kubernetes artifacts in: ${artifact_dir}"
                 ;;
             vps)
                 # Assuming VPS deploys a general purpose bundle, e.g., 'zip' from build.sh bundles
-                artifact_dir="${project_root_dir}/dist/bundles/zip/${VERSION}"
+                artifact_dir="${DEST_DIR}/bundles/zip/${VERSION}"
                 info "Expecting local VPS (zip bundle) artifacts in: ${artifact_dir}"
                 ;;
             windows)
-                artifact_dir="${project_root_dir}/dist/desktop/windows/${VERSION}"
+                artifact_dir="${DEST_DIR}/desktop/windows/${VERSION}"
                 info "Expecting local Windows Desktop artifacts in: ${artifact_dir}"
                 ;;
             android)
                 # This path assumes build.sh (or scripts it calls like googlePlayStore.sh)
                 # will place versioned Android artifacts here for local deployment scenarios.
                 # Current build.sh output for Android might need adjustments to align with this versioned path.
-                artifact_dir="${project_root_dir}/dist/android/${VERSION}"
+                artifact_dir="${DEST_DIR}/android/${VERSION}"
                 info "Expecting local Android artifacts in: ${artifact_dir}"
                 ;;
             *)
@@ -154,7 +157,7 @@ main() {
                 ;;
         esac
     else # Assuming remote or other locations
-        artifact_dir="/var/tmp/${VERSION}"
+        artifact_dir="${REMOTE_DIST_DIR}/${VERSION}"
         info "Expecting remote artifacts in: ${artifact_dir}"
     fi
 
