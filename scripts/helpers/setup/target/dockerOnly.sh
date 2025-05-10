@@ -5,14 +5,14 @@ set -euo pipefail
 SETUP_TARGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${SETUP_TARGET_DIR}/../../utils/logging.sh"
+source "${SETUP_TARGET_DIR}/../../utils/log.sh"
 
 setup_docker_only() {
-    header "Setting up Docker only development/production..."
+    log::header "Setting up Docker only development/production..."
 
-    info "Building Docker images for all services..."
+    log::info "Building Docker images for all services..."
     docker-compose build
 
-    success "✅ Docker images built successfully."
+    log::success "✅ Docker images built successfully."
 }
 

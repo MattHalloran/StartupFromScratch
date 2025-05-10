@@ -19,7 +19,6 @@ async function main() {
         "JWT_PUB", // Public key for JWT tokens
         "PROJECT_DIR", // Path to the project directory
         "VITE_SERVER_LOCATION", // Location of the server
-        "LETSENCRYPT_EMAIL", // Email for Let's Encrypt
         "VAPID_PUBLIC_KEY", // Public key for VAPID
         "VAPID_PRIVATE_KEY", // Private key for VAPID
         "WORKER_ID", // Worker ID (e.g. pod ordinal) for Snowflake IDs
@@ -38,7 +37,7 @@ async function main() {
     });
 
     // Add health check endpoint
-    app.get("/health", (req, res) => {
+    app.get("/healthcheck", (req, res) => {
         res.status(200).send("OK");
     });
 
@@ -49,7 +48,7 @@ async function main() {
 
 // Only call this from the "server" package when not testing
 if (
-    process.env.npm_package_name === "@local/server" &&
+    process.env.npm_package_name?.endsWith('/server') &&
     process.env.NODE_ENV !== "test"
 ) {
     main();

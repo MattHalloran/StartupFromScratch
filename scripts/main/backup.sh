@@ -9,7 +9,7 @@ source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/logging.sh"
+source "${MAIN_DIR}/../helpers/utils/log.sh"
 
 # Default values
 BACKUP_COUNT="5"
@@ -22,11 +22,11 @@ do_backup() {
 
     # Set the remote server location, using SITE_IP from .env
     remote_server="root@${SITE_IP}"
-    info "Remote server: ${remote_server}"
+    log::info "Remote server: ${remote_server}"
 
     # Fetch the version number from the package.json on the remote server
     VERSION=$(ssh -i ~/.ssh/id_rsa_${SITE_IP} $remote_server "cat ${REMOTE_ROOT_DIR}/package.json | grep '\"version\":' | head -1 | awk -F: '{ print \$2 }' | sed 's/[\", ]//g'")
-    info "Version number retrieved from remote package.json: ${VERSION}"
+    log::info "Version number retrieved from remote package.json: ${VERSION}"
 
     # Set the local directory to save the backup files to
     backup_root_dir="${BACKUPS_DIR}/${SITE_IP}"
@@ -42,7 +42,7 @@ do_backup() {
     ls -t "$backup_root_dir" | tail -n +$((BACKUP_COUNT + 1)) | xargs -I {} rm -r "$backup_root_dir"/{}
 
     # Log the backup operation
-    info "Backup created: ${local_dir}/backup-$VERSION.tar.gz"
+    log::info "Backup created: ${local_dir}/backup-$VERSION.tar.gz"
 }
 
 init_backup() {
@@ -67,10 +67,10 @@ schedule_backups() {
 
     # Install cron entry if not already present
     if crontab -l 2>/dev/null | grep -F "${CRON_CMD}" >/dev/null; then
-        info "Backup cron already installed"
+        log::info "Backup cron already installed"
     else
         (crontab -l 2>/dev/null; echo "${CRON_ENTRY}") | crontab -
-        success "✅ Scheduled backup cron job: ${CRON_ENTRY}"
+        log::success "✅ Scheduled backup cron job: ${CRON_ENTRY}"
     fi
 
     # Start a backup immediately

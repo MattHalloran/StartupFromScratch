@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
 
-SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/logging.sh"
+SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/log.sh"
 . "$SCRIPT_PATH"
 
 @test "get_color_code returns correct codes" {

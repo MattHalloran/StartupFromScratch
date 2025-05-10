@@ -9,15 +9,15 @@ SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/logging.sh"
+source "${SETUP_DIR}/../utils/log.sh"
 
 # Fix the system clock
-fix_system_clock() {
-    if ! can_run_sudo; then
-        warning "Skipping system clock accuracy check due to insufficient permissions"
+clock::fix_system_clock() {
+    if ! flow::can_run_sudo; then
+        log::warning "Skipping system clock accuracy check due to insufficient permissions"
         return
     fi
-    header "Making sure the system clock is accurate"
+    log::header "Making sure the system clock is accurate"
     sudo hwclock -s
-    info "System clock is now: $(date)"
+    log::info "System clock is now: $(date)"
 }

@@ -5,7 +5,7 @@ set -euo pipefail
 export TERM=${TERM:-xterm}
 
 # Helper function to get color code
-get_color_code() {
+log::get_color_code() {
     local color=$1
     case $color in
     RED) echo "1" ;;
@@ -20,11 +20,12 @@ get_color_code() {
 }
 
 # Initialize a single color
-initialize_color() {
+log::initialize_color() {
     local color_name="$1"
     local color_code
-    color_code=$(get_color_code "$color_name")
+    color_code=$(log::get_color_code "$color_name")
 
+    # NOTE: Don't use system::is_command here, because it will cause a circular dependency
     if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
         eval "$color_name=$(tput setaf "$color_code")"
     else
@@ -33,7 +34,8 @@ initialize_color() {
 }
 
 # Initialize color reset
-initialize_reset() {
+log::initialize_reset() {
+    # NOTE: Don't use system::is_command here, because it will cause a circular dependency
     if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
         RESET=$(tput sgr0)
     else
@@ -42,45 +44,39 @@ initialize_reset() {
 }
 
 # Echo colored text
-echo_color() {
+log::echo_color() {
     local color="$1"
     local message="$2"
     local color_value
 
-    initialize_color "$color"
-    initialize_reset
+    log::initialize_color "$color"
+    log::initialize_reset
 
     eval "color_value=\$$color"
 
     printf '%s%s%s\n' "$color_value" "$message" "$RESET"
 }
 
-# Print header message
-header() {
-    echo_color MAGENTA "[HEADER]  $*"
+log::header() {
+    log::echo_color MAGENTA "[HEADER]  $*"
 }
 
-# Print info message
-info() {
-    echo_color CYAN "[INFO]    $*"
+log::info() {
+    log::echo_color CYAN "[INFO]    $*"
 }
 
-# Print success message
-success() {
-    echo_color GREEN "[SUCCESS] $*"
+log::success() {
+    log::echo_color GREEN "[SUCCESS] $*"
 }
 
-# Print error message
-error() {
-    echo_color RED "[ERROR]   $*"
+log::error() {
+    log::echo_color RED "[ERROR]   $*"
 }
 
-# Print warning message
-warning() {
-    echo_color YELLOW "[WARNING] $*"
+log::warning() {
+    log::echo_color YELLOW "[WARNING] $*"
 }
 
-# Print input prompt message
-prompt() {
-    echo_color BLUE "[PROMPT]  $*"
+log::prompt() {
+    log::echo_color BLUE "[PROMPT]  $*"
 }

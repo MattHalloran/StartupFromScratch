@@ -10,7 +10,7 @@ source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/locations.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/logging.sh"
+source "${SETUP_DIR}/../utils/log.sh"
 
 BATS_DEPENDENCIES_DIR="${SCRIPT_TESTS_DIR}/helpers"
 
@@ -21,15 +21,15 @@ _determine_bats_prefix() {
 
     # Check if we need to switch to user-local dir
     # Condition: Default prefix is used AND (sudo mode is skip OR sudo cannot be run)
-    if [ "$prefix" = "/usr/local" ] && { [ "${SUDO_MODE:-error}" = "skip" ] || ! can_run_sudo; }; then
+    if [ "$prefix" = "/usr/local" ] && { [ "${SUDO_MODE:-error}" = "skip" ] || ! flow::can_run_sudo; }; then
         prefix="$HOME/.local"
-        info "Sudo unavailable/skipped: switching Bats install prefix to $prefix"
+        log::info "Sudo unavailable/skipped: switching Bats install prefix to $prefix"
         # Ensure the local bin directory exists for Bats install and PATH update
         mkdir -p "$prefix/bin" # Bats install.sh might expect the base prefix to exist
     elif [ "$prefix" != "/usr/local" ]; then
-        info "Using user-defined BATS_PREFIX: $prefix"
+        log::info "Using user-defined BATS_PREFIX: $prefix"
     else
-        info "Using default Bats install prefix: $prefix"
+        log::info "Using default Bats install prefix: $prefix"
     fi
     export BATS_PREFIX="$prefix" # Export the final determined value
 }
@@ -46,9 +46,9 @@ install_bats_dependency() {
     cd "$BATS_DEPENDENCIES_DIR"
     if [ ! -d "$dir_name" ]; then
         git clone "$repo_url" "$dir_name"
-        success "$dir_name installed successfully at $(pwd)/$dir_name"
+        log::success "$dir_name installed successfully at $(pwd)/$dir_name"
     else
-        info "$dir_name is already installed"
+        log::info "$dir_name is already installed"
     fi
     cd "$ORIGINAL_DIR"
 }
@@ -62,17 +62,17 @@ install_bats_core() {
         git clone https://github.com/bats-core/bats-core.git
         cd bats-core
         mkdir -p "$BATS_PREFIX"
-        if can_run_sudo; then
-            info "Installing Bats-core into $BATS_PREFIX (with sudo)"
+        if flow::can_run_sudo; then
+            log::info "Installing Bats-core into $BATS_PREFIX (with sudo)"
             sudo ./install.sh "$BATS_PREFIX"
         else
-            info "Installing Bats-core into $BATS_PREFIX (no sudo)"
+            log::info "Installing Bats-core into $BATS_PREFIX (no sudo)"
             ./install.sh "$BATS_PREFIX"
         fi
-        success "Bats-core installed successfully into $BATS_PREFIX"
+        log::success "Bats-core installed successfully into $BATS_PREFIX"
         cd ..
     else
-        info "Bats-core is already installed"
+        log::info "Bats-core is already installed"
     fi
     cd "$ORIGINAL_DIR"
 }
@@ -81,7 +81,7 @@ install_bats_core() {
 install_bats() {
     _determine_bats_prefix # Determine prefix before potentially updating PATH
 
-    header "Installing Bats and dependencies for Bash script testing"
+    log::header "Installing Bats and dependencies for Bash script testing"
 
     # Create dependencies directory
     create_bats_dependencies_dir
@@ -97,8 +97,8 @@ install_bats() {
     # Ensure Bats bin directory is in PATH without duplicates
     if [[ ":$PATH:" != *":$BATS_PREFIX/bin:"* ]]; then
         export PATH="$BATS_PREFIX/bin:$PATH"
-        info "Added $BATS_PREFIX/bin to PATH"
+        log::info "Added $BATS_PREFIX/bin to PATH"
     fi
 
-    success "Bats and dependencies installed successfully"
+    log::success "Bats and dependencies installed successfully"
 }

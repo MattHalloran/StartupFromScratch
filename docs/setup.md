@@ -39,8 +39,8 @@ This file is committed and shows the keys you must set. Actual environment files
 Contains common helpers sourced by all scripts:
 
 ```bash
-# is_yes: returns true if argument is y, yes, true, or 1 (case-insensitive)
-is_yes() {
+# Returns 0 if argument is yes-like
+flow::is_yes() {
   case "${1,,}" in
     y|yes|true|1) return 0;;
     *) return 1;;

@@ -6,7 +6,7 @@ DESCRIPTION="Prepares the project for development or production."
 MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/arguments.sh"
+source "${MAIN_DIR}/../helpers/utils/args.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/domainCheck.sh"
 # shellcheck disable=SC1091
@@ -14,11 +14,11 @@ source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/genJwt.sh"
+source "${MAIN_DIR}/../helpers/utils/jwt.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/logging.sh"
+source "${MAIN_DIR}/../helpers/utils/log.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/ports.sh"
 # shellcheck disable=SC1091
@@ -31,16 +31,16 @@ source "${MAIN_DIR}/../helpers/setup/index.sh"
 source "${MAIN_DIR}/../helpers/setup/target/index.sh"
 
 parse_arguments() {
-    arg_reset
+    args::reset
 
-    arg_register_help
-    arg_register_sudo_mode
-    arg_register_yes
-    arg_register_location
-    arg_register_environment
-    arg_register_target
+    args::register_help
+    args::register_sudo_mode
+    args::register_yes
+    args::register_location
+    args::register_environment
+    args::register_target
 
-    arg_register \
+    args::register \
         --name "clean" \
         --flag "c" \
         --desc "Remove previous artefacts (volumes, ~/.pnpm-store, etc.)" \
@@ -48,7 +48,7 @@ parse_arguments() {
         --options "yes|no" \
         --default "no"
 
-    arg_register \
+    args::register \
         --name "ci-cd" \
         --flag "d" \
         --desc "Configure the system for CI/CD (via GitHub Actions)" \
@@ -56,54 +56,55 @@ parse_arguments() {
         --options "yes|no" \
         --default "no"
 
-    if is_asking_for_help "$@"; then
-        arg_usage "$DESCRIPTION"
-        print_exit_codes
+    if args::is_asking_for_help "$@"; then
+        args::usage "$DESCRIPTION"
+        exit_codes::print
         exit 0
     fi
 
-    arg_parse "$@" >/dev/null
+    args::parse "$@" >/dev/null
     
-    export TARGET=$(arg_get "target")
-    export CLEAN=$(arg_get "clean")
-    export CI=$(arg_get "ci-cd")
-    export SUDO_MODE=$(arg_get "sudo-mode")
-    export YES=$(arg_get "yes")
-    export LOCATION=$(arg_get "location")
-    export ENVIRONMENT=$(arg_get "environment")
+    export TARGET=$(args::get "target")
+    export CLEAN=$(args::get "clean")
+    export CI=$(args::get "ci-cd")
+    export SUDO_MODE=$(args::get "sudo-mode")
+    export YES=$(args::get "yes")
+    export LOCATION=$(args::get "location")
+    export ENVIRONMENT=$(args::get "environment")
 }
 
 main() {
     parse_arguments "$@"
-    header "🔨 Starting project setup for $(match_target "$TARGET")..."
+    log::header "🔨 Starting project setup for $(match_target "$TARGET")..."
 
     # Prepare the system
-    set_script_permissions
-    fix_system_clock
-    check_internet
-    run_system_update_and_upgrade
+    permissions::make_scripts_executable
+    clock::fix_system_clock
+    internet::check_connection
+    system::update_and_upgrade
 
     # Setup tools
-    setup_common_deps
-    setup_vault_client_deps
+    common_deps::check_and_install
+    setup_vault::check_deps
 
     # Clean up volumes & caches
-    if is_yes "$CLEAN"; then
-        clean
+    if flow::is_yes "$CLEAN"; then
+        clean::main
     fi
 
-    generate_jwt_key_pair
+    jwt::generate_key_pair
     load_secrets
     check_location_if_not_set
+    construct_derived_secrets
 
     if [[ "$LOCATION" == "remote" ]]; then
-        purge_apt_update_notifier
+        system::purge_apt_update_notifier
 
-        check_and_free_port "${PORT_DB:-5432}"
-        check_and_free_port "${PORT_JOBS:-4001}"
-        check_and_free_port "${PORT_REDIS:-6379}"
-        check_and_free_port "${PORT_SERVER:-5329}"
-        check_and_free_port "${PORT_UI:-3000}"
+        ports::check_and_free_port "${PORT_DB:-5432}"
+        ports::check_and_free_port "${PORT_JOBS:-4001}"
+        ports::check_and_free_port "${PORT_REDIS:-6379}"
+        ports::check_and_free_port "${PORT_SERVER:-5329}"
+        ports::check_and_free_port "${PORT_UI:-3000}"
 
         setup_reverse_proxy
     fi
@@ -118,7 +119,7 @@ main() {
 
     # Run the setup script for the target
     execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE:-1}"
-    success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
+    log::success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
 
     # Schedule backups if production .env exists
     if env_prod_file_exists; then

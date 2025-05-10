@@ -5,31 +5,47 @@ set -euo pipefail
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/logging.sh"
+source "${UTILS_DIR}/exit_codes.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/flow.sh"
 
 # Default timeout for system installs (in seconds)
 SYSTEM_INSTALL_TIMEOUT=${SYSTEM_INSTALL_TIMEOUT:-420}
 
-detect_pm() {
-    if   command -v apt-get  >/dev/null; then echo "apt-get"
-    elif command -v dnf      >/dev/null; then echo "dnf"
-    elif command -v yum      >/dev/null; then echo "yum"
-    elif command -v pacman   >/dev/null; then echo "pacman"
-    elif command -v apk      >/dev/null; then echo "apk"
-    elif command -v brew     >/dev/null; then echo "brew"
+system::is_command() {
+    # Using 'command -v' is generally preferred and more portable than 'which'
+    command -v "$1" >/dev/null 2>&1
+}
+
+system::assert_command() {
+    local command="$1"
+    local error_message="${2:-Command $command not found}"
+    if ! system::is_command "$command"; then
+        log::error "$error_message"
+        exit "${ERROR_COMMAND_NOT_FOUND}"
+    fi
+}
+
+system::detect_pm() {
+    if   system::is_command "apt-get"; then echo "apt-get"
+    elif system::is_command "dnf"; then echo "dnf"
+    elif system::is_command "yum"; then echo "yum"
+    elif system::is_command "pacman"; then echo "pacman"
+    elif system::is_command "apk"; then echo "apk"
+    elif system::is_command "brew"; then echo "brew"
     else
-        error "Unsupported pkg manager; please install dependencies manually."
+        log::error "Unsupported pkg manager; please install dependencies manually."
         exit 1
     fi
 }
 
 # Given a command name, return the real package to install on this distro.
-get_package_name() {
+system::get_package_name() {
     local cmd="$1"
     local pm
-    pm=$(detect_pm)
+    pm=$(system::detect_pm)
     
     case "$cmd" in
         # coreutils commands
@@ -58,22 +74,22 @@ get_package_name() {
     esac
 }
 
-install_pkg() {
+system::install_pkg() {
     local pkg="$1"
     local pm prefix
   
-    header "📦 Installing system package $pkg as $(get_package_name $pkg)"
-    pkg=$(get_package_name $pkg)
-    pm=$(detect_pm)
+    log::header "📦 Installing system package $pkg as $(system::get_package_name $pkg)"
+    pkg=$(system::get_package_name $pkg)
+    pm=$(system::detect_pm)
   
     # Brew never needs sudo; others only if allowed
     if [[ "$pm" == "brew" ]]; then
         prefix=""
-    elif can_run_sudo; then
+    elif flow::can_run_sudo; then
         prefix="sudo"
     else
         prefix=""
-        warning "No sudo available; running $pm commands as user"
+        log::warning "No sudo available; running $pm commands as user"
     fi
   
     case "$pm" in
@@ -99,59 +115,59 @@ install_pkg() {
             brew install "$pkg"
             ;;
         *)
-            error "Unsupported pkg manager: $pm"
+            log::error "Unsupported pkg manager: $pm"
             exit 1
             ;;
     esac
     
-    success "Installed $pkg via $pm"
+    log::success "Installed $pkg via $pm"
 }
 
 # Update package lists
-system_update() {
-    header "🔄 Updating system package lists"
-    if command -v apt-get >/dev/null 2>&1; then
+system::update() {
+    log::header "🔄 Updating system package lists"
+    if system::is_command "apt-get"; then
         # If we can sudo, prefix apt commands; otherwise run as current user
         local update_cmd="apt-get"
-        if can_run_sudo; then
+        if flow::can_run_sudo; then
             update_cmd="sudo apt-get"
         else
-            info "No sudo available, running apt-get update as current user"
+            log::info "No sudo available, running apt-get update as current user"
         fi
         $update_cmd update
-        success "apt-get update complete"
-    elif command -v brew >/dev/null 2>&1; then
+        log::success "apt-get update complete"
+    elif system::is_command "brew"; then
         brew update
-        success "Homebrew update complete"
+        log::success "Homebrew update complete"
     else
-        error "No supported package manager found for update"
+        log::error "No supported package manager found for update"
     fi
 }
 
 # Upgrade installed packages
-system_upgrade() {
-    header "⬆️ Upgrading system packages"
-    if command -v apt-get >/dev/null 2>&1; then
+system::upgrade() {
+    log::header "⬆️ Upgrading system packages"
+    if system::is_command "apt-get"; then
         # If we can sudo, prefix apt commands; otherwise run as current user
         local upgrade_cmd="apt-get"
-        if can_run_sudo; then
+        if flow::can_run_sudo; then
             upgrade_cmd="sudo apt-get"
         else
-            info "No sudo available, running apt-get upgrade as current user"
+            log::info "No sudo available, running apt-get upgrade as current user"
         fi
         $upgrade_cmd -y upgrade
-        success "apt-get upgrade complete"
-    elif command -v brew >/dev/null 2>&1; then
+        log::success "apt-get upgrade complete"
+    elif system::is_command "brew"; then
         brew upgrade
-        success "Homebrew upgrade complete"
+        log::success "Homebrew upgrade complete"
     else
-        error "No supported package manager found for upgrade"
+        log::error "No supported package manager found for upgrade"
     fi
 } 
 
 # Limits the number of system update calls
-should_run_system_update() {
-    if command -v apt-get >/dev/null 2>&1; then
+system::should_run_update() {
+    if system::is_command "apt-get"; then
         # Use apt list timestamp to throttle updates
         local last_update
         last_update=$(stat -c %Y /var/lib/apt/lists/)
@@ -163,7 +179,7 @@ should_run_system_update() {
         else
             return 1
         fi
-    elif command -v brew >/dev/null 2>&1; then
+    elif system::is_command "brew"; then
         # Always run brew update
         return 0
     else
@@ -173,8 +189,8 @@ should_run_system_update() {
 }
 
 # Limit the number of system upgrade calls
-should_run_system_upgrade() {
-    if command -v apt-get >/dev/null 2>&1; then
+system::should_run_upgrade() {
+    if system::is_command "apt-get"; then
         # Use dpkg status timestamp to throttle upgrades
         local last_upgrade
         last_upgrade=$(stat -c %Y /var/lib/dpkg/status)
@@ -186,7 +202,7 @@ should_run_system_upgrade() {
         else
             return 1
         fi
-    elif command -v brew >/dev/null 2>&1; then
+    elif system::is_command "brew"; then
         # Always run brew upgrade
         return 0
     else
@@ -195,45 +211,45 @@ should_run_system_upgrade() {
     fi
 }
 
-run_system_update_and_upgrade() {
-    if should_run_system_update; then
-        system_update
+system::update_and_upgrade() {
+    if system::should_run_update; then
+        system::update
     else
-        info "Skipping system update - last update was less than 24 hours ago"
+        log::info "Skipping system update - last update was less than 24 hours ago"
     fi
-    if should_run_system_upgrade; then
-        system_upgrade
+    if system::should_run_upgrade; then
+        system::upgrade
     else
-        info "Skipping system upgrade - last upgrade was less than 1 week ago"
+        log::info "Skipping system upgrade - last upgrade was less than 1 week ago"
     fi
 }
 
 # Purges apt update notifier, which can cause hangs on some systems
-purge_apt_update_notifier() {
-    if command -v apt-get &> /dev/null; then
-        info "Purging apt update-notifier packages (if present)..."
-        maybe_run_sudo apt-get purge -y update-notifier update-notifier-common || info "Update notifier not present or already purged."
-        success "Finished attempting to purge update-notifier."
+system::purge_apt_update_notifier() {
+    if system::is_command "apt-get"; then
+        log::info "Purging apt update-notifier packages (if present)..."
+        flow::maybe_run_sudo apt-get purge -y update-notifier update-notifier-common || log::info "Update notifier not present or already purged."
+        log::success "Finished attempting to purge update-notifier."
     else
-        info "Not an apt-based system, skipping update-notifier purge."
+        log::info "Not an apt-based system, skipping update-notifier purge."
     fi
 }
 
-check_and_install() {
+system::check_and_install() {
     local cmd="$1"
-    info "Checking for $cmd..."
-    if check_command_exists "$cmd"; then
-        success "$cmd is already installed."
+    log::info "Checking for $cmd..."
+    if system::is_command "$cmd"; then
+        log::success "$cmd is already installed."
         return 0
     fi
   
-    warning "$cmd not found. Installing…"
-    install_pkg "$cmd"
+    log::warning "$cmd not found. Installing…"
+    system::install_pkg "$cmd"
   
-    if check_command_exists "$cmd"; then
-        success "$cmd installed successfully."
+    if system::is_command "$cmd"; then
+        log::success "$cmd installed successfully."
     else
-        error "Could not install $cmd—please install it manually."
+        log::error "Could not install $cmd—please install it manually."
         exit "${ERROR_DEPENDENCY_MISSING}"
     fi
 }

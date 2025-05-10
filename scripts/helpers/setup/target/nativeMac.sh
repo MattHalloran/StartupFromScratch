@@ -5,23 +5,25 @@ set -euo pipefail
 SETUP_TARGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${SETUP_TARGET_DIR}/../../utils/logging.sh"
+source "${SETUP_TARGET_DIR}/../../utils/log.sh"
+# shellcheck disable=SC1091
+source "${SETUP_TARGET_DIR}/../../utils/system.sh"
 
 brew_install() {
-    if ! command -v brew &> /dev/null; then
-        echo "Homebrew not found, installing..."
+    if ! system::is_command "brew"; then
+        log::info "Homebrew not found, installing..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     else
-        echo "Homebrew is already installed."
+        log::info "Homebrew is already installed."
     fi
 }
 
 volta_install() {
-    if ! command -v volta &> /dev/null; then
-        echo "Volta not found, installing..."
+    if ! system::is_command "volta"; then
+        log::info "Volta not found, installing..."
         brew install volta
     else
-        echo "Volta is already installed."
+        log::info "Volta is already installed."
     fi
 }
 
@@ -39,7 +41,7 @@ docker_compose_infra() {
 }
 
 setup_native_mac() {
-    header "Setting up native Mac development/production..."
+    log::header "Setting up native Mac development/production..."
     brew_install
     volta_install
     node_pnpm_setup

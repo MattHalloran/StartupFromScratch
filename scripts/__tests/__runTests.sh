@@ -7,7 +7,7 @@ TESTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 export BATS_LIB_PATH="${TESTS_DIR}/helpers:${BATS_LIB_PATH-}"
 
 # shellcheck disable=SC1091
-source "${TESTS_DIR}/../utils/index.sh"
+source "${TESTS_DIR}/../utils/log.sh"
 
 # Disable exit on error to allow handling test failures manually
 set +e
@@ -17,7 +17,7 @@ SCRIPTS_DIR=$(dirname "${TESTS_DIR}")
 total_tests=0
 total_failures=0
 
-header "Running bats tests..."
+log::header "Running bats tests..."
 
 # Run all tests in the scripts directory and subdirectories
 while IFS= read -r test_file; do
@@ -27,7 +27,7 @@ while IFS= read -r test_file; do
 
     # If the bats command failed, consider it a failure
     if [ "$exit_code" -ne "${EXIT_SUCCESS}" ] && ! echo "${output}" | grep -q "^not ok"; then
-        error "Failed to run test: ${test_file}. Got exit code: ${exit_code}"
+        log::error "Failed to run test: ${test_file}. Got exit code: ${exit_code}"
         total_failures=$((total_failures + 1))
         continue
     fi
@@ -46,11 +46,11 @@ done < <(find "${SCRIPTS_DIR}" -path "${SCRIPTS_DIR}/__tests/helpers" -prune -o 
 
 # Print summary
 echo ""
-info "Total tests run: ${total_tests}"
+log::info "Total tests run: ${total_tests}"
 if [ "${total_failures}" -eq "${EXIT_SUCCESS}" ]; then
-    success "All tests passed successfully!"
+    log::success "All tests passed successfully!"
 else
-    error "Total failures: ${total_failures}"
+    log::error "Total failures: ${total_failures}"
 fi
 
 # Exit with appropriate code

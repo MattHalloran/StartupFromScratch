@@ -18,7 +18,7 @@ declare -A ARG_NO_VALUE=()  # Arguments that don't require values (like help)
 SCRIPT_NAME="$(basename "$0")"
 
 # Reset all registered arguments
-arg_reset() {
+args::reset() {
     unset ARG_FLAGS ARG_NAMES ARG_DESCS ARG_TYPES ARG_DEFAULTS ARG_REQUIRED ARG_VALUES ARG_OPTIONS ARG_NO_VALUE ARG_ORDER
     declare -gA ARG_FLAGS ARG_NAMES ARG_DESCS ARG_TYPES ARG_DEFAULTS ARG_REQUIRED ARG_VALUES ARG_OPTIONS ARG_NO_VALUE
     declare -ga ARG_ORDER
@@ -26,7 +26,7 @@ arg_reset() {
 
 # Register a new argument
 # Usage:
-#   arg_register \
+#   args::register \
 #     --name "target" \
 #     --flag "t" \
 #     --desc "Target environment" \
@@ -34,7 +34,7 @@ arg_reset() {
 #     --default "native-linux" \
 #     --options "native-linux|native-macos|docker|k8s" \
 #     --required "yes"
-arg_register() {
+args::register() {
     local name="" flag="" desc="" type="value" default="" options="" required="no" no_value="no"
   
     while [[ $# -gt 0 ]]; do
@@ -48,7 +48,7 @@ arg_register() {
             --required) required="$2"; shift 2 ;;
             --no-value) no_value="$2"; shift 2 ;;
             *)
-              echo "Error: Unknown parameter $1 for arg_register" >&2
+              echo "Error: Unknown parameter $1 for args::register" >&2
               return 1
               ;;
         esac
@@ -56,7 +56,7 @@ arg_register() {
   
     # Validate required parameters
     if [[ -z "$name" ]]; then
-        echo "Error: Missing required parameter --name for arg_register" >&2
+        echo "Error: Missing required parameter --name for args::register" >&2
         return 1
     fi
   
@@ -79,7 +79,7 @@ arg_register() {
 }
 
 # Parse command line arguments according to registered arguments
-arg_parse() {
+args::parse() {
     local pos_args=()
     local show_usage=false
     
@@ -115,7 +115,7 @@ arg_parse() {
                     # Regular arguments require values
                     if [[ $# -lt 2 ]]; then
                         echo "Error: Option $arg requires a value" >&2
-                        arg_usage
+                        args::usage
                         exit 1
                     fi
                     
@@ -154,7 +154,7 @@ arg_parse() {
                     # Regular arguments require values
                     if [[ $# -lt 2 ]]; then
                         echo "Error: Option $arg requires a value" >&2
-                        arg_usage
+                        args::usage
                         exit 1
                     fi
                     
@@ -186,7 +186,7 @@ arg_parse() {
     
     # If help was requested, show usage and exit
     if $show_usage; then
-        arg_usage
+        args::usage
         exit 0
     fi
     
@@ -194,7 +194,7 @@ arg_parse() {
     for key in "${!ARG_REQUIRED[@]}"; do
         if [[ "${ARG_REQUIRED[$key]}" == "yes" && -z "${ARG_VALUES[$key]}" ]]; then
             echo "Error: Required argument --${ARG_NAMES[$key]} is missing" >&2
-            arg_usage
+            args::usage
             exit 1
         fi
     done
@@ -204,15 +204,15 @@ arg_parse() {
 }
 
 # Get value of a specific argument
-# arg_get <name>
-arg_get() {
+# args::get <name>
+args::get() {
     local name="$1"
     echo "${ARG_VALUES[$name]:-}"
 }
 
 # Export all argument values as environment variables with prefix
-# arg_export [prefix]
-arg_export() {
+# args::export [prefix]
+args::export() {
     local prefix="${1:-}"
     
     for key in "${!ARG_VALUES[@]}"; do
@@ -228,7 +228,7 @@ arg_export() {
 }
 
 # Generate and print a usage message
-arg_usage() {
+args::usage() {
     local script_desc="${1:-}"
     
     echo "Usage: $SCRIPT_NAME [OPTIONS]"
@@ -304,17 +304,17 @@ arg_usage() {
 }  
   
 # Returns true if argument is enabled (value is "yes", "true", "1", etc.)
-# arg_is_enabled <name>
-arg_is_enabled() {
+# args::is_enabled <name>
+args::is_enabled() {
     local name="$1"
     local value
-    value=$(arg_get "$name")
+    value=$(args::get "$name")
     value=$(echo "$value" | tr '[:upper:]' '[:lower:]')
     [[ "$value" == "yes" || "$value" == "true" || "$value" == "1" || "$value" == "on" ]]
 }
 
 # Returns true if we should show the help message
-is_asking_for_help() {
+args::is_asking_for_help() {
     local args=("$@")
     for arg in "${args[@]}"; do
         if [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
@@ -328,8 +328,8 @@ is_asking_for_help() {
 # ===== Common arguments for most scripts ===== #
 # ===============================================
 
-arg_register_help() {
-    arg_register \
+args::register_help() {
+    args::register \
         --name "help" \
         --flag "h" \
         --desc "Show this help message" \
@@ -338,8 +338,8 @@ arg_register_help() {
         --no-value "yes" 
 }
 
-arg_register_sudo_mode() {  
-    arg_register \
+args::register_sudo_mode() {  
+    args::register \
         --name "sudo-mode" \
         --flag "m" \
         --desc "What to do when encountering sudo commands without elevated privileges" \
@@ -348,8 +348,8 @@ arg_register_sudo_mode() {
         --default "${SUDO_MODE:-error}"
 }
 
-arg_register_yes() {      
-    arg_register \
+args::register_yes() {      
+    args::register \
         --name "yes" \
         --flag "y" \
         --desc "Automatically answer yes to all confirmation prompts" \
@@ -358,8 +358,8 @@ arg_register_yes() {
         --default "no"
 }
 
-arg_register_location() {      
-    arg_register \
+args::register_location() {      
+    args::register \
         --name "location" \
         --flag "l" \
         --desc "Override automatic server location detection" \
@@ -368,8 +368,8 @@ arg_register_location() {
         --default "${LOCATION:-}"
 }
 
-arg_register_target() {
-    arg_register \
+args::register_target() {
+    args::register \
         --name "target" \
         --flag "t" \
         --desc "How the app is being started" \
@@ -379,8 +379,8 @@ arg_register_target() {
         --required "yes"
 }
 
-arg_register_environment() {
-    arg_register \
+args::register_environment() {
+    args::register \
         --name "environment" \
         --flag "e" \
         --desc "Skips development-only steps and uses production environment variables" \
@@ -390,8 +390,8 @@ arg_register_environment() {
 }
 
 # Registers --detached flag for skipping teardown in reverse proxy setup
-arg_register_detached() {
-    arg_register \
+args::register_detached() {
+    args::register \
         --name "detached" \
         --flag "x" \
         --desc "Run in detached mode. Frees the terminal and disables teardown events" \

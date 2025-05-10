@@ -9,27 +9,27 @@ source "${DEVELOP_TARGET_DIR}/../../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${DEVELOP_TARGET_DIR}/../../utils/locations.sh"
 # shellcheck disable=SC1091
-source "${DEVELOP_TARGET_DIR}/../../utils/logging.sh"
+source "${DEVELOP_TARGET_DIR}/../../utils/log.sh"
 
 start_development_native_linux() {
-    header "🚀 Starting native Linux development environment..."
+    log::header "🚀 Starting native Linux development environment..."
     cd "$ROOT_DIR"
 
     cleanup() {
-        info "🔧 Cleaning up development environment at $ROOT_DIR..."
+        log::info "🔧 Cleaning up development environment at $ROOT_DIR..."
         cd "$ROOT_DIR"
         docker-compose down
         cd "$ORIGINAL_DIR"
         exit 0
     }
-    if ! is_yes "$DETACHED"; then
+    if ! flow::is_yes "$DETACHED"; then
         trap cleanup SIGINT SIGTERM
     fi
 
-    info "Starting database containers (Postgres and Redis)..."
+    log::info "Starting database containers (Postgres and Redis)..."
     docker-compose up -d postgres redis
 
-    info "Starting watchers and development servers (server, jobs, UI)..."
+    log::info "Starting watchers and development servers (server, jobs, UI)..."
     # Define development watcher commands
     local watchers=(
         "pnpm exec tsc -b packages/server --watch --preserveWatchOutput"
@@ -38,15 +38,15 @@ start_development_native_linux() {
         "pnpm exec node --watch packages/jobs/dist/index.js"
         "pnpm --filter @vrooli/ui run dev -- --port 3000"
     )
-    if is_yes "$DETACHED"; then
-        info "Detached mode: launching individual watchers in background"
+    if flow::is_yes "$DETACHED"; then
+        log::info "Detached mode: launching individual watchers in background"
         # Start each watcher in background using nohup and track PIDs
         local pids=()
         for cmd in "${watchers[@]}"; do
             nohup bash -c "$cmd" > /dev/null 2>&1 &
             pids+=("$!")
         done
-        info "Launched watchers (PIDs: ${pids[*]})"
+        log::info "Launched watchers (PIDs: ${pids[*]})"
         return 0
     else
         # Foreground mode: use concurrently to run all watchers together

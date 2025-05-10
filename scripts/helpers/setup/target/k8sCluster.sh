@@ -8,7 +8,9 @@ SETUP_TARGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${SETUP_TARGET_DIR}/../../utils/flow.sh"
 # shellcheck disable=SC1091
-source "${SETUP_TARGET_DIR}/../../utils/logging.sh"
+source "${SETUP_TARGET_DIR}/../../utils/log.sh"
+# shellcheck disable=SC1091
+source "${SETUP_TARGET_DIR}/../../utils/system.sh"
 
 # Define installation directory and commands based on sudo availability
 INSTALL_DIR="/usr/local/bin"
@@ -19,8 +21,8 @@ NEEDS_PATH_UPDATE="NO"
 
 adjust_paths() {
     # Check if sudo is available and adjust paths/commands if not
-    if ! can_run_sudo; then
-        warning "Sudo not available or skipped. Installing k8s tools to user directory."
+    if ! flow::can_run_sudo; then
+        log::warning "Sudo not available or skipped. Installing k8s tools to user directory."
         INSTALL_DIR="$HOME/.local/bin"
         MV_CMD="mv"
         INSTALL_CMD="install" # 'install' might work without sudo if target is writable
@@ -33,7 +35,7 @@ adjust_paths() {
         # Ensure the local bin directory is in PATH for the current session
         if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
             export PATH="$INSTALL_DIR:$PATH"
-            info "Added $INSTALL_DIR to PATH for current session."
+            log::info "Added $INSTALL_DIR to PATH for current session."
             # Consider suggesting adding this to shell profile (e.g., ~/.bashrc)
         fi
     fi
@@ -41,13 +43,13 @@ adjust_paths() {
 
 # Install kubectl, which is used to manage the Kubernetes cluster
 install_kubectl() {
-    if ! command -v kubectl >/dev/null 2>&1; then
-        info "📦 Installing kubectl..."
+    if ! system::is_command "kubectl"; then
+        log::info "📦 Installing kubectl..."
         local arch
         case "$(uname -m)" in
             x86_64) arch="amd64" ;;
             aarch64|arm64) arch="arm64" ;;
-            *) error "Unsupported architecture for kubectl: $(uname -m)" ;;
+            *) log::error "Unsupported architecture for kubectl: $(uname -m)" ;;
         esac
 
         local kubectl_url="https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${arch}/kubectl"
@@ -57,10 +59,10 @@ install_kubectl() {
         if curl -Lo "$tmp_kubectl" "$kubectl_url"; then
             ${CHMOD_CMD} +x "$tmp_kubectl"
             ${MV_CMD} "$tmp_kubectl" "${INSTALL_DIR}/kubectl"
-            success "kubectl installed successfully to ${INSTALL_DIR}"
+            log::success "kubectl installed successfully to ${INSTALL_DIR}"
             # No need to check command -v again here, assume success if mv worked
         else
-            error "Failed to download kubectl"
+            log::error "Failed to download kubectl"
             rm -f "$tmp_kubectl" # Clean up temp file on failure
             # Exiting might be too harsh, consider returning error code
             # cd "$ORIGINAL_DIR" # No need to cd back if not exiting
@@ -73,19 +75,19 @@ install_kubectl() {
         rm -f "$tmp_kubectl" > /dev/null 2>&1
 
     else
-        info "kubectl is already installed"
+        log::info "kubectl is already installed"
     fi
 }
 
 # Install Helm, which is used to manage Kubernetes charts
 install_helm() {
-    if ! command -v helm > /dev/null 2>&1; then
-        info "📦 Installing Helm..."
+    if ! system::is_command "helm"; then
+        log::info "📦 Installing Helm..."
         local arch
         case "$(uname -m)" in
             x86_64) arch="amd64" ;;
             aarch64|arm64) arch="arm64" ;;
-            *) error "Unsupported architecture for Helm: $(uname -m)" ;;
+            *) log::error "Unsupported architecture for Helm: $(uname -m)" ;;
         esac
 
         local helm_version="latest" # Or pin to a specific version
@@ -99,26 +101,26 @@ install_helm() {
             # Helm binary might already be executable, but ensure it
             ${CHMOD_CMD} +x "${INSTALL_DIR}/helm"
             rm -rf "$tmpdir"
-            success "Helm installed successfully to ${INSTALL_DIR}"
+            log::success "Helm installed successfully to ${INSTALL_DIR}"
         else
-            warning "Download or extraction of Helm failed"
+            log::warning "Download or extraction of Helm failed"
             rm -rf "$tmpdir"
             return 1 # Return error code
         fi
     else
-        info "helm is already installed"
+        log::info "helm is already installed"
     fi
 }
 
 # Install Minikube, which is used to run a local Kubernetes cluster
 install_minikube() {
-    if ! command -v minikube >/dev/null 2>&1; then
-        info "📦 Installing minikube..."
+    if ! system::is_command "minikube"; then
+        log::info "📦 Installing minikube..."
         local arch
         case "$(uname -m)" in
             x86_64) arch="amd64" ;;
             aarch64|arm64) arch="arm64" ;;
-            *) error "Unsupported architecture for minikube: $(uname -m)" ;;
+            *) log::error "Unsupported architecture for minikube: $(uname -m)" ;;
         esac
 
         local minikube_url="https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${arch}"
@@ -131,27 +133,27 @@ install_minikube() {
             # 'install' command usually sets executable permissions, but ensure with CHMOD_CMD if needed
             # ${CHMOD_CMD} +x "${INSTALL_DIR}/minikube"
             rm -f "$tmp_minikube" # Clean up temp file
-            success "Minikube installed successfully to ${INSTALL_DIR}"
+            log::success "Minikube installed successfully to ${INSTALL_DIR}"
 
             # Check if kubectl config commands need sudo? Unlikely, but worth noting.
             # Rename Minikube context to dev-cluster
-            if command -v kubectl >/dev/null 2>&1; then
-                 info "Renaming minikube context to vrooli-dev-cluster"
-                 kubectl config rename-context minikube vrooli-dev-cluster || warning "Failed to rename minikube context. It might not exist yet."
+            if system::is_command "kubectl"; then
+                 log::info "Renaming minikube context to vrooli-dev-cluster"
+                 kubectl config rename-context minikube vrooli-dev-cluster || log::warning "Failed to rename minikube context. It might not exist yet."
                  # Set dev-cluster as the current context
-                 info "Setting current context to vrooli-dev-cluster"
-                 kubectl config use-context vrooli-dev-cluster || warning "Failed to set current context to vrooli-dev-cluster."
+                 log::info "Setting current context to vrooli-dev-cluster"
+                 kubectl config use-context vrooli-dev-cluster || log::warning "Failed to set current context to vrooli-dev-cluster."
             else
-                warning "kubectl not found, skipping context configuration."
+                log::warning "kubectl not found, skipping context configuration."
             fi
         else
-            error "Failed to download Minikube"
+            log::error "Failed to download Minikube"
             rm -f "$tmp_minikube" # Clean up temp file on failure
             return 1 # Return error code
         fi
 
     else
-        info "minikube is already installed"
+        log::info "minikube is already installed"
     fi
 }
 
@@ -163,7 +165,7 @@ install_kubernetes() {
     if [ "${ENVIRONMENT}" = "development" ]; then
         install_minikube
     else
-        info "📦 Configuring production Kubernetes cluster 'vrooli-prod-cluster'..."
+        log::info "📦 Configuring production Kubernetes cluster 'vrooli-prod-cluster'..."
         # Ensure required environment variables are set
         : "${KUBE_API_SERVER:?Environment variable KUBE_API_SERVER must be set}"
         : "${KUBE_CA_CERT_PATH:?Environment variable KUBE_CA_CERT_PATH must be set}"
@@ -188,12 +190,12 @@ install_kubernetes() {
             --cluster=vrooli-prod-cluster \
             --user=prod-user
         kubectl config use-context vrooli-prod-cluster
-        success "Production Kubernetes cluster 'vrooli-prod-cluster' configured successfully"
+        log::success "Production Kubernetes cluster 'vrooli-prod-cluster' configured successfully"
     fi
 }
 
 setup_k8s_cluster() {
-    header "Setting up Kubernetes cluster development/production..."
+    log::header "Setting up Kubernetes cluster development/production..."
 
     install_kubernetes
 }

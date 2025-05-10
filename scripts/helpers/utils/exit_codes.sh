@@ -120,8 +120,12 @@ EXIT_CODES+=("ERROR_MISSING_DEPENDENCIES")
 : "${DESC_ERROR_JWT_FILE_MISSING:=JWT file missing}"
 EXIT_CODES+=("ERROR_JWT_FILE_MISSING")
 
+: "${ERROR_COMMAND_NOT_FOUND:=90}"
+: "${DESC_ERROR_COMMAND_NOT_FOUND:=Command not found}"
+EXIT_CODES+=("ERROR_COMMAND_NOT_FOUND")
+
 # Helper function to generate exit codes display for usage
-print_exit_codes() {
+exit_codes::print() {
     local var_name code desc_var description
     echo "Exit Codes:"
     for var_name in "${EXIT_CODES[@]}"; do

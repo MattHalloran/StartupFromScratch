@@ -4,7 +4,7 @@ set -euo pipefail
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/logging.sh"
+source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/exit_codes.sh"
 
@@ -38,7 +38,7 @@ match_target() {
             return 0
             ;;
         *)
-            error "Bad --target: $1" >&2
+            log::error "Bad --target: $1" >&2
             return 1
             ;;
     esac
@@ -62,7 +62,7 @@ execute_for_target() {
     
     # Check if the function exists
     if ! declare -F "$function_name" > /dev/null; then
-        error "Function $function_name does not exist"
+        log::error "Function $function_name does not exist"
         return "${ERROR_FUNCTION_NOT_FOUND}"
     fi
     

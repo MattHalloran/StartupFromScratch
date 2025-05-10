@@ -7,21 +7,21 @@ SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/logging.sh"
+source "${SETUP_DIR}/../utils/log.sh"
 
 # Check if host has internet access. Exits with error if no access.
 setup_firewall() {
     # Use argument or environment variable
     local environment="${1:-$ENVIRONMENT}"
     if [[ -z "$environment" ]]; then
-        exit_with_error "Environment is required to setup firewall" "$ERROR_USAGE"
+        flow::exit_with_error "Environment is required to setup firewall" "$ERROR_USAGE"
     fi
 
-    if ! can_run_sudo; then
-        warning "Skipping firewall setup due to sudo mode"
+    if ! flow::can_run_sudo; then
+        log::warning "Skipping firewall setup due to sudo mode"
         return
     fi
-    header "🔥🧱 Setting up firewall in $environment environment..."
+    log::header "🔥🧱 Setting up firewall in $environment environment..."
     
     # Track if any changes were made
     local changes_made=false
@@ -32,9 +32,9 @@ setup_firewall() {
 
     # 1) Enable UFW only if not already active
     if echo "$status_verbose" | grep -q "^Status: active"; then
-        info "UFW already active"
+        log::info "UFW already active"
     else
-        info "Enabling UFW"
+        log::info "Enabling UFW"
         sudo ufw --force enable
         changes_made=true
         # Update status after enabling
@@ -45,9 +45,9 @@ setup_firewall() {
     local defaults
     defaults=$(echo "$status_verbose" | grep "^Default:")
     if echo "$defaults" | grep -q "deny (incoming).*allow (outgoing)"; then
-        info "Default policies already set"
+        log::info "Default policies already set"
     else
-        info "Setting default policies"
+        log::info "Setting default policies"
         sudo ufw default allow outgoing
         sudo ufw default deny incoming
         changes_made=true
@@ -65,9 +65,9 @@ setup_firewall() {
 
     for port_proto in "${ports[@]}"; do
         if echo "$status_plain" | grep -qw "$port_proto"; then
-            info "Rule for $port_proto already exists"
+            log::info "Rule for $port_proto already exists"
         else
-            info "Allowing $port_proto"
+            log::info "Allowing $port_proto"
             sudo ufw allow "$port_proto"
             changes_made=true
         fi
@@ -75,12 +75,12 @@ setup_firewall() {
 
     # 4) Reload sysctl and UFW only if changes were made
     if $changes_made; then
-        info "Reloading sysctl and UFW"
+        log::info "Reloading sysctl and UFW"
         sudo sysctl -p >/dev/null 2>&1
         sudo ufw reload >/dev/null 2>&1
     else
-        info "No firewall changes needed; skipping reload"
+        log::info "No firewall changes needed; skipping reload"
     fi
 
-    success "Firewall setup complete"
+    log::success "Firewall setup complete"
 }

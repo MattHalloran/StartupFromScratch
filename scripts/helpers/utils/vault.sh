@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2148
 
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/system.sh"
+
 # --- Vault Utility Functions ---
 
 # Verifies that required command-line tools (curl, jq) are installed.
 # Exits with an error code if dependencies are missing.
 check_vault_dependencies() {
-    if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
-        error "Required dependencies 'curl' and 'jq' are missing."
-        exit "${ERROR_MISSING_DEPENDENCIES:-88}"
-    fi
+    system::assert_command "curl"
+    system::assert_command "jq"
 }
 
 # Parses and validates Vault API responses.
@@ -21,7 +22,7 @@ validate_vault_response() {
     local status="$1"
     local body="$2"
     if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-        error "Vault API request failed with status $status"
+        log::error "Vault API request failed with status $status"
         return "${ERROR_VAULT_SECRET_FETCH_FAILED:-87}"
     fi
     return 0
@@ -55,7 +56,7 @@ extract_secrets() {
         local value
         value=$(echo "$secrets_json" | jq -r --arg k "$key" '.[$k]')
         export "$key"="$value"
-        info "Exported secret '$key'"
+        log::info "Exported secret '$key'"
     done
 }
 
@@ -67,7 +68,7 @@ check_vault_health() {
     local response
     local http_code
 
-    info "Checking Vault health at ${health_url}..."
+    log::info "Checking Vault health at ${health_url}..."
 
     # Use curl to get health status. Handle self-signed certs in dev (-k).
     # Timeout ensures script doesn't hang indefinitely.
@@ -77,25 +78,25 @@ check_vault_health() {
     response_body=$(echo "$response" | sed '$d')
 
     if [ "$http_code" -ne 200 ]; then
-        error "Vault health check failed: Received HTTP status $http_code from $health_url"
+        log::error "Vault health check failed: Received HTTP status $http_code from $health_url"
         # Distinguish connection refused error (might be 000 from curl timeout/refused)
         if [ "$http_code" = "000" ]; then 
-            error "Could not connect to Vault at $VAULT_ADDR. Is it running?"
+            log::error "Could not connect to Vault at $VAULT_ADDR. Is it running?"
         fi
         return "${ERROR_VAULT_CONNECTION_FAILED:-30}"
     fi
 
     # Check JSON content using jq
     if ! echo "$response_body" | jq -e '.initialized == true and .sealed == false and .standby == false' > /dev/null; then
-        error "Vault is reachable but not ready (initialized, unsealed, and active)."
+        log::error "Vault is reachable but not ready (initialized, unsealed, and active)."
         # Determine specific reason (optional)
-        if echo "$response_body" | jq -e '.initialized == false' >/dev/null; then error "Reason: Vault is not initialized."; fi
+        if echo "$response_body" | jq -e '.initialized == false' >/dev/null; then log::error "Reason: Vault is not initialized."; fi
         if echo "$response_body" | jq -e '.sealed == true' >/dev/null; then error "Reason: Vault is sealed."; fi
         if echo "$response_body" | jq -e '.standby == true' >/dev/null; then error "Reason: Vault is in standby mode."; fi
         return "${ERROR_VAULT_AUTH_FAILED:-31}" # Using AUTH_FAILED as a proxy for 'not ready'
     fi
 
-    success "Vault is initialized, unsealed, and active."
+    log::success "Vault is initialized, unsealed, and active."
     return 0
 }
 
@@ -114,10 +115,10 @@ retry_vault_operation() {
         if "${cmd[@]}"; then
             return 0
         fi
-        info "Retry $attempt/$max_retries failed for: ${cmd[*]}"
+        log::info "Retry $attempt/$max_retries failed for: ${cmd[*]}"
         sleep "$delay"
         attempt=$((attempt + 1))
     done
-    error "All $max_retries retries failed for: ${cmd[*]}"
+    log::error "All $max_retries retries failed for: ${cmd[*]}"
     return "${ERROR_VAULT_SECRET_FETCH_FAILED:-87}"
 } 
