@@ -15,7 +15,7 @@ source "${SETUP_DIR}/../utils/log.sh"
 BATS_DEPENDENCIES_DIR="${SCRIPT_TESTS_DIR}/helpers"
 
 # Function to determine and export BATS_PREFIX based on environment and sudo mode
-_determine_bats_prefix() {
+bats::determine_prefix() {
     # Default Bats installation prefix unless overridden by environment variable
     local prefix=${BATS_PREFIX:-/usr/local}
 
@@ -35,12 +35,12 @@ _determine_bats_prefix() {
 }
 
 # Function to create directory to store bats core and dependencies
-create_bats_dependencies_dir() {
+bats::create_dependencies_dir() {
     mkdir -p "$BATS_DEPENDENCIES_DIR"
 }
 
 # Function to clone and confirm a bats dependency
-install_bats_dependency() {
+bats::install_dependency() {
     local repo_url=$1
     local dir_name=$2
     cd "$BATS_DEPENDENCIES_DIR"
@@ -54,8 +54,8 @@ install_bats_dependency() {
 }
 
 # Install Bats-core
-install_bats_core() {
-    _determine_bats_prefix # Determine prefix just before installation
+bats::install_core() {
+    bats::determine_prefix # Determine prefix just before installation
 
     cd "$BATS_DEPENDENCIES_DIR"
     if [ ! -d "bats-core" ]; then
@@ -78,21 +78,21 @@ install_bats_core() {
 }
 
 # Install Bats for testing bash scripts
-install_bats() {
-    _determine_bats_prefix # Determine prefix before potentially updating PATH
+bats::install() {
+    bats::determine_prefix # Determine prefix before potentially updating PATH
 
     log::header "Installing Bats and dependencies for Bash script testing"
 
     # Create dependencies directory
-    create_bats_dependencies_dir
+    bats::create_dependencies_dir
 
     # Install Bats-core
-    install_bats_core
+    bats::install_core
 
     # Install other dependencies
-    install_bats_dependency "https://github.com/bats-core/bats-support.git" "bats-support"
-    install_bats_dependency "https://github.com/jasonkarns/bats-mock.git" "bats-mock"
-    install_bats_dependency "https://github.com/bats-core/bats-assert.git" "bats-assert"
+    bats::install_dependency "https://github.com/bats-core/bats-support.git" "bats-support"
+    bats::install_dependency "https://github.com/jasonkarns/bats-mock.git" "bats-mock"
+    bats::install_dependency "https://github.com/bats-core/bats-assert.git" "bats-assert"
 
     # Ensure Bats bin directory is in PATH without duplicates
     if [[ ":$PATH:" != *":$BATS_PREFIX/bin:"* ]]; then

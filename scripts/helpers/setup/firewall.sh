@@ -5,12 +5,14 @@ DESCRIPTION="Sets up the firewall to safely allow traffic to the server"
 SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
+source "${SETUP_DIR}/../utils/env.sh"
+# shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/log.sh"
 
 # Check if host has internet access. Exits with error if no access.
-setup_firewall() {
+firewall::setup() {
     # Use argument or environment variable
     local environment="${1:-$ENVIRONMENT}"
     if [[ -z "$environment" ]]; then
@@ -55,7 +57,7 @@ setup_firewall() {
 
     # 3) Only open required ports using a loop to minimize status calls
     local ports=("80/tcp" "443/tcp" "22/tcp")
-    if [[ "$environment" = "development" ]]; then
+    if env::in_development "$environment"; then
         ports+=("${PORT_UI:-3000}/tcp" "${PORT_SERVER:-5329}/tcp")
     fi
 

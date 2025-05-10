@@ -127,7 +127,7 @@ main() {
 
     # Determine artifact directory based on location and source type
     local artifact_dir
-    if [[ "$LOCATION" == "local" ]]; then
+    if env::is_location_local; then
         case "$SOURCE_TYPE" in
             docker)
                 artifact_dir="${DEST_DIR}/artifacts/docker/${VERSION}"
@@ -166,7 +166,7 @@ main() {
     # Check if artifacts exist at the determined location
     if [ ! -d "$artifact_dir" ]; then
         log::error "Artifact directory not found: ${artifact_dir}"
-        if [[ "$LOCATION" == "local" ]]; then
+        if env::is_location_local; then
             log::error "For local deployment, ensure artifacts for SOURCE_TYPE '${SOURCE_TYPE}' (version: ${VERSION}) were correctly built and placed."
             log::error "This typically involves 'build.sh --dest local' or equivalent steps for the specific source type."
         else
@@ -176,8 +176,8 @@ main() {
     fi
     # Optionally, check for specific files needed by the source_type within artifact_dir
 
-    if [[ "$LOCATION" == "remote" ]]; then
-        setup_reverse_proxy
+    if env::is_location_remote; then
+        proxy::setup
         if ! flow::is_yes "$DETACHED"; then
             trap 'info "Tearing down Caddy reverse proxy..."; stop_reverse_proxy' EXIT INT TERM
         fi

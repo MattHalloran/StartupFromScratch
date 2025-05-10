@@ -7,7 +7,9 @@ TESTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 export BATS_LIB_PATH="${TESTS_DIR}/helpers:${BATS_LIB_PATH-}"
 
 # shellcheck disable=SC1091
-source "${TESTS_DIR}/../utils/log.sh"
+source "${TESTS_DIR}/../helpers/utils/exit_codes.sh"
+# shellcheck disable=SC1091
+source "${TESTS_DIR}/../helpers/utils/log.sh"
 
 # Disable exit on error to allow handling test failures manually
 set +e

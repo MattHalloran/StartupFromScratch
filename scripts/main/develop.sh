@@ -19,7 +19,7 @@ source "${MAIN_DIR}/../helpers/develop/index.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/develop/target/index.sh"
 
-parse_arguments() {
+develop::parse_arguments() {
     args::reset
 
     args::register_help
@@ -46,14 +46,14 @@ parse_arguments() {
     export DETACHED=$(args::get "detached")
 }
 
-main() {
-    parse_arguments "$@"
+develop::main() {
+    develop::parse_arguments "$@"
     log::header "🏃 Starting development environment for $(match_target "$TARGET")"
 
     source "${MAIN_DIR}/setup.sh" "$@"
 
-    if [[ "$LOCATION" == "remote" ]]; then
-        setup_reverse_proxy
+    if env::is_location_remote; then
+        proxy::setup
         if ! flow::is_yes "$DETACHED"; then
             trap 'info "Tearing down Caddy reverse proxy..."; stop_reverse_proxy' EXIT INT TERM
         fi
@@ -63,4 +63,4 @@ main() {
     log::success "✅ Development environment started." 
 }
 
-main "$@"
+develop::main "$@"

@@ -23,7 +23,7 @@ ports::is_port_in_use() {
 }
 
 # Kills processes listening on TCP port $1
-ports::kill_port() {
+ports::kill() {
     local port=$1
     local pids
     pids=$(lsof -tiTCP:"$port" -sTCP:LISTEN) || pids=""
@@ -34,7 +34,7 @@ ports::kill_port() {
 }
 
 # If port is in use, prompt user to kill blockers
-ports::check_and_free_port() {
+ports::check_and_free() {
     local port=$1
     local yes=${2:-$YES}
     if ports::is_port_in_use "$port"; then
@@ -42,10 +42,10 @@ ports::check_and_free_port() {
         pids=$(lsof -tiTCP:"$port" -sTCP:LISTEN)
         log::warning "Port $port is in use by process(es): $pids"
         if flow::is_yes "$yes"; then
-            ports::kill_port "$port"
+            ports::kill "$port"
         else
             if flow::confirm "Kill process(es) listening on port $port?"; then
-                ports::kill_port "$port"
+                ports::kill "$port"
             else
                 flow::exit_with_error "Please free port $port and retry" "$ERROR_USAGE"
             fi

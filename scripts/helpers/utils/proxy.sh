@@ -13,7 +13,7 @@ source "${UTILS_DIR}/reverseProxy.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/system.sh"
 
-install_caddy() {
+proxy::install_caddy() {
     if system::is_command "caddy"; then
         log::info "Caddy is already installed."
         caddy version
@@ -71,9 +71,9 @@ install_caddy() {
     fi
 }
 
-setup_reverse_proxy() {
+proxy::setup() {
     log::header "Setting up reverse proxy..."
-    install_caddy
+    proxy::install_caddy
     # Determine domain: use DOMAIN env if set, otherwise extract from API_URL
     local target_domain=""
     if [[ -n "${DOMAIN:-}" ]]; then

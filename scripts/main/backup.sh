@@ -47,7 +47,7 @@ do_backup() {
 
 init_backup() {
     export NODE_ENV="${NODE_ENV:-production}"
-    load_env_file
+    env::load_env_file
 
     "${HERE}/keylessSsh.sh"
 }

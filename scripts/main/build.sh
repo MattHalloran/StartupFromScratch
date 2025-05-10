@@ -154,8 +154,8 @@ main() {
     parse_arguments "$@"
     log::header "🔨 Starting build for ${ENVIRONMENT} environment..."
 
-    load_secrets
-    construct_derived_secrets
+    env::load_secrets
+    env::construct_derived_secrets
 
     log::info "Cleaning previous build artifacts..."
     clean_build
@@ -215,7 +215,7 @@ main() {
                 ;;
         esac
 
-        if [ "$DEST" = "local" ]; then
+        if env::is_location_local "$DEST"; then
             local dest_dir="${DEST_DIR}/bundles/${b}/${VERSION}"
             mkdir -p "${dest_dir}"
             local source_dir="${REMOTE_DIST_DIR}/${VERSION}"
@@ -303,7 +303,7 @@ main() {
                 log::warning "Unknown artifact type: $a";
                 ;;
         esac
-        if [ "$DEST" = "local" ]; then
+        if env::is_location_local "$DEST"; then
             log::warning "Local copy for artifact $a not implemented"
         else
             log::warning "Remote destination not implemented for artifact $a"
@@ -354,7 +354,7 @@ main() {
             log::success "Electron build completed for $c. Output in dist/desktop/"
 
             # Copying logic (optional, adjust as needed)
-            if [ "$DEST" = "local" ]; then
+            if env::is_location_local "$DEST"; then
               local dest_dir="${DEST_DIR}/desktop/${c}/${VERSION}"
               local source_dir="${DEST_DIR}/desktop"
               mkdir -p "${dest_dir}"
@@ -370,7 +370,7 @@ main() {
     done
 
     # --- Remote Destination Handling ---
-    if [ "$DEST" = "remote" ]; then
+    if env::is_location_remote "$DEST"; then
         log::header "🚚 Preparing and copying build artifacts to remote server..."
         local remote_tmp_dir="${REMOTE_DIST_DIR}"
         local local_source_dir="${DEST_DIR}"

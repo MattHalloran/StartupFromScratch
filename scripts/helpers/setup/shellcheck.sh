@@ -11,7 +11,7 @@ source "${SETUP_DIR}/../utils/log.sh"
 source "${SETUP_DIR}/../utils/system.sh"
 
 # Function to install ShellCheck for shell script linting
-install_shellcheck() {
+shellcheck::install() {
     # Check if ShellCheck is already installed
     if system::is_command "shellcheck"; then
         log::info "ShellCheck is already installed"

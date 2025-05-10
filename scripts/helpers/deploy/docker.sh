@@ -4,6 +4,8 @@ set -euo pipefail
 DEPLOY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
+source "${DEPLOY_DIR}/../utils/env.sh"
+# shellcheck disable=SC1091
 source "${DEPLOY_DIR}/../utils/locations.sh"
 # shellcheck disable=SC1091
 source "${DEPLOY_DIR}/../utils/log.sh"
@@ -35,7 +37,7 @@ deploy_docker() {
 
   # Select compose file based on target environment
   local compose_file
-  if [[ "$target_env" == "prod" ]]; then
+  if env::in_production; then
     compose_file="${ROOT_DIR}/docker-compose-prod.yml"
   else
     compose_file="${ROOT_DIR}/docker-compose.yml"

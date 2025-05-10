@@ -14,19 +14,18 @@ source "${UTILS_DIR}/system.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/vault.sh"
 
-env_dev_file_exists() {
+env::dev_file_exists() {
     [ -f "$ENV_DEV_FILE" ]
 }
 
-env_prod_file_exists() {
+env::prod_file_exists() {
     [ -f "$ENV_PROD_FILE" ]
 }
 
 # Load secrets from an environment file
-load_env_file() {
-
+env::load_env_file() {
     ENV_FILE="$ENV_PROD_FILE"
-    if [ "$NODE_ENV" = "development" ]; then
+    if env::in_development "$NODE_ENV"; then
         ENV_FILE="$ENV_DEV_FILE"
     fi
 
@@ -43,7 +42,7 @@ load_env_file() {
 }
 
 # Authenticates to Vault using the token method.
-authenticate_with_token() {
+env::authenticate_with_token() {
     : "${VAULT_TOKEN:?Required environment variable VAULT_TOKEN is not set}"
     log::info "Authenticating to Vault using token"
     export VAULT_TOKEN
@@ -51,7 +50,7 @@ authenticate_with_token() {
 }
 
 # Authenticates to Vault using the AppRole method.
-authenticate_with_approle() {
+env::authenticate_with_approle() {
     : "${VAULT_ROLE_ID:?Required environment variable VAULT_ROLE_ID is not set}"
     : "${VAULT_SECRET_ID:?Required environment variable VAULT_SECRET_ID is not set}"
     log::info "Authenticating to Vault using AppRole"
@@ -64,7 +63,7 @@ authenticate_with_approle() {
 }
 
 # Authenticates to Vault using the Kubernetes method.
-authenticate_with_kubernetes() {
+env::authenticate_with_kubernetes() {
     : "${VAULT_K8S_ROLE:?Required environment variable VAULT_K8S_ROLE is not set}"
     : "${K8S_JWT_PATH:?Required environment variable K8S_JWT_PATH is not set}"
     log::info "Authenticating to Vault using Kubernetes auth"
@@ -79,7 +78,7 @@ authenticate_with_kubernetes() {
 }
 
 # Fetches secrets from the configured Vault path after successful authentication.
-fetch_secrets_from_vault() {
+env::fetch_secrets_from_vault() {
     log::info "Fetching secrets from Vault at path: $VAULT_SECRET_PATH"
     check_vault_dependencies
     local endpoint="${VAULT_ADDR}/v1/${VAULT_SECRET_PATH}"
@@ -99,7 +98,7 @@ fetch_secrets_from_vault() {
 
 # Load secrets from HashiCorp Vault.
 # Orchestrates authentication and secret retrieval based on environment variables.
-load_vault_secrets() {
+env::load_vault_secrets() {
     log::info "Loading secrets from HashiCorp Vault..."
 
     # Ensure Vault address is set
@@ -128,13 +127,13 @@ load_vault_secrets() {
     # 5. Call appropriate authenticate_with_* function
     case "$auth_method" in
         token)
-            authenticate_with_token
+            env::authenticate_with_token
             ;;
         approle)
-            authenticate_with_approle
+            env::authenticate_with_approle
             ;;
         kubernetes)
-            authenticate_with_kubernetes
+            env::authenticate_with_kubernetes
             ;;
         *)
             log::error "Unsupported VAULT_AUTH_METHOD: $auth_method"
@@ -142,8 +141,8 @@ load_vault_secrets() {
             ;;
     esac
 
-    # 6. Call fetch_secrets_from_vault
-    fetch_secrets_from_vault
+    # 6. Call env::fetch_secrets_from_vault
+    env::fetch_secrets_from_vault
 
     log::info "Raw secrets fetched from Vault successfully."
     return 0
@@ -153,7 +152,7 @@ load_vault_secrets() {
 # Arguments:
 #   $1: The name of the environment variable to set (e.g., JWT_PRIV)
 #   $2: The full path to the PEM file.
-load_jwt_key_from_pem_if_unset() {
+env::load_jwt_key_from_pem_if_unset() {
     local var_name="$1"
     local file_path="$2"
     local current_value
@@ -188,23 +187,21 @@ load_jwt_key_from_pem_if_unset() {
 }
 
 # Main function to load secrets based on the SECRETS_SOURCE environment variable.
-# NOTE: Make sure to call construct_derived_secrets() after this function and after any other secrets are loaded (e.g. check_location_if_not_set())
-load_secrets() {
+# NOTE: Make sure to call env::construct_derived_secrets() after this function and after any other secrets are loaded (e.g. check_location_if_not_set())
+env::load_secrets() {
     log::header "🔑 Loading secrets..."
 
     : "${ENVIRONMENT:?Required environment variable ENVIRONMENT is not set}"
 
     # Determine Node Env
     NODE_ENV="${NODE_ENV:-development}"
-    case "$ENVIRONMENT" in
-        [dD]*) NODE_ENV="development" ;;
-        [pP]*) NODE_ENV="production" ;;
-        *) log::error "Invalid environment: $ENVIRONMENT"; exit "${ERROR_USAGE:-1}" ;;
-    esac
+    if env::in_production; then
+        NODE_ENV="production"
+    fi
 
     # Determine the correct .env file to source
     local env_file_to_source="$ENV_PROD_FILE"
-    if [ "$NODE_ENV" = "development" ]; then
+    if env::in_development "$NODE_ENV"; then
         env_file_to_source="$ENV_DEV_FILE"
     fi
 
@@ -231,13 +228,13 @@ load_secrets() {
             : "${DB_USER:?DB_USER not found in environment/file when SECRETS_SOURCE=file}"
             : "${DB_PASSWORD:?DB_PASSWORD not found in environment/file when SECRETS_SOURCE=file}"
             : "${REDIS_PASSWORD:?REDIS_PASSWORD not found in environment/file when SECRETS_SOURCE=file}"
-            # load_env_file function is now redundant as sourcing is done above
+            # env::load_env_file function is now redundant as sourcing is done above
             ;;
         v|vault|hashicorp|hashicorp-vault)
             # Call the function to load secrets from Vault
             # This function assumes VAULT_* vars are now set (from file or injected env)
             # It will fetch and export secrets like DB_USER, DB_PASSWORD, etc., potentially overwriting sourced values.
-            load_vault_secrets
+            env::load_vault_secrets
             ;;
         *)
             log::error "Invalid secrets source: $SECRETS_SOURCE"
@@ -247,13 +244,13 @@ load_secrets() {
 
     # Load JWT keys from their respective PEM files if they haven't been set by the primary source.
     log::info "Checking/Loading JWT keys from PEM files if not already set..."
-    load_jwt_key_from_pem_if_unset "JWT_PRIV" "${ROOT_DIR}/jwt_priv.pem"
-    load_jwt_key_from_pem_if_unset "JWT_PUB" "${ROOT_DIR}/jwt_pub.pem"
+    env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${ROOT_DIR}/jwt_priv.pem"
+    env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${ROOT_DIR}/jwt_pub.pem"
 
     log::success "Secrets loaded and processed."
 }
 
-construct_derived_secrets() {
+env::construct_derived_secrets() {
     log::info "Constructing derived secrets (DB_URL, REDIS_URL) and checking required secrets..."
     : "${LOCATION:?FATAL: LOCATION is not set. This should have been set by the location-checking script.}"
     : "${DB_USER:?DB_USER was not set by environment file or Vault}"
@@ -268,7 +265,53 @@ construct_derived_secrets() {
     export WORKER_ID=0 # This is fine for single-node deployments, but should be set to the pod ordinal for multi-node deployments.
 }
 
-# Checks if the script is running in a CI environment.
-is_running_in_ci() {
+env::is_running_in_ci() {
     [[ "$CI" == "true" ]]
 }
+
+env::is_location_remote() {
+    # Use LOCATION or provided argument
+    local location="${LOCATION:-}"
+    if [ -z "$location" ]; then
+        location="$LOCATION"
+    fi
+    location=$(echo "$location" | tr '[:upper:]' '[:lower:]')
+
+    case "$location" in
+        r*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+env::is_location_local() {
+    ! env::is_location_remote
+}
+
+env::in_production() {
+    # Use ENVIRONMENT or provided argument
+    local environment="${ENVIRONMENT:-}"
+    if [ -z "$environment" ]; then
+        environment="$ENVIRONMENT"
+    fi
+    environment=$(echo "$environment" | tr '[:upper:]' '[:lower:]') 
+
+    case "$environment" in
+        p*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+env::in_development() {
+    # Use ENVIRONMENT or provided argument
+    local environment="${ENVIRONMENT:-}"
+    if [ -z "$environment" ]; then
+        environment="$ENVIRONMENT"
+    fi
+    environment=$(echo "$environment" | tr '[:upper:]' '[:lower:]')
+
+    case "$environment" in
+        d*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+

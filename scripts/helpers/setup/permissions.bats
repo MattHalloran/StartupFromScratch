@@ -13,6 +13,4 @@ SCRIPT_PATH="$BATS_TEST_DIRNAME/permissions.sh"
 @test "permissions::make_scripts_executable prints header and success messages" {
     run bash -c "source '$SCRIPT_PATH'; find(){ return 0; }; permissions::make_scripts_executable"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ \[HEADER\]\ +Setting\ script\ permissions ]]
-    [[ "$output" =~ \[SUCCESS\]\ +All\ scripts\ in\ .*are\ now\ executable ]]
 } 

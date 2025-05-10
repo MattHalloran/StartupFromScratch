@@ -6,6 +6,8 @@ ORIGINAL_DIR=$(pwd)
 SETUP_TARGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
+source "${SETUP_TARGET_DIR}/../../utils/env.sh"
+# shellcheck disable=SC1091
 source "${SETUP_TARGET_DIR}/../../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${SETUP_TARGET_DIR}/../../utils/log.sh"
@@ -162,7 +164,7 @@ install_kubernetes() {
     install_kubectl
     install_helm
 
-    if [ "${ENVIRONMENT}" = "development" ]; then
+    if env::in_development; then
         install_minikube
     else
         log::info "📦 Configuring production Kubernetes cluster 'vrooli-prod-cluster'..."

@@ -6,10 +6,26 @@ UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
 
+# Returns 0 if the first argument is a recognized "yes" (y/yes), else 1.
+flow::is_yes() {
+    # Convert to lowercase. Note that [A-Z] and [a-z] in `tr` are POSIX,
+    # but using '[:upper:]' and '[:lower:]' is typically safer for all locales.
+    ans=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+
+    case "$ans" in
+    y | yes)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
 # One-line confirmation prompt
 flow::confirm() {
     # If auto-confirm is enabled, skip the prompt
-    if flow::is_yes "$YES"; then
+    if flow::is_yes "${YES:-}"; then
         log::info "Auto-confirm enabled, skipping prompt"
         return 0
     fi
@@ -37,28 +53,6 @@ flow::continue_with_error() {
     local code="${2:-1}" # Default to exit code 1 if not provided
     log::error "$message"
     return "$code"
-}
-
-# Returns 0 if the first argument is a recognized "yes" (y/yes), else 1.
-# Usage:
-#     if flow::is_yes "$SOME_VAR"; then
-#         echo "It's a yes!"
-#     else
-#         echo "It's a no!"
-#     fi
-flow::is_yes() {
-    # Convert to lowercase. Note that [A-Z] and [a-z] in `tr` are POSIX,
-    # but using '[:upper:]' and '[:lower:]' is typically safer for all locales.
-    ans=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-
-    case "$ans" in
-    y | yes)
-        return 0
-        ;;
-    *)
-        return 1
-        ;;
-    esac
 }
 
 #  Checks if sudo can be invoked according to SUDO_MODE.
