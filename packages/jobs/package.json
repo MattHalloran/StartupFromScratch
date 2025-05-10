@@ -19,8 +19,8 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "type-check": "cross-env NODE_OPTIONS=--max-old-space-size=6144 tsc --noEmit",
-    "start:dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nodemon dist/index.js",
-    "start:prod": "node --experimental-modules --experimental-specifier-resolution=node dist/index.js"
+    "start:development": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nodemon dist/index.js",
+    "start:production": "node --experimental-modules --experimental-specifier-resolution=node dist/index.js"
   },
   "dependencies": {
     "@prisma/client": "6.1.0",

@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# Check for required variables
+if [ -z "$PROJECT_DIR" ]; then
+  echo "ERROR: PROJECT_DIR environment variable is not set." >&2
+  exit 1
+fi
+
 # Create a new directory for Redis appendonly if it does not exist
 mkdir -p ${PROJECT_DIR}/data/redis/appendonlydir
 

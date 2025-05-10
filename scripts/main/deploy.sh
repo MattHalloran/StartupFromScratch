@@ -18,6 +18,8 @@ source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/logging.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/version.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/deploy/docker.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/deploy/k8s.sh"

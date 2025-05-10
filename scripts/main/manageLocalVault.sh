@@ -151,7 +151,7 @@ seed_local_dev_secrets() {
         | grep -v -E '^(VAULT_|SECRETS_SOURCE)'
     )
     # Compute derived URLs and append them
-    local computed_db_url="DB_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${PORT_DB:-5432}"
+    local computed_db_url="DB_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:${PORT_DB:-5432}"
     local computed_redis_url="REDIS_URL=redis://:${REDIS_PASSWORD}@redis:${PORT_REDIS:-6379}"
     kv_pairs+=("$computed_db_url" "$computed_redis_url")
     if [ ${#kv_pairs[@]} -eq 0 ]; then

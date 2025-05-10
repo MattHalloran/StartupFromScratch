@@ -9,15 +9,19 @@ source "${SETUP_DIR}/../utils/locations.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/logging.sh"
 
+# Makes all scripts in a directory (recursively) executable
+make_scripts_executable() {
+    header "Making scripts in ${1} executable"
+    if [ -d "$1" ]; then
+        find "$1" -type f -name "*.sh" -exec chmod +x {} \;
+        success "All scripts in ${1} are now executable"
+    else
+        warning "Directory not found: ${1}"
+    fi
+}
+
 # Makes every script executable
 set_script_permissions() {
-    header "Setting script permissions"
-    find "$SCRIPTS_DIR" -type f -name "*.sh" -exec chmod +x {} \;
-    success "All scripts in ${SCRIPTS_DIR} are now executable"
-    if [ -d "$POSTGRES_ENTRYPOINT_DIR" ]; then
-        find "$POSTGRES_ENTRYPOINT_DIR" -type f -name "*.sh" -exec chmod +x {} \;
-        success "Postgres entrypoint scripts in ${POSTGRES_ENTRYPOINT_DIR} are now executable"
-    else
-        warning "Postgres entrypoint directory not found: ${POSTGRES_ENTRYPOINT_DIR}"
-    fi
+    make_scripts_executable "$SCRIPTS_DIR"
+    make_scripts_executable "$POSTGRES_ENTRYPOINT_DIR"
 }

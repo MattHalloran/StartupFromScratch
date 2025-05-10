@@ -1,10 +1,15 @@
 # syntax=docker/dockerfile:1.4
 
+ARG PROJECT_DIR=/srv/app
+ENV PROJECT_DIR=${PROJECT_DIR}
+
 ### Base stage for production: install only production dependencies and build workspace
 FROM node:18-slim AS base
+ARG PROJECT_DIR
+ENV PROJECT_DIR=${PROJECT_DIR}
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-WORKDIR /usr/src/app
+WORKDIR ${PROJECT_DIR}
 ENV NODE_ENV=production
 
 # Enable Corepack and prepare pnpm
@@ -47,17 +52,17 @@ RUN pnpm --filter @vrooli/server run build:shared \
 
 ### Production server image
 FROM base AS server
-WORKDIR /usr/src/app
+WORKDIR ${PROJECT_DIR}
 EXPOSE ${PORT_SERVER}
 CMD ["node", "packages/server/dist/index.js"]
 
 ### Production jobs image
 FROM base AS jobs
-WORKDIR /usr/src/app
+WORKDIR ${PROJECT_DIR}
 EXPOSE ${PORT_JOBS}
 CMD ["node", "packages/jobs/dist/index.js"]
 
 ### Production UI image: serve static build with nginx
 FROM nginx:alpine AS ui
-COPY --from=base /usr/src/app/packages/ui/dist /usr/share/nginx/html
+COPY --from=base ${PROJECT_DIR}/packages/ui/dist /usr/share/nginx/html
 EXPOSE ${PORT_UI} 

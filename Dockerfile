@@ -1,10 +1,14 @@
 # syntax=docker/dockerfile:1.4
 
+ARG PROJECT_DIR=/srv/app
+
 ### Base stage: install dependencies and build workspace
-FROM node:18-slim AS base
+FROM node:18-alpine3.20 AS base
+ARG PROJECT_DIR
+ENV PROJECT_DIR=${PROJECT_DIR}
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-WORKDIR /usr/src/app
+WORKDIR ${PROJECT_DIR}
 ENV NODE_ENV=development
 
 # Enable Corepack and prepare pnpm
@@ -45,8 +49,8 @@ RUN pnpm --filter @vrooli/server run build:shared \
 
 ### Server image: run compiled server code
 FROM base AS server
-ENV NODE_ENV=production
-WORKDIR /usr/src/app
+ENV NODE_ENV=development
+WORKDIR ${PROJECT_DIR}
 # Inherit all built code and dependencies from base
 EXPOSE ${PORT_SERVER}
 CMD ["node", "packages/server/dist/index.js"]
@@ -54,8 +58,8 @@ CMD ["node", "packages/server/dist/index.js"]
 
 ### Jobs image: run compiled jobs code
 FROM base AS jobs
-ENV NODE_ENV=production
-WORKDIR /usr/src/app
+ENV NODE_ENV=development
+WORKDIR ${PROJECT_DIR}
 # Inherit all built code and dependencies from base
 EXPOSE ${PORT_JOBS}
 CMD ["node", "packages/jobs/dist/index.js"]
@@ -63,9 +67,9 @@ CMD ["node", "packages/jobs/dist/index.js"]
 
 ### UI development image: run Vite dev server (inherits pnpm from base)
 FROM base AS ui-dev
-WORKDIR /usr/src/app
-COPY --from=base /usr/src/app/node_modules ./node_modules
-COPY --from=base /usr/src/app .
+WORKDIR ${PROJECT_DIR}
+COPY --from=base ${PROJECT_DIR}/node_modules ./node_modules
+COPY --from=base ${PROJECT_DIR} .
 EXPOSE ${PORT_UI}
 RUN corepack enable && corepack prepare pnpm@latest --activate
 CMD ["pnpm", "--filter", "@vrooli/ui", "run", "dev", "--", "--host", "0.0.0.0", "--port", "${PORT_UI}"] 

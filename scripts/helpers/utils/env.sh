@@ -151,7 +151,7 @@ load_vault_secrets() {
     : "${DB_PASSWORD:?DB_PASSWORD not found in Vault secrets}"
     : "${REDIS_PASSWORD:?REDIS_PASSWORD not found in Vault secrets}"
     : "${API_URL:?API_URL not found in Vault secrets}"
-    export DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@db:${PORT_DB:-5432}"
+    export DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@postgres:${PORT_DB:-5432}"
     export REDIS_URL="redis://:${REDIS_PASSWORD}@redis:${PORT_REDIS:-6379}"
     export VITE_API_URL="${API_URL}"
     info "Vault secrets loaded and processed successfully"
@@ -221,7 +221,7 @@ load_secrets() {
     : "${DB_USER:?DB_USER was not set by environment file or Vault}"
     : "${DB_PASSWORD:?DB_PASSWORD was not set by environment file or Vault}"
     : "${REDIS_PASSWORD:?REDIS_PASSWORD was not set by environment file or Vault}"
-    export DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@db:${PORT_DB:-5432}"
+    export DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@postgres:${PORT_DB:-5432}"
     export REDIS_URL="redis://:${REDIS_PASSWORD}@redis:${PORT_REDIS:-6379}"
     success "Secrets loaded and processed."
 }

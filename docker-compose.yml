@@ -22,11 +22,6 @@ services:
       VITE_GOOGLE_ADSENSE_PUBLISHER_ID: "${GOOGLE_ADSENSE_PUBLISHER_ID}"
       VITE_GOOGLE_TRACKING_ID: "${GOOGLE_TRACKING_ID}"
       PROJECT_DIR: "${PROJECT_DIR:-/srv/app}"
-      VIRTUAL_HOST: "${VIRTUAL_HOST}"
-      VIRTUAL_PATH: "/"
-      VIRTUAL_PORT: "${PORT_UI:-3000}"
-      LETSENCRYPT_HOST: "${VIRTUAL_HOST}"
-      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
     ports:
       - ${PORT_UI:-3000}:${PORT_UI:-3000}
     networks:
@@ -34,6 +29,7 @@ services:
     volumes:
       - ./packages/ui:${PROJECT_DIR:-/srv/app}/packages/ui:z
       - ./packages/shared:${PROJECT_DIR:-/srv/app}/packages/shared:z
+      - ./scripts:${PROJECT_DIR:-/srv/app}/scripts:z
     healthcheck:
       test:
         - CMD-SHELL
@@ -43,7 +39,7 @@ services:
       interval: 20s
       timeout: 5s
       retries: 5
-    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/ui.sh"
+    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/package/ui/start.sh"
   server:
     build:
       context: .
@@ -66,7 +62,6 @@ services:
       VITE_PORT_API: ${PORT_API:-5329}
       REDIS_URL: "${REDIS_URL}"
       DB_URL: "${DB_URL}"
-      DB_PULL: "${DB_PULL}"
       JWT_PRIV: "${JWT_PRIV}"
       JWT_PUB: "${JWT_PUB}"
       EXTERNAL_SITE_KEY: "${EXTERNAL_SITE_KEY}"
@@ -88,11 +83,6 @@ services:
       TWILIO_AUTH_TOKEN: "${TWILIO_AUTH_TOKEN}"
       TWILIO_PHONE_NUMBER: "${TWILIO_PHONE_NUMBER}"
       UI_URL: "${UI_URL}"
-      VIRTUAL_HOST: "${VIRTUAL_HOST}"
-      VIRTUAL_PORT: ${PORT_API:-5329}
-      VIRTUAL_PATH: "/api"
-      LETSENCRYPT_HOST: "${VIRTUAL_HOST}"
-      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
       WORKER_ID: "${WORKER_ID}"
     ports:
       - ${PORT_API:-5329}:${PORT_API:-5329}
@@ -105,6 +95,7 @@ services:
       - ./data/logs:${PROJECT_DIR:-/srv/app}/data/logs:z
       - ./data/uploads:${PROJECT_DIR:-/srv/app}/data/uploads:z
       - ./packages/server/src/db/migrations:${PROJECT_DIR:-/srv/app}/packages/server/src/db/migrations
+      - ./scripts:${PROJECT_DIR:-/srv/app}/scripts:z
     depends_on:
       redis:
         condition: service_healthy
@@ -116,7 +107,7 @@ services:
       interval: 20s
       timeout: 5s
       retries: 15
-    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/server.sh"
+    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/package/server/start.sh"
   jobs:
     build:
       context: .
@@ -139,7 +130,6 @@ services:
       VITE_PORT_API: ${PORT_API:-5329}
       REDIS_URL: "${REDIS_URL}"
       DB_URL: "${DB_URL}"
-      DB_PULL: "${DB_PULL}"
       JWT_PRIV: "${JWT_PRIV}"
       JWT_PUB: "${JWT_PUB}"
       EXTERNAL_SITE_KEY: "${EXTERNAL_SITE_KEY}"
@@ -170,11 +160,12 @@ services:
       - ./packages/server:${PROJECT_DIR:-/srv/app}/packages/server:z
       - ./packages/shared:${PROJECT_DIR:-/srv/app}/packages/shared:z
       - ./packages/ui/dist:${PROJECT_DIR:-/srv/app}/packages/ui/dist:z
+      - ./scripts:${PROJECT_DIR:-/srv/app}/scripts:z
       - ./data/logs:${PROJECT_DIR:-/srv/app}/data/logs:z
     depends_on:
       server:
         condition: service_healthy
-    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/jobs.sh"
+    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/package/jobs/start.sh"
   postgres:
     image: pgvector/pgvector:pg15 
     restart: always
@@ -211,7 +202,7 @@ services:
       - ./scripts:${PROJECT_DIR:-/srv/app}/scripts
     expose:
       - ${PORT_REDIS:-6379}
-    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/redis/startRedis.sh"
+    command: /bin/sh -c "${PROJECT_DIR:-/srv/app}/scripts/package/redis/start.sh"
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
