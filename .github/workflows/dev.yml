@@ -11,21 +11,24 @@ on:
     branches: [dev]
   workflow_dispatch:
     inputs:
-      ignore_lint_errors:
-        description: 'Ignore linting errors'
+      run_lint:
+        description: 'Run linting step'
         required: false
         type: boolean
-        default: false
-      ignore_test_errors:
-        description: 'Ignore test errors'
+        default: true
+      run_test:
+        description: 'Run tests step'
         required: false
         type: boolean
-        default: false
+        default: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      RUN_LINT: ${{ github.event.inputs.run_lint != 'false' }}
+      RUN_TEST: ${{ github.event.inputs.run_test != 'false' }}
     steps:
       - uses: actions/checkout@v3
       - name: Use Node.js 18
@@ -44,11 +47,11 @@ jobs:
       - name: pnpm install (frozen lockfile)
         run: pnpm install --frozen-lockfile
       - name: Lint
+        if: ${{ env.RUN_LINT == 'true' }}
         run: pnpm run lint
-        continue-on-error: ${{ github.event.inputs.ignore_lint_errors == 'true' }}
       - name: Test
+        if: ${{ env.RUN_TEST == 'true' }}
         run: pnpm test
-        continue-on-error: ${{ github.event.inputs.ignore_test_errors == 'true' }}
       - name: Build
         run: pnpm run build
       - name: Configure SSH
