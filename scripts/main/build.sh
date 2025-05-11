@@ -33,6 +33,7 @@ parse_arguments() {
     args::register_help
     args::register_sudo_mode
     args::register_yes
+    args::register_location
     args::register_environment
 
     args::register \
@@ -77,7 +78,7 @@ parse_arguments() {
     
     args::register \
         --name "lint" \
-        --flag "l" \
+        --flag "q" \
         --desc "Run linting before building (default: true)" \
         --type "value" \
         --options "yes|no" \

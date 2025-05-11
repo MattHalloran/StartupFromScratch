@@ -54,14 +54,17 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
       - name: pnpm install (frozen lockfile)
         run: pnpm install --frozen-lockfile
-      - name: Lint
-        if: ${{ env.RUN_LINT == 'true' }}
-        run: pnpm run lint
-      - name: Test
-        if: ${{ env.RUN_TEST == 'true' }}
-        run: pnpm test
-      - name: Build
-        run: pnpm run build
+      - name: Build & package
+        run: |
+          pnpm run build -- \
+            --bundles zip \
+            --artifacts docker \
+            --binaries none \
+            --dest local \
+            --yes yes \
+            --location remote \
+            --lint "${{ env.RUN_LINT == 'true' && 'yes' || 'no' }}" \
+            --test "${{ env.RUN_TEST == 'true' && 'yes' || 'no' }}"
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -78,7 +81,12 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes ${{ secrets.VPS_DEPLOY_USER }}@${{ secrets.VPS_DEPLOY_HOST }} "echo 'SSH OK'"
       - name: Deploy to Staging
-        run: pnpm run deploy -- --source vps --target staging
+        run: |
+          pnpm run deploy -- \
+            --source vps \
+            --target staging \
+            --yes yes \
+            --location remote
         env:
           SSH_KEY_PATH: ~/.ssh/deploy_key
           VPS_DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }}
