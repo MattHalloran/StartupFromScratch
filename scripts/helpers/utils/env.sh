@@ -244,8 +244,13 @@ env::load_secrets() {
 
     # Load JWT keys from their respective PEM files if they haven't been set by the primary source.
     log::info "Checking/Loading JWT keys from PEM files if not already set..."
-    env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${ROOT_DIR}/jwt_priv.pem"
-    env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${ROOT_DIR}/jwt_pub.pem"
+    if env::in_development; then
+        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${STAGING_JWT_PRIV_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${STAGING_JWT_PUB_KEY_FILE}"
+    else
+        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${PRODUCTION_JWT_PRIV_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${PRODUCTION_JWT_PUB_KEY_FILE}"
+    fi
 
     log::success "Secrets loaded and processed."
 }
