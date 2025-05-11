@@ -15,8 +15,10 @@ Both workflows follow these steps:
 3.  **Lint**: Run code linting checks (`pnpm run lint`).
 4.  **Test**: Run unit tests (`pnpm test`).
 5.  **Build**: Build the application (`pnpm run build`).
-6.  **Setup SSH Key**: Write the SSH private key (from secrets) to a file for deployment.
-7.  **Deploy**: Run `scripts/main/deploy.sh` with the appropriate target (`staging` or `prod`) and deployment type (e.g., `--type vps`), passing necessary secrets.
+6.  **Configure SSH**: Disable strict host-key checking on the Actions runner.
+7.  **Setup SSH Key**: Write the SSH private key (from environment secrets) to `~/.ssh/deploy_key` and set secure permissions.
+8.  **Verify SSH connection**: Test connectivity to the VPS with `ssh -i ~/.ssh/deploy_key -o BatchMode=yes ${{ secrets.VPS_DEPLOY_USER }}@${{ secrets.VPS_DEPLOY_HOST }} "echo 'SSH OK'"`.
+9.  **Deploy**: Run `scripts/main/deploy.sh --source vps --target <environment>` (e.g., `staging` or `prod`), passing `SSH_KEY_PATH`, `VPS_DEPLOY_USER`, `VPS_DEPLOY_HOST`, and `VPS_DEPLOY_PATH` as environment variables.
 
 ## GitHub Setup
 
