@@ -34,5 +34,5 @@ jwt::generate_key_pair() {
     log::header "Generating JWT key pair for authentication"
     openssl genpkey -algorithm RSA -out "${JWT_PRIV_KEY_FILE}" -pkeyopt rsa_keygen_bits:2048
     openssl rsa -pubout -in "${JWT_PRIV_KEY_FILE}" -out "${JWT_PUB_KEY_FILE}"
-    log::info "JWT keys generated and saved to ${JWT_PRIV_KEY_FILE} and ${JWT_PUB_KEY_FILE} in the root directory of the project."
+    log::info "JWT keys generated and saved to ${JWT_PRIV_KEY_FILE} and ${JWT_PUB_KEY_FILE}."
 }

@@ -2,11 +2,12 @@
 set -euo pipefail
 DESCRIPTION="Prepares the project for development or production."
 
-# Changed to export since it's used in other scripts
 MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/args.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/ci.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/domainCheck.sh"
 # shellcheck disable=SC1091
@@ -106,12 +107,19 @@ setup::main() {
         ports::check_and_free "${PORT_UI:-3000}"
 
         proxy::setup
+    else
+        ci::generate_key_pair
     fi
 
     firewall::setup
     if env::in_development; then
         bats::install
         shellcheck::install
+    fi
+
+    if env::is_running_in_ci; then
+        ci::create_deploy_user
+        ci::create_deploy_path
     fi
 
     setup_docker

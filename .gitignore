@@ -201,13 +201,9 @@ packages/ui/public/sitemaps/
 # 0x flame graph data
 **/*.0x/
 
-# JWT keys
-jwt_pub.pem
-jwt_priv.pem
+# Key pairs
+*.pem
+*.jks
 
 # Vault keys
 .vault*
-
-# Upload keys (for Google Play Store)
-upload_certificate.pem
-upload-keystore.jks
