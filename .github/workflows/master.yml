@@ -27,6 +27,8 @@ jobs:
     env:
       RUN_LINT: ${{ github.event.inputs.run_lint != 'false' }}
       RUN_TEST: ${{ github.event.inputs.run_test != 'false' }}
+      SECRETS_SOURCE: file
+      ENVIRONMENT: production
     steps:
       - uses: actions/checkout@v3
       - name: Use Node.js 18

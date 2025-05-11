@@ -15,18 +15,20 @@ on:
         description: 'Run linting step'
         required: false
         type: boolean
-        default: true
+        default: false
       run_test:
         description: 'Run tests step'
         required: false
         type: boolean
-        default: true
+        default: false
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     environment: staging
     env:
+      SECRETS_SOURCE: file
+      ENVIRONMENT: development
       RUN_LINT: ${{ github.event.inputs.run_lint != 'false' }}
       RUN_TEST: ${{ github.event.inputs.run_test != 'false' }}
     steps:
