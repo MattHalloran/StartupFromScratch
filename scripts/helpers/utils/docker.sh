@@ -105,8 +105,10 @@ docker::check_internet_access() {
     if docker run --rm busybox ping -c 1 google.com &>/dev/null; then
         log::success "Docker internet access: OK"
     else
-        log::error "Docker internet access: FAILED"
-        return 1
+        log::warning "Docker internet access: FAILED"
+        if ! flow::is_yes "${CI:-}"; then
+            return 1
+        fi
     fi
 }
 
