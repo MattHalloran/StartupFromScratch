@@ -13,7 +13,6 @@ internet::check_connection() {
     if ping -c 1 google.com &>/dev/null; then
         log::success "Host internet access: OK"
     else
-        log::error "Host internet access: FAILED"
-        exit "${ERROR_NO_INTERNET}"
+        log::warning "Host internet access: FAILED"
     fi
 }
