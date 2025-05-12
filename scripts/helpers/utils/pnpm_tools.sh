@@ -22,14 +22,20 @@ pnpm_tools::ensure_pnpm() {
     # If pnpm is still not available, install it locally for the user
     if ! system::is_command "pnpm"; then
         echo "pnpm not found, installing locally via npm..."
-        # Install pnpm to a user-local directory
         export PNPM_HOME="$HOME/.pnpm"
         mkdir -p "$PNPM_HOME"
         npm install --prefix "$PNPM_HOME" pnpm
+
+        # Manually symlink the pnpm binary if needed
+        if [ ! -f "$PNPM_HOME/bin/pnpm" ]; then
+            mkdir -p "$PNPM_HOME/bin"
+            ln -sf "$PNPM_HOME/lib/node_modules/pnpm/bin/pnpm.cjs" "$PNPM_HOME/bin/pnpm"
+            chmod +x "$PNPM_HOME/bin/pnpm"
+        fi
+
         export PATH="$PNPM_HOME/bin:$PATH"
     fi
 
-    # Final check
     if ! system::is_command "pnpm"; then
         log::error "pnpm is still not available after attempted install. Exiting."
         exit 1
