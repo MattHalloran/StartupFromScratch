@@ -167,8 +167,7 @@ build::main() {
     build::parse_arguments "$@"
     log::header "🔨 Starting build for ${ENVIRONMENT} environment..."
 
-    env::load_secrets
-    env::construct_derived_secrets
+    source "${MAIN_DIR}/setup.sh" "$@"
 
     log::info "Cleaning previous build artifacts..."
     clean_build
