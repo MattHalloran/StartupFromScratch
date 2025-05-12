@@ -13,17 +13,20 @@ source "${SETUP_DIR}/../utils/system.sh"
 
 # Ensure pnpm is available, using corepack if possible, otherwise fallback to npm install -g pnpm
 pnpm_tools::ensure_pnpm() {
-    # Try to use corepack if available
+    # Try to use corepack if available and pnpm is available after activation
     if system::is_command "corepack"; then
         corepack enable || true
         corepack prepare pnpm@latest --activate || true
     fi
 
-    # If pnpm is still not available, install it locally
+    # If pnpm is still not available, install it locally for the user
     if ! system::is_command "pnpm"; then
         echo "pnpm not found, installing locally via npm..."
-        npm install -g pnpm
-        export PATH="$PATH:$(npm root -g)/pnpm/bin"
+        # Install pnpm to a user-local directory
+        export PNPM_HOME="$HOME/.pnpm"
+        mkdir -p "$PNPM_HOME"
+        npm install --prefix "$PNPM_HOME" pnpm
+        export PATH="$PNPM_HOME/bin:$PATH"
     fi
 
     # Final check
