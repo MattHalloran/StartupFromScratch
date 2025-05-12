@@ -57,6 +57,7 @@ jobs:
       - name: Build & package
         run: |
           pnpm run build -- \
+            --environment development \
             --bundles zip \
             --artifacts docker \
             --binaries none \
@@ -83,10 +84,9 @@ jobs:
       - name: Deploy to Staging
         run: |
           pnpm run deploy -- \
-            --source vps \
-            --target staging \
-            --yes yes \
-            --location remote
+            --environment development \
+            --source docker \
+            --yes yes
         env:
           SSH_KEY_PATH: ~/.ssh/deploy_key
           VPS_DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }}

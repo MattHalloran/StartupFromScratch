@@ -12,9 +12,9 @@ source "${BUILD_DIR}/../utils/log.sh"
 zip::folder() {
     local folder="$1"
     local outfile="$2"
-    log::info "Zipping folder $folder into $outfile..."
-    tar -czf "$outfile" "$folder"
-    log::success "Zipped folder $folder into $outfile"
+    log::info "Zipping contents of folder $folder into $outfile..."
+    tar -czf "$outfile" -C "$folder" .
+    log::success "Zipped contents of folder $folder into $outfile"
 }
 
 # Unzips a tarball into a folder
@@ -54,23 +54,37 @@ zip::build_artifacts() {
             cp -r "$pkg/dist" "$outdir/$(basename "$pkg")-dist"
         fi
     done
-} 
+}
+
+zip::undo_build_artifacts() {
+    local artifacts_dir="$1"
+    for pkg in "${PACKAGES_DIR}/"*; do
+        # Remove existing dist folder
+        rm -rf "$pkg/dist"
+        # Copy dist folder from artifacts directory
+        if [ -d "$artifacts_dir/$(basename "$pkg")-dist" ]; then
+            log::info "Copying $(basename "$pkg") distribution..."
+            cp -r "$artifacts_dir/$(basename "$pkg")-dist" "$pkg/dist"
+        fi
+    done
+}
 
 zip::copy_project_files() {
-    local outdir="$1"
-    log::info "Copying project files to $outdir..."
+    local folder="$1"
+    local outdir="$2"
+    log::info "Copying project files from $folder to $outdir..."
 
     mkdir -p "$outdir"
-    cp "${ROOT_DIR}/package.json" "$outdir"
-    cp "${ROOT_DIR}/pnpm-lock.yaml" "$outdir"
-    cp "${ROOT_DIR}/pnpm-workspace.yaml" "$outdir"
+    cp "${folder}/package.json" "$outdir"
+    cp "${folder}/pnpm-lock.yaml" "$outdir"
+    cp "${folder}/pnpm-workspace.yaml" "$outdir"
 }
 
 zip::copy_project() {
     local outdir="$1"
     mkdir -p "$outdir"
     log::header "Preparing project (minus Docker/Kubernetes files) for deployment..."
-    zip::copy_project_files "$outdir"
+    zip::copy_project_files "$ROOT_DIR" "$outdir"
     zip::build_artifacts "$outdir"
     log::success "Project artifacts have been copies to $outdir"
 }
@@ -78,10 +92,25 @@ zip::copy_project() {
 zip::artifacts() {
     local folder="$1"
     local outdir="$2"
-    log::info "Zipping and compressing build artifacts to ${outdir}..."
+    log::info "Creating compressed build artifact bundle ${outdir}/artifacts.zip.gz..."
     mkdir -p "${outdir}"
-    zip::folder "${folder}" "${outdir}/artifacts.zip"
-    trap "rm -f ${outdir}/artifacts.zip" EXIT
-    zip::compress "${outdir}/artifacts.zip" "${outdir}/artifacts.zip.gz"
+    zip::folder "${folder}" "${outdir}/artifacts.zip.gz"
     log::success "Created tarball: ${outdir}/artifacts.zip.gz"
+}
+
+# Decompresses the artifacts.zip.gz file into the given directory
+zip::unzip_artifacts() {
+    local infile="$1"
+    local outdir="$2"
+    log::info "Decompressing $infile into $outdir..."
+    tar -xzf "$infile" -C "$outdir" --strip-components=1
+    log::success "Decompressed $infile into $outdir"
+}
+
+zip::load_artifacts() {
+    local infile="$1"
+    log::info "Loading artifacts from $infile into $ROOT_DIR..."
+    zip::copy_project_files "$infile" "$ROOT_DIR"
+    zip::undo_build_artifacts "$infile"
+    log::success "Loaded artifacts from $infile into $ROOT_DIR"
 }

@@ -62,6 +62,23 @@ docker::restart() {
     sudo service docker restart
 }
 
+docker::kill_all() {
+    # If docker is not running
+    if ! system::is_command "docker"; then
+        log::warning "Docker is not running"
+        return
+    fi
+
+    # If there are no running containers, do nothing
+    if [ -z "$(docker ps -q)" ]; then
+        log::warning "No running containers found"
+        return
+    fi
+
+    # Kill all running containers
+    docker kill $(docker ps -q)
+}
+
 docker::setup_docker_compose() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker Compose installation due to sudo mode"
@@ -398,5 +415,23 @@ docker::build_artifacts() {
     docker::build_images
     docker::pull_base_images
     docker::save_images "$outdir"
-    log::success "Docker images saved to $outdir/docker-images.tar.gz"
+    log::success "Docker images saved to $outdir/docker-images.tar"
+}
+
+docker::load_images_from_tar() {
+    local tar_path="$1"
+
+    if [ ! -f "$tar_path" ]; then
+        log::error "Docker images tarball not found at: ${tar_path}"
+        return 1
+    fi
+
+    log::info "Loading Docker images from ${tar_path}..."
+    if docker load -i "$tar_path"; then
+        log::success "Successfully loaded Docker images from ${tar_path}."
+        return 0
+    else
+        log::error "Failed to load Docker images from ${tar_path}."
+        return 1
+    fi
 }

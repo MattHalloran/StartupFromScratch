@@ -250,11 +250,6 @@ build::main() {
                 log::warning "Unknown artifact type: $a";
                 ;;
         esac
-        if env::is_location_local "$DEST"; then
-            log::warning "Local copy for artifact $a not implemented"
-        else
-            log::warning "Remote destination not implemented for artifact $a"
-        fi
     done
 
     # Process platform binaries (e.g. Desktop App)
