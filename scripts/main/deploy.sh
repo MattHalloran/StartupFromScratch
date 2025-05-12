@@ -113,6 +113,7 @@ deploy::main() {
     # Where to put bundles
     local bundles_dir="${build_dir}/bundles"
 
+    mkdir -p "$artifacts_dir"
     zip::unzip_artifacts "${bundles_dir}/artifacts.zip.gz" "$artifacts_dir"
     zip::load_artifacts "$artifacts_dir" "$DEST_DIR"
 
