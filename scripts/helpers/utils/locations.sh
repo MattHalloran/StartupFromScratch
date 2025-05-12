@@ -33,7 +33,8 @@ export PRODUCTION_JWT_PRIV_KEY_FILE="$ROOT_DIR/jwt_priv_production.pem"
 export PRODUCTION_JWT_PUB_KEY_FILE="$ROOT_DIR/jwt_pub_production.pem"
 
 # Remote server
-export REMOTE_ROOT_DIR="/root/Vrooli"
+export REMOTE_ROOT_DIR="/root/StartupFromScratch"
+export REMOTE_DEST_DIR="$REMOTE_ROOT_DIR/dist"
 
 # Package directories/files
 export POSTGRES_ENTRYPOINT_DIR="$PACKAGES_DIR/postgres/entrypoint"

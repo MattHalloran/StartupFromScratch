@@ -321,24 +321,23 @@ build::main() {
         log::info "Setting up SSH connection to remote server ${SITE_IP} using key ${ssh_key_path}..."
         keyless_ssh::connect
 
-        log::info "Ensuring remote bundles directory ${SITE_IP}:${build_dir} exists and is empty..."
-        ssh -i "$ssh_key_path" "root@${SITE_IP}" "mkdir -p ${build_dir} && rm -rf ${build_dir}/*" || {
-            log::error "Failed to create or clean remote bundles directory ${SITE_IP}:${build_dir}"
+        local remote_bundles_dir="${REMOTE_DEST_DIR}/${VERSION}/bundles"
+        log::info "Ensuring remote bundles directory ${SITE_IP}:${remote_bundles_dir} exists and is empty..."
+        ssh -i "$ssh_key_path" "root@${SITE_IP}" "mkdir -p ${remote_bundles_dir} && rm -rf ${remote_bundles_dir}/*" || {
+            log::error "Failed to create or clean remote bundles directory ${SITE_IP}:${remote_bundles_dir}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
 
-        log::info "Copying compressed build artifacts to ${SITE_IP}:${bundles_dir}..."
-        rsync -avz --progress -e "ssh -i $ssh_key_path" "${bundles_dir}/artifacts.zip.gz" "root@${SITE_IP}:${bundles_dir}/" || {
-            log::error "Failed to copy compressed build artifacts to ${SITE_IP}:${bundles_dir}"
+        log::info "Copying compressed build artifacts to ${SITE_IP}:${remote_bundles_dir}..."
+        rsync -avz --progress -e "ssh -i $ssh_key_path" "${bundles_dir}/artifacts.zip.gz" "root@${SITE_IP}:${remote_bundles_dir}/" || {
+            log::error "Failed to copy compressed build artifacts to ${SITE_IP}:${remote_bundles_dir}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
-        log::success "Compressed build artifacts copied to ${SITE_IP}:${bundles_dir}"
+        log::success "Compressed build artifacts copied to ${SITE_IP}:${remote_bundles_dir}"
 
-        log::success "✅ Remote copy completed. Artifacts available at ${SITE_IP}:${artifacts_dir}"
-        log::info "You can now run deploy.sh on the remote server (${SITE_IP})."
+        log::success "✅ Remote copy completed. You can now run deploy.sh on the remote server (${SITE_IP})."
     else
-        log::success "✅ Local copy completed. Artifacts available at ${artifacts_dir}"
-        log::info "You can now run deploy.sh on the local server."
+        log::success "✅ Local copy completed. You can now run deploy.sh on the local server."
     fi
 }
 
