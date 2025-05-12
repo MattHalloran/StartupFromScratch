@@ -11,6 +11,28 @@ source "${SETUP_DIR}/../utils/log.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/system.sh"
 
+# Ensure pnpm is available, using corepack if possible, otherwise fallback to npm install -g pnpm
+pnpm_tools::ensure_pnpm() {
+    # Try to use corepack if available
+    if system::is_command "corepack"; then
+        corepack enable || true
+        corepack prepare pnpm@latest --activate || true
+    fi
+
+    # If pnpm is still not available, install it locally
+    if ! system::is_command "pnpm"; then
+        echo "pnpm not found, installing locally via npm..."
+        npm install -g pnpm
+        export PATH="$PATH:$(npm root -g)/pnpm/bin"
+    fi
+
+    # Final check
+    if ! system::is_command "pnpm"; then
+        log::error "pnpm is still not available after attempted install. Exiting."
+        exit 1
+    fi
+}
+
 pnpm_tools::generate_prisma_client() {
     HASH_FILE="${DATA_DIR}/schema-hash"
 
@@ -36,7 +58,7 @@ pnpm_tools::generate_prisma_client() {
     else
         log::info "Schema changed; generating Prisma client..."
         pnpm --filter @vrooli/prisma run generate
-        mkdir -p "$HASH_DIR"
+        mkdir -p "$DATA_DIR"
         echo "$CURRENT_HASH" > "$HASH_FILE"
     fi
 }
@@ -44,11 +66,10 @@ pnpm_tools::generate_prisma_client() {
 # Function to enable Corepack, install pnpm dependencies, and generate Prisma client
 pnpm_tools::setup() {
     log::header "🔧 Enabling Corepack and installing dependencies..."
-    corepack enable
-    corepack prepare pnpm@latest --activate
+    pnpm_tools::ensure_pnpm
 
     log::info "Installing dependencies via pnpm..."
-    { unset CI; pnpm install; }
+    pnpm install
 
     # Generate Prisma client if (and only if) the schema changed
     pnpm_tools::generate_prisma_client
