@@ -37,14 +37,14 @@ keyless_ssh::get_remote_server() {
 keyless_ssh::check_key() {
     local key_name=$(keyless_ssh::get_key_path)
     local remote_server=$(keyless_ssh::get_remote_server)
-    if [ ! -f ~/.ssh/${key_name} ]; then
+    if [ ! -f "${key_name}" ]; then
         # Generate a new SSH key pair for the project
-        ssh-keygen -t rsa -f ~/.ssh/${key_name} -N ""
+        ssh-keygen -t rsa -f "${key_name}" -N ""
         # Copy the public key to the remote host
-        cat ~/.ssh/${key_name}.pub | ssh ${remote_server} 'chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; cat >> ~/.ssh/authorized_keys'
+        cat "${key_name}.pub" | ssh ${remote_server} 'chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; cat >> ~/.ssh/authorized_keys'
         if [ $? -ne 0 ]; then
             log::error "Failed to copy public key to remote host. Exiting..."
-            rm ~/.ssh/${key_name}*
+            rm "${key_name}"*
             exit 1
         fi
     fi
@@ -52,8 +52,8 @@ keyless_ssh::check_key() {
 
 keyless_ssh::remove_key_file() {
     local key_name=$(keyless_ssh::get_key_path)
-    if [ -f ~/.ssh/${key_name} ] && [ $(find ~/.ssh/${key_name} -mmin -5 | wc -l) -gt 0 ]; then
-        rm ~/.ssh/${key_name}*
+    if [ -f "${key_name}" ] && [ $(find "${key_name}" -mmin -5 | wc -l) -gt 0 ]; then
+        rm "${key_name}"*
     fi
 }
 
@@ -61,14 +61,14 @@ keyless_ssh::connect() {
     local key_name=$(keyless_ssh::get_key_path)
     local remote_server=$(keyless_ssh::get_remote_server)
     log::info "Testing SSH connection to ${remote_server}..."
-    ssh -i ~/.ssh/${key_name} -o "BatchMode=yes" -o "ConnectTimeout=${CONN_TIMEOUT_S}" ${remote_server} "echo 2>&1" >/dev/null
+    ssh -i "${key_name}" -o "BatchMode=yes" -o "ConnectTimeout=${CONN_TIMEOUT_S}" ${remote_server} "echo 2>&1" >/dev/null
     RET=$?
     if [ ${RET} -ne 0 ]; then
         log::error "SSH connection failed: ${RET}. Retrying after removing old host key..."
         # Remove the known hosts entry for the remote server
         ssh-keygen -R ${SITE_IP}
         # Retry the SSH connection
-        ssh -i ~/.ssh/${key_name} -o "BatchMode=yes" -o "ConnectTimeout=${CONN_TIMEOUT_S}" ${remote_server} "echo 2>&1" >/dev/null
+        ssh -i "${key_name}" -o "BatchMode=yes" -o "ConnectTimeout=${CONN_TIMEOUT_S}" ${remote_server} "echo 2>&1" >/dev/null
         RET=$?
         if [ ${RET} -ne 0 ]; then
             log::error "SSH connection still failed: ${RET}. Exiting..."
