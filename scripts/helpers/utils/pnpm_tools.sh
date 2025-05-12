@@ -11,21 +11,7 @@ source "${SETUP_DIR}/../utils/log.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/system.sh"
 
-# Function to enable Corepack, install pnpm dependencies, and generate Prisma client
-setup_pnpm() {
-    log::header "🔧 Enabling Corepack and installing dependencies..."
-    corepack enable
-    corepack prepare pnpm@latest --activate
-
-    log::info "Installing dependencies via pnpm..."
-    { unset CI; pnpm install; }
-
-    # Generate Prisma client if (and only if) the schema changed
-    generate_prisma_client
-}
-
-# Function to generate Prisma client only when the schema changes
-generate_prisma_client() {
+pnpm_tools::generate_prisma_client() {
     HASH_FILE="${DATA_DIR}/schema-hash"
 
     # Compute current schema hash
@@ -53,4 +39,17 @@ generate_prisma_client() {
         mkdir -p "$HASH_DIR"
         echo "$CURRENT_HASH" > "$HASH_FILE"
     fi
-} 
+}
+
+# Function to enable Corepack, install pnpm dependencies, and generate Prisma client
+pnpm_tools::setup() {
+    log::header "🔧 Enabling Corepack and installing dependencies..."
+    corepack enable
+    corepack prepare pnpm@latest --activate
+
+    log::info "Installing dependencies via pnpm..."
+    { unset CI; pnpm install; }
+
+    # Generate Prisma client if (and only if) the schema changed
+    pnpm_tools::generate_prisma_client
+}
