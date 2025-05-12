@@ -317,8 +317,8 @@ build::main() {
 
      # --- Remote Destination Handling ---
     if env::is_location_remote "$DEST"; then
-        log::info "Setting up SSH connection to remote server ${SITE_IP}..."
         local ssh_key_path=$(keyless_ssh::get_key_path)
+        log::info "Setting up SSH connection to remote server ${SITE_IP} using key ${ssh_key_path}..."
         keyless_ssh::connect
 
         log::info "Ensuring remote bundles directory ${SITE_IP}:${build_dir} exists and is empty..."
