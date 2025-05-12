@@ -88,7 +88,6 @@ setup::main() {
 
     # Setup tools
     common_deps::check_and_install
-    setup_vault::check_deps
     # Clean up volumes & caches
     if flow::is_yes "$CLEAN"; then
         clean::main

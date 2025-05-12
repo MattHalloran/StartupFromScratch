@@ -41,6 +41,29 @@ env::load_env_file() {
     set +a
 }
 
+# Checks if the HashiCorp Vault CLI ('vault') is installed.
+# If not, prints instructions and exits.
+env::check_vault_cli() {
+    log::info "Checking for Vault CLI..."
+    if system::is_command "vault"; then
+        log::success "Vault CLI is already installed."
+        return 0
+    fi
+
+    # Vault CLI installation is typically manual (downloading binary)
+    # Attempting auto-install via package managers is unreliable
+    log::error "HashiCorp Vault CLI ('vault') not found. Please install it manually from https://developer.hashicorp.com/vault/downloads and ensure it's in your system PATH."
+    exit "${ERROR_DEPENDENCY_MISSING:-5}"
+}
+
+# Main function to check for the Vault CLI.
+env::check_vault_deps() {
+    log::header "⚙️ Checking Vault client dependencies..."
+    env::check_vault_cli
+    log::success "✅ Vault client dependencies checked."
+    return 0
+} 
+
 # Authenticates to Vault using the token method.
 env::authenticate_with_token() {
     : "${VAULT_TOKEN:?Required environment variable VAULT_TOKEN is not set}"
@@ -231,6 +254,7 @@ env::load_secrets() {
             # env::load_env_file function is now redundant as sourcing is done above
             ;;
         v|vault|hashicorp|hashicorp-vault)
+            env::check_vault_deps
             # Call the function to load secrets from Vault
             # This function assumes VAULT_* vars are now set (from file or injected env)
             # It will fetch and export secrets like DB_USER, DB_PASSWORD, etc., potentially overwriting sourced values.
