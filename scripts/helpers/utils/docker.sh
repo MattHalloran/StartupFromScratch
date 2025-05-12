@@ -106,9 +106,7 @@ docker::check_internet_access() {
         log::success "Docker internet access: OK"
     else
         log::warning "Docker internet access: FAILED"
-        if ! flow::is_yes "${CI:-}"; then
-            return 1
-        fi
+        return 1
     fi
 }
 
@@ -307,8 +305,10 @@ docker::setup() {
     docker::install
     docker::start
     docker::setup_docker_compose
-    docker::setup_internet_access
-    docker::configure_resource_limits
+    if ! flow::is_yes "${CI:-}"; then
+        docker::setup_internet_access
+        docker::configure_resource_limits
+    fi
 }
 
 docker::get_compose_file() {
