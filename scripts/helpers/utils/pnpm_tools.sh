@@ -21,22 +21,14 @@ pnpm_tools::ensure_pnpm() {
 
     # If pnpm is still not available, install it locally for the user
     if ! system::is_command "pnpm"; then
-        echo "pnpm not found, installing locally via npm..."
-        export PNPM_HOME="$HOME/.pnpm"
+        echo "pnpm not found, installing standalone binary..."
+        export PNPM_HOME="$HOME/.local/share/pnpm"
         mkdir -p "$PNPM_HOME"
-        npm install --prefix "$PNPM_HOME" pnpm
-
-        # Try to find the pnpm binary
-        if [ -f "$PNPM_HOME/bin/pnpm" ]; then
-            export PATH="$PNPM_HOME/bin:$PATH"
-        else
-            # Fallback: use npx for all pnpm commands
-            alias pnpm="npx --prefix $PNPM_HOME pnpm"
-        fi
+        curl -fsSL https://get.pnpm.io/install.sh | bash -
+        export PATH="$PNPM_HOME:$PATH"
     fi
 
-    # Final check: try to run pnpm --version (using alias if set)
-    if ! pnpm --version >/dev/null 2>&1; then
+    if ! system::is_command "pnpm"; then
         log::error "pnpm is still not available after attempted install. Exiting."
         exit 1
     fi
