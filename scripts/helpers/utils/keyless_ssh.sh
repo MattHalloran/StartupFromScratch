@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # This script sets up keyless SSH access to a remote server.
 
-MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/locations.sh"
+source "${UTILS_DIR}/locations.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/log.sh"
+source "${UTILS_DIR}/log.sh"
 
 CONN_TIMEOUT_S=10
 SETUP_MODE=false
