@@ -26,17 +26,17 @@ pnpm_tools::ensure_pnpm() {
         mkdir -p "$PNPM_HOME"
         npm install --prefix "$PNPM_HOME" pnpm
 
-        # Manually symlink the pnpm binary if needed
-        if [ ! -f "$PNPM_HOME/bin/pnpm" ]; then
-            mkdir -p "$PNPM_HOME/bin"
-            ln -sf "$PNPM_HOME/lib/node_modules/pnpm/bin/pnpm.cjs" "$PNPM_HOME/bin/pnpm"
-            chmod +x "$PNPM_HOME/bin/pnpm"
+        # Try to find the pnpm binary
+        if [ -f "$PNPM_HOME/bin/pnpm" ]; then
+            export PATH="$PNPM_HOME/bin:$PATH"
+        else
+            # Fallback: use npx for all pnpm commands
+            alias pnpm="npx --prefix $PNPM_HOME pnpm"
         fi
-
-        export PATH="$PNPM_HOME/bin:$PATH"
     fi
 
-    if ! system::is_command "pnpm"; then
+    # Final check: try to run pnpm --version (using alias if set)
+    if ! pnpm --version >/dev/null 2>&1; then
         log::error "pnpm is still not available after attempted install. Exiting."
         exit 1
     fi
