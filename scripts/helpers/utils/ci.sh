@@ -73,35 +73,8 @@ ci::generate_key_pair() {
    - For production: set VPS_SSH_PRIVATE_KEY = contents of $PRODUCTION_CI_SSH_PRIV_KEY_FILE
 
 4. Ensure each environment secret set also includes:
-   VPS_DEPLOY_USER, VPS_DEPLOY_HOST, VPS_DEPLOY_PATH
+   VPS_DEPLOY_USER, VPS_DEPLOY_HOST, JWT_PRIV_PEM, JWT_PUB_PEM, ENV_FILE_CONTENT
 
 5. Re-run the GitHub Actions pipeline and confirm both "Verify SSH connection" steps pass.
 EOF
-}
-
-ci::create_deploy_user() {
-    local deploy_user_staging="${VPS_DEPLOY_USER_STAGING:-root}"
-    local deploy_user_production="${VPS_DEPLOY_USER_PRODUCTION:-root}"
-
-    if ! id "$deploy_user_staging" &>/dev/null; then
-        log::info "Creating deploy user $deploy_user_staging"
-        sudo useradd -m "$deploy_user_staging"
-    fi
-
-    if ! id "$deploy_user_production" &>/dev/null; then
-        log::info "Creating deploy user $deploy_user_production"
-        sudo useradd -m "$deploy_user_production"
-    fi
-}
-
-ci::create_deploy_path() {
-    local deploy_path_staging="${VPS_DEPLOY_PATH_STAGING:-/var/www/vrooli-staging}"
-    local deploy_path_production="${VPS_DEPLOY_PATH_PRODUCTION:-/var/www/vrooli}"
-    local deploy_user_staging="${VPS_DEPLOY_USER_STAGING:-root}"
-    local deploy_user_production="${VPS_DEPLOY_USER_PRODUCTION:-root}"
-
-    mkdir -p "$deploy_path_staging" "$deploy_path_production"
-    chown -R "$deploy_user_staging:$deploy_user_staging" "$deploy_path_staging"
-    chown -R "$deploy_user_production:$deploy_user_production" "$deploy_path_production"
-    chmod -R 755 "$deploy_path_staging" "$deploy_path_production"
 }

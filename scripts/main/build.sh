@@ -13,6 +13,8 @@ source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/keyless_ssh.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
@@ -316,35 +318,31 @@ build::main() {
      # --- Remote Destination Handling ---
     if env::is_location_remote "$DEST"; then
         log::info "Setting up SSH connection to remote server ${SITE_IP}..."
-        # shellcheck disable=SC1091
-        ENV_FILE="${ENV_DEV_FILE}"
-        if env::in_production; then
-            ENV_FILE="${ENV_PROD_FILE}"
-        fi
-        source "${MAIN_DIR}/keyless_ssh.sh" -e "${ENV_FILE}" -i "${SITE_IP}"
+        local ssh_key_path=$(keyless_ssh::get_key_path)
+        keyless_ssh::connect
 
         log::info "Ensuring remote bundles directory ${SITE_IP}:${build_dir} exists and is empty..."
-        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "mkdir -p ${build_dir} && rm -rf ${build_dir}/*" || {
+        ssh -i "$ssh_key_path" "root@${SITE_IP}" "mkdir -p ${build_dir} && rm -rf ${build_dir}/*" || {
             log::error "Failed to create or clean remote bundles directory ${SITE_IP}:${build_dir}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
 
         log::info "Copying compressed build artifacts to ${SITE_IP}:${bundles_dir}..."
-        rsync -avz --progress -e "ssh -i $SSH_KEY_PATH" "${bundles_dir}/artifacts.zip.gz" "root@${SITE_IP}:${bundles_dir}/" || {
+        rsync -avz --progress -e "ssh -i $ssh_key_path" "${bundles_dir}/artifacts.zip.gz" "root@${SITE_IP}:${bundles_dir}/" || {
             log::error "Failed to copy compressed build artifacts to ${SITE_IP}:${bundles_dir}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
         log::success "Compressed build artifacts copied to ${SITE_IP}:${bundles_dir}"
 
         log::info "Unzipping compressed build artifacts on remote server at ${bundles_dir} to ${artifacts_dir}..."
-        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "tar -xzf ${bundles_dir}/artifacts.zip.gz -C ${artifacts_dir}" || {
+        ssh -i "$ssh_key_path" "root@${SITE_IP}" "tar -xzf ${bundles_dir}/artifacts.zip.gz -C ${artifacts_dir}" || {
             log::error "Failed to unzip compressed build artifacts on remote server ${SITE_IP}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
         log::success "Compressed build artifacts unzipped on ${SITE_IP}:${bundles_dir}"
 
         log::info "Cleaning up remote tarball..."
-        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "rm -f ${bundles_dir}/artifacts.zip.gz"
+        ssh -i "$ssh_key_path" "root@${SITE_IP}" "rm -f ${bundles_dir}/artifacts.zip.gz"
 
         log::success "✅ Remote copy completed. Artifacts available at ${SITE_IP}:${artifacts_dir}"
         log::info "You can now run deploy.sh on the remote server (${SITE_IP})."

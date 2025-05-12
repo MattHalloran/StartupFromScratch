@@ -294,10 +294,6 @@ env::construct_derived_secrets() {
     export WORKER_ID=0 # This is fine for single-node deployments, but should be set to the pod ordinal for multi-node deployments.
 }
 
-env::is_running_in_ci() {
-    [[ "$CI" == "true" ]]
-}
-
 env::is_location_remote() {
     # Use LOCATION or provided argument
     local location="${LOCATION:-}"

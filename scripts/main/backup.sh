@@ -7,6 +7,8 @@ MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/keyless_ssh.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
@@ -48,8 +50,7 @@ backup::do() {
 backup::init() {
     export NODE_ENV="${NODE_ENV:-production}"
     env::load_env_file
-
-    "${HERE}/keyless_ssh.sh"
+    keyless_ssh::connect
 }
 
 backup::schedule() {

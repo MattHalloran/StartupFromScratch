@@ -66,13 +66,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-      - name: Verify SSH connection
-        run: |
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes ${{ secrets.VPS_DEPLOY_USER }}@${{ secrets.VPS_DEPLOY_HOST }} "echo 'SSH OK'"
       - name: Deploy to Production
         run: pnpm run deploy -- --source vps --target prod
         env:
           SSH_KEY_PATH: ~/.ssh/deploy_key
-          VPS_DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }}
-          VPS_DEPLOY_HOST: ${{ secrets.VPS_DEPLOY_HOST }}
-          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }} 
