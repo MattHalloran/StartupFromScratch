@@ -38,9 +38,9 @@ deploy_docker() {
   # Select compose file based on target environment
   local compose_file
   if env::in_production; then
-    compose_file="${ROOT_DIR}/docker-compose-prod.yml"
+    compose_file="${DOCKER_COMPOSE_PROD_FILE}"
   else
-    compose_file="${ROOT_DIR}/docker-compose.yml"
+    compose_file="${DOCKER_COMPOSE_DEV_FILE}"
   fi
 
   log::info "Using Docker Compose file: $compose_file"

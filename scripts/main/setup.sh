@@ -9,6 +9,8 @@ source "${MAIN_DIR}/../helpers/utils/args.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/ci.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/docker.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/domainCheck.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/env.sh"
@@ -122,7 +124,7 @@ setup::main() {
         ci::create_deploy_path
     fi
 
-    setup_docker
+    docker::setup
 
     # Run the setup script for the target
     execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE:-1}"

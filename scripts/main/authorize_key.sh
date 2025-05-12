@@ -7,7 +7,7 @@ MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
 
-main() {
+authorize_key::main() {
   log::header "Authorize SSH Public Key"
   log::info "This will add a new public key to ~/.ssh/authorized_keys."
   log::info "Please paste the public key now, then press Ctrl-D when finished:"
@@ -32,4 +32,4 @@ if [[ "${1-}" == "-h" || "${1-}" == "--help" ]]; then
   exit 0
 fi
 
-main 
+authorize_key::main 

@@ -7,6 +7,8 @@ MAIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/args.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/docker.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/flow.sh"
@@ -19,15 +21,13 @@ source "${MAIN_DIR}/../helpers/utils/system.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/version.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/zip.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/build/index.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/build/artifacts/index.sh"
-# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/build/binaries/index.sh"
-# shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/build/bundles/index.sh"
 
-parse_arguments() {
+build::parse_arguments() {
     args::reset
 
     args::register_help
@@ -101,6 +101,7 @@ parse_arguments() {
     
     export SUDO_MODE=$(args::get "sudo-mode")
     export YES=$(args::get "yes")
+    export LOCATION=$(args::get "location")
     export ENVIRONMENT=$(args::get "environment")
     # Read comma-separated strings into temp variables
     local bundles_str=$(args::get "bundles")
@@ -116,25 +117,36 @@ parse_arguments() {
     IFS=',' read -r -a ARTIFACTS <<< "$artifacts_str"
     IFS=',' read -r -a BINARIES <<< "$binaries_str"
 
-    # Assign default values for BUNDLES
-    # Check if array is not empty before accessing first element
-    if [ ${#BUNDLES[@]} -eq 0 ] || { [ ${#BUNDLES[@]} -gt 0 ] && [ "${BUNDLES[0]}" == "all" ]; }; then
+    # Treat explicit 'none' values (or default empty for binaries) as empty lists
+    if [ "$bundles_str" = "none" ]; then
+        BUNDLES=()
+    fi
+    if [ "$artifacts_str" = "none" ]; then
+        ARTIFACTS=()
+    fi
+    if [ "$binaries_str" = "none" ]; then
+        BINARIES=()
+    fi
+    # Treat explicit 'all' values as full arrays
+    if [ "$bundles_str" = "all" ]; then
         BUNDLES=("zip" "cli")
     fi
-
-    # Assign default values for ARTIFACTS
-    # Check if array is not empty before accessing first element
-    if [ ${#ARTIFACTS[@]} -eq 0 ] || { [ ${#ARTIFACTS[@]} -gt 0 ] && [ "${ARTIFACTS[0]}" == "all" ]; }; then
+    if [ "$artifacts_str" = "all" ]; then
         ARTIFACTS=("docker" "k8s")
     fi
-
-    # Handle BINARIES: 'all' or specific list (empty list if default "" is used)
-    # Check if the array is not empty before accessing the first element
-    if [ ${#BINARIES[@]} -gt 0 ] && [ "${BINARIES[0]}" == "all" ]; then
-        # Explicitly 'all' provided
+    if [ "$binaries_str" = "all" ]; then
         BINARIES=("windows" "mac" "linux" "android" "ios")
     fi
-    # Otherwise, BINARIES is either the user-provided list or empty (from default="")
+    # Treat missing values as their default values
+    if [ -z "$bundles_str" ]; then
+        BUNDLES=("zip")
+    fi
+    if [ -z "$artifacts_str" ]; then
+        ARTIFACTS=("docker")
+    fi
+    if [ -z "$binaries_str" ]; then
+        BINARIES=()
+    fi
 
     # Handle default destination, test, lint
     if [ -z "$DEST" ]; then
@@ -151,8 +163,8 @@ parse_arguments() {
     fi
 }
 
-main() {
-    parse_arguments "$@"
+build::main() {
+    build::parse_arguments "$@"
     log::header "🔨 Starting build for ${ENVIRONMENT} environment..."
 
     env::load_secrets
@@ -200,12 +212,19 @@ main() {
       log::success "Electron scripts built and renamed to .cjs."
     fi
 
-    # Process bundle types
+    log::header "🎁 Preparing build artifacts..."
+    local build_dir="${DEST_DIR}/${VERSION}"
+    # Where to put build artifacts
+    local artifacts_dir="${build_dir}/artifacts"
+    # Where to put bundles
+    local bundles_dir="${build_dir}/bundles"
+
+    # Collect artifacts based on bundle types
     for b in "${BUNDLES[@]}"; do
         case "$b" in
             zip)
                 log::info "Building ZIP bundle..."
-                zip_artifacts "${ENVIRONMENT}" "${VERSION}"
+                zip::copy_project "${artifacts_dir}"
                 ;;
             cli)
                 log::info "Building CLI executables..."
@@ -215,86 +234,13 @@ main() {
                 log::warning "Unknown bundle type: $b"
                 ;;
         esac
-
-        if env::is_location_local "$DEST"; then
-            local dest_dir="${DEST_DIR}/bundles/${b}/${VERSION}"
-            mkdir -p "${dest_dir}"
-            local source_dir="${REMOTE_DIST_DIR}/${VERSION}"
-            if [ -d "${source_dir}" ]; then
-              cp -r "${source_dir}"/* "${dest_dir}/"
-              log::success "Copied bundle ${b} version ${VERSION} to ${dest_dir}"
-            else
-              log::warning "Source directory ${source_dir} not found for bundle ${b}. Skipping copy."
-            fi
-        else
-            log::warning "Remote destination not implemented for bundle $b"
-        fi
     done
 
-    # Compress build artifacts for distribution
-    log::info "Compressing build artifacts for Docker deployments..."
-    local out_dir="${REMOTE_DIST_DIR}/${VERSION}"
-    mkdir -p "$out_dir"
-    # Archive package dist directories
-    pushd "${PACKAGES_DIR}" >/dev/null || { log::error "Failed to change to packages directory"; exit "$ERROR_BUILD_FAILED"; }
-    tar -czf "$out_dir/build.tar.gz" ui/dist server/dist shared/dist 2>/dev/null || {
-        popd >/dev/null
-        log::error "Failed to compress build artifacts"
-        exit "$ERROR_BUILD_FAILED"
-    }
-    popd >/dev/null
-    log::success "Build artifacts compressed to $out_dir/build.tar.gz"
-
-    # Process container artifacts
+    # Collect Docker/Kubernetes artifacts
     for a in "${ARTIFACTS[@]}"; do
         case "$a" in
             docker)
-                log::info "Building Docker artifacts..."
-                # Always use docker-compose-prod.yml
-                local compose_file="${ROOT_DIR}/docker-compose-prod.yml"
-                log::info "Using Docker Compose file: $compose_file"
-                # Navigate to project root
-                pushd "${ROOT_DIR}" >/dev/null || { log::error "Cannot change to project root"; exit "$ERROR_BUILD_FAILED"; }
-                # Build Docker images
-                if system::is_command "docker compose"; then
-                    docker compose -f "$compose_file" build --no-cache --progress=plain
-                elif system::is_command "docker-compose"; then
-                    docker-compose -f "$compose_file" build --no-cache
-                else
-                    log::error "No Docker Compose available to build images"
-                    popd >/dev/null
-                    exit "$ERROR_BUILD_FAILED"
-                fi
-                popd >/dev/null
-                # Pull base service images
-                log::info "Pulling base images"
-                docker pull redis:7.4.0-alpine
-                docker pull ankane/pgvector:v0.4.4
-                # Determine tag suffix for custom images (always use prod)
-                local suffix="prod"
-                # Collect images to save
-                local images=("ui:${suffix}" "server:${suffix}" "jobs:${suffix}" "redis:7.4.0-alpine" "ankane/pgvector:v0.4.4")
-                local available_images=()
-                for img in "${images[@]}"; do
-                    if docker image inspect "$img" >/dev/null 2>&1; then
-                        available_images+=("$img")
-                    else
-                        log::warning "Image $img not found, skipping"
-                    fi
-                done
-                if [[ ${#available_images[@]} -eq 0 ]]; then
-                    log::error "No Docker images available to save"
-                    exit "$ERROR_BUILD_FAILED"
-                fi
-                # Save and compress Docker images
-                local images_tar="$out_dir/docker-images.tar"
-                docker save -o "$images_tar" "${available_images[@]}"
-                if [[ $? -ne 0 ]]; then
-                    log::error "Failed to save Docker images"
-                    exit "$ERROR_BUILD_FAILED"
-                fi
-                gzip -f "$images_tar"
-                log::success "Docker images saved to $out_dir/docker-images.tar.gz"
+                docker::build_artifacts "$artifacts_dir"
                 ;;
             k8s)
                 log::info "Building Kubernetes artifacts (stub)"
@@ -311,7 +257,7 @@ main() {
         fi
     done
 
-    # Process platform binaries (now Desktop Apps)
+    # Process platform binaries (e.g. Desktop App)
     for c in "${BINARIES[@]}"; do
         local target_platform=""
         case "$c" in
@@ -370,84 +316,48 @@ main() {
 
     done
 
-    # --- Remote Destination Handling ---
+    # Zip and compress the entire artifacts directory to the bundles directory
+    zip::artifacts "${artifacts_dir}" "${bundles_dir}"
+
+     # --- Remote Destination Handling ---
     if env::is_location_remote "$DEST"; then
-        log::header "🚚 Preparing and copying build artifacts to remote server..."
-        local remote_tmp_dir="${REMOTE_DIST_DIR}"
-        local local_source_dir="${DEST_DIR}"
-        local remote_dest_dir="${remote_tmp_dir}/${VERSION}"
-        local tarball_name="vrooli-build-${VERSION}.tar.gz"
-        local local_tarball_path="${remote_tmp_dir}/${tarball_name}" # Create tarball locally in /var/tmp
-
-        if [ ! -d "${local_source_dir}" ] || [ -z "$(ls -A "${local_source_dir}")" ]; then
-            log::error "Source directory ${local_source_dir} is empty or does not exist. Cannot proceed with remote copy."
-            exit "$ERROR_INVALID_STATE"
-        fi
-
-        log::info "Creating tarball of build artifacts from ${local_source_dir}..."
-        # Create the tarball in /var/tmp locally
-        tar -czf "${local_tarball_path}" -C "${local_source_dir}" . || {
-            log::error "Failed to create tarball ${local_tarball_path}"
-            exit "$ERROR_BUILD_FAILED"
-        }
-        log::success "Created tarball: ${local_tarball_path}"
-
-        log::info "Setting up SSH connection to ${SITE_IP}..."
-        # Assuming keylessSsh.sh sets up keys correctly. Need to ensure SITE_IP is loaded.
+        log::info "Setting up SSH connection to remote server ${SITE_IP}..."
         # shellcheck disable=SC1091
-        source "${MAIN_DIR}/../helpers/utils/keylessSsh.sh"
-        setup_ssh_key "${SITE_IP}" || {
-            log::error "Failed to set up SSH key for ${SITE_IP}"
-            exit "$ERROR_REMOTE_OPERATION_FAILED"
-        }
-
-        if ! flow::is_yes "$YES"; then
-            log::prompt "About to copy ${tarball_name} to ${SITE_IP}:${remote_tmp_dir}. Proceed? (y/N)"
-            read -r reply
-            if [[ ! "$reply" =~ ^[Yy]$ ]]; then
-                log::info "Aborted by user."
-                # Clean up local tarball
-                rm -f "${local_tarball_path}"
-                exit "$EXIT_SUCCESS"
-            fi
+        ENV_FILE="${ENV_DEV_FILE}"
+        if env::in_production; then
+            ENV_FILE="${ENV_PROD_FILE}"
         fi
+        source "${MAIN_DIR}/keyless_ssh.sh" -e "${ENV_FILE}" -i "${SITE_IP}"
 
-        log::info "Ensuring remote directory ${remote_dest_dir} exists and is empty..."
-        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "mkdir -p ${remote_dest_dir} && rm -rf ${remote_dest_dir}/*" || {
-            log::error "Failed to create or clean remote directory ${remote_dest_dir} on ${SITE_IP}"
-            # Clean up local tarball
-            rm -f "${local_tarball_path}"
+        log::info "Ensuring remote bundles directory ${SITE_IP}:${build_dir} exists and is empty..."
+        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "mkdir -p ${build_dir} && rm -rf ${build_dir}/*" || {
+            log::error "Failed to create or clean remote bundles directory ${SITE_IP}:${build_dir}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
 
-        log::info "Copying ${tarball_name} to ${SITE_IP}:${remote_tmp_dir}..."
-        rsync -avz --progress -e "ssh -i $SSH_KEY_PATH" "${local_tarball_path}" "root@${SITE_IP}:${remote_tmp_dir}/" || {
-            log::error "Failed to copy ${tarball_name} to ${SITE_IP}:${remote_tmp_dir}"
-            # Clean up local tarball
-            rm -f "${local_tarball_path}"
+        log::info "Copying compressed build artifacts to ${SITE_IP}:${bundles_dir}..."
+        rsync -avz --progress -e "ssh -i $SSH_KEY_PATH" "${bundles_dir}/artifacts.zip.gz" "root@${SITE_IP}:${bundles_dir}/" || {
+            log::error "Failed to copy compressed build artifacts to ${SITE_IP}:${bundles_dir}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
-        log::success "Tarball copied to ${SITE_IP}:${remote_tmp_dir}"
+        log::success "Compressed build artifacts copied to ${SITE_IP}:${bundles_dir}"
 
-        log::info "Extracting tarball on remote server at ${remote_dest_dir}..."
-        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "tar -xzf ${remote_tmp_dir}/${tarball_name} -C ${remote_dest_dir}" || {
-            log::error "Failed to extract tarball on remote server ${SITE_IP}"
-            # Potentially leave remote tarball for debugging? Or attempt cleanup?
-            # Clean up local tarball
-            rm -f "${local_tarball_path}"
+        log::info "Unzipping compressed build artifacts on remote server at ${bundles_dir} to ${artifacts_dir}..."
+        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "tar -xzf ${bundles_dir}/artifacts.zip.gz -C ${artifacts_dir}" || {
+            log::error "Failed to unzip compressed build artifacts on remote server ${SITE_IP}"
             exit "$ERROR_REMOTE_OPERATION_FAILED"
         }
-        log::success "Artifacts extracted to ${SITE_IP}:${remote_dest_dir}"
+        log::success "Compressed build artifacts unzipped on ${SITE_IP}:${bundles_dir}"
 
-        log::info "Cleaning up local and remote tarballs..."
-        rm -f "${local_tarball_path}"
-        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "rm -f ${remote_tmp_dir}/${tarball_name}"
+        log::info "Cleaning up remote tarball..."
+        ssh -i "$SSH_KEY_PATH" "root@${SITE_IP}" "rm -f ${bundles_dir}/artifacts.zip.gz"
 
-        log::success "✅ Remote copy completed. Artifacts available at ${SITE_IP}:${remote_dest_dir}"
+        log::success "✅ Remote copy completed. Artifacts available at ${SITE_IP}:${artifacts_dir}"
         log::info "You can now run deploy.sh on the remote server (${SITE_IP})."
+    else
+        log::success "✅ Local copy completed. Artifacts available at ${artifacts_dir}"
+        log::info "You can now run deploy.sh on the local server."
     fi
-
-    log::success "✅ Build process completed for ${ENVIRONMENT} environment."
 }
 
-main "$@" 
+build::main "$@" 

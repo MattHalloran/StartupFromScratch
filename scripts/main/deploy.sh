@@ -40,11 +40,10 @@ usage() {
     exit_codes::print
 }
 
-parse_arguments() {
+deploy::parse_arguments() {
     args::reset
 
     args::register_help
-    # Register arguments similar to build.sh where applicable
     args::register_sudo_mode # Assuming it might be needed by deploy functions
     args::register_yes # For non-interactive mode
     args::register_environment # To derive TARGET if not specified? Or just use TARGET directly. Let's stick to TARGET.
@@ -118,8 +117,8 @@ parse_arguments() {
 
 # --- Main Deployment Logic ---
 
-main() {
-    parse_arguments "$@"
+deploy::main() {
+    deploy::parse_arguments "$@"
 
     log::header "🚀 Starting deployment of '$SOURCE_TYPE' to '$TARGET' (version: $VERSION, location: $LOCATION)..."
 
@@ -159,7 +158,7 @@ main() {
                 ;;
         esac
     else # Assuming remote or other locations
-        artifact_dir="${REMOTE_DIST_DIR}/${VERSION}"
+        artifact_dir="${DIST_DIR}/${VERSION}"
         log::info "Expecting remote artifacts in: ${artifact_dir}"
     fi
 
@@ -213,4 +212,4 @@ main() {
     log::success "✅ Deployment completed for $SOURCE_TYPE on $TARGET."
 }
 
-main "$@" 
+deploy::main "$@" 
