@@ -7,6 +7,8 @@ MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/env.sh"
 # shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/keyless_ssh.sh"
+# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/locations.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
@@ -14,9 +16,9 @@ source "${MAIN_DIR}/../helpers/utils/log.sh"
 # Default values
 BACKUP_COUNT="5"
 
-do_backup() {
+backup::do() {
     if [ -z "$SITE_IP" ]; then
-        echo "Error: SITE_IP not set in environment"
+        log::error "SITE_IP not set in environment"
         exit $ERROR_USAGE
     fi
 
@@ -45,15 +47,14 @@ do_backup() {
     log::info "Backup created: ${local_dir}/backup-$VERSION.tar.gz"
 }
 
-init_backup() {
+backup::init() {
     export NODE_ENV="${NODE_ENV:-production}"
     env::load_env_file
-
-    "${HERE}/keylessSsh.sh"
+    keyless_ssh::connect
 }
 
-schedule_backups() {
-    init_backup
+backup::schedule() {
+    backup::init
 
     LOG_DIR="${ROOT_DIR}/data"
     mkdir -p "${LOG_DIR}"
@@ -74,15 +75,15 @@ schedule_backups() {
     fi
 
     # Start a backup immediately
-    do_backup
+    backup::do
 }
 
-main() {
+backup::main() {
     if [[ "${1:-}" == "run_backup" ]]; then
-        do_backup
+        backup::do
     else
-        schedule_backups
+        backup::schedule
     fi
 }
 
-main "$@"
+backup::main "$@"

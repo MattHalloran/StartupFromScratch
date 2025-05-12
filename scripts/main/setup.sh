@@ -2,11 +2,14 @@
 set -euo pipefail
 DESCRIPTION="Prepares the project for development or production."
 
-# Changed to export since it's used in other scripts
 MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/args.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/ci.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/docker.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/domainCheck.sh"
 # shellcheck disable=SC1091
@@ -51,7 +54,7 @@ setup::parse_arguments() {
     args::register \
         --name "ci-cd" \
         --flag "d" \
-        --desc "Configure the system for CI/CD (via GitHub Actions)" \
+        --desc "True if running in CI/CD (via GitHub Actions)" \
         --type "value" \
         --options "yes|no" \
         --default "no"
@@ -78,25 +81,29 @@ setup::main() {
     log::header "🔨 Starting project setup for $(match_target "$TARGET")..."
 
     # Prepare the system
-    permissions::make_scripts_executable
-    clock::fix
-    internet::check_connection
-    system::update_and_upgrade
+    if ! flow::is_yes "$CI"; then
+        permissions::make_scripts_executable
+        clock::fix
+        internet::check_connection
+        system::update_and_upgrade
+    fi
 
     # Setup tools
     common_deps::check_and_install
-    setup_vault::check_deps
     # Clean up volumes & caches
     if flow::is_yes "$CLEAN"; then
         clean::main
     fi
 
-    jwt::generate_key_pair
+    if ! flow::is_yes "$CI"; then
+        jwt::generate_key_pair
+    fi
+
     env::load_secrets
     check_location_if_not_set
     env::construct_derived_secrets
 
-    if env::is_location_remote; then
+    if ! flow::is_yes "$CI" && env::is_location_remote; then
         system::purge_apt_update_notifier
 
         ports::check_and_free "${PORT_DB:-5432}"
@@ -106,22 +113,27 @@ setup::main() {
         ports::check_and_free "${PORT_UI:-3000}"
 
         proxy::setup
+        firewall::setup
     fi
 
-    firewall::setup
-    if env::in_development; then
+    if ! flow::is_yes "$CI" && env::is_location_local; then
+        ci::generate_key_pair
+    fi
+
+    # Both CI and development environments can run tests
+    if flow::is_yes "$CI" || env::in_development; then
         bats::install
         shellcheck::install
     fi
 
-    setup_docker
+    docker::setup
 
     # Run the setup script for the target
     execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE:-1}"
     log::success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
 
     # Schedule backups if production environment file exists
-    if env::prod_file_exists; then
+    if ! flow::is_yes "$CI" && env::prod_file_exists; then
         "${HERE}/backup.sh"
     fi
 }

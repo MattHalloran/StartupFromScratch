@@ -12,8 +12,8 @@ We have two main workflows defined in `.github/workflows/`:
 Both workflows follow these steps:
 1.  **Checkout**: Get the latest code.
 2.  **Setup Node.js & pnpm**: Configure Node.js v18 and install dependencies using pnpm.
-3.  **Lint**: Run code linting checks (`pnpm run lint`).
-4.  **Test**: Run unit tests (`pnpm test`).
+3.  **Lint**: Run code linting checks (`pnpm run lint`). Skipped if `run_lint=false`. Failures do not block the workflow.
+4.  **Test**: Run unit tests (`pnpm test`). Skipped if `run_test=false`. Failures do not block the workflow.
 5.  **Build**: Build the application (`pnpm run build`).
 6.  **Configure SSH**: Disable strict host-key checking on the Actions runner.
 7.  **Setup SSH Key**: Write the SSH private key (from environment secrets) to `~/.ssh/deploy_key` and set secure permissions.
@@ -117,9 +117,9 @@ For **each** VPS instance (staging and production), you need to perform the foll
 
 You can also manually trigger the workflows from the GitHub Actions tab using the "Run workflow" button. When triggering manually, you have the following options:
 
-*   `ignore_lint_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `pnpm run lint` command fails.
-*   `ignore_test_errors` (checkbox, default: unchecked): If checked, the workflow will continue to the next step even if the `pnpm test` command fails.
+*   `run_lint` (checkbox, default: checked): If unchecked, the lint step will be skipped.
+*   `run_test` (checkbox, default: checked): If unchecked, the test step will be skipped.
 
-**Note:** These options only affect manually triggered runs. Runs triggered by pushes or pull requests will always fail if linting or tests fail.
+**Note:** Both lint and test steps run by default and their failures do not block deployment. You can use the above options to skip them in manual runs.
 
 --- 

@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/flow.sh"
+source "${UTILS_DIR}/env.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/log.sh"
+source "${UTILS_DIR}/flow.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/system.sh"
+source "${UTILS_DIR}/locations.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/log.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/system.sh"
 
-install_docker() {
+docker::install() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker installation due to sudo mode"
         return
@@ -32,7 +36,7 @@ install_docker() {
     fi
 }
 
-start_docker() {
+docker::start() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker start due to sudo mode"
         return
@@ -48,7 +52,7 @@ start_docker() {
     fi
 }
 
-restart_docker() {
+docker::restart() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker restart due to sudo mode"
         return
@@ -58,7 +62,24 @@ restart_docker() {
     sudo service docker restart
 }
 
-setup_docker_compose() {
+docker::kill_all() {
+    # If docker is not running
+    if ! system::is_command "docker"; then
+        log::warning "Docker is not running"
+        return
+    fi
+
+    # If there are no running containers, do nothing
+    if [ -z "$(docker ps -q)" ]; then
+        log::warning "No running containers found"
+        return
+    fi
+
+    # Kill all running containers
+    docker kill $(docker ps -q)
+}
+
+docker::setup_docker_compose() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker Compose installation due to sudo mode"
         return
@@ -79,17 +100,17 @@ setup_docker_compose() {
     fi
 }
 
-check_docker_internet() {
+docker::check_internet_access() {
     log::header "Checking Docker internet access..."
     if docker run --rm busybox ping -c 1 google.com &>/dev/null; then
         log::success "Docker internet access: OK"
     else
-        log::error "Docker internet access: FAILED"
+        log::warning "Docker internet access: FAILED"
         return 1
     fi
 }
 
-show_docker_daemon() {
+docker::show_daemon() {
     if [ -f /etc/docker/daemon.json ]; then
         log::info "Current /etc/docker/daemon.json:"
         cat /etc/docker/daemon.json
@@ -98,7 +119,7 @@ show_docker_daemon() {
     fi
 }
 
-update_docker_daemon() {
+docker::update_daemon() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker daemon update due to sudo mode"
         return
@@ -123,36 +144,36 @@ EOF
     log::info "/etc/docker/daemon.json updated."
 }
 
-setup_docker_internet() {
-    if ! check_docker_internet; then
-        log::error "Docker cannot access the internet. This may be a DNS issue."
-        show_docker_daemon
+docker::setup_internet_access() {
+    if docker::check_internet_access; then
+        log::success "Docker internet access: OK"
+        return 0
+    fi
 
-        if [ "$SKIP_CONFIRMATIONS" = "true" ]; then
-            update_docker_daemon
-            restart_docker
-            log::info "Docker DNS updated. Retesting Docker internet access..."
-            check_docker_internet && log::success "Docker internet access is now working!" || log::error "Docker internet access still failing."
-        else
-            log::prompt "Would you like to update /etc/docker/daemon.json to use Google DNS (8.8.8.8)? (y/n): " choice
-            read -n1 -r choice
-            echo
-            if flow::is_yes "$choice"; then
-                update_docker_daemon
-                restart_docker
-                log::info "Docker DNS updated. Retesting Docker internet access..."
-                check_docker_internet && log::success "Docker internet access is now working!" || log::error "Docker internet access still failing."
-            else
-                log::info "No changes made."
-            fi
-        fi
+    log::error "Docker cannot access the internet. This may be a DNS issue."
+    docker::show_daemon
+
+    if flow::is_yes "${YES:-}"; then
+        docker::update_daemon
+        docker::restart
+        log::info "Docker DNS updated. Retesting Docker internet access..."
+        docker::check_internet_access && log::success "Docker internet access is now working!" || log::error "Docker internet access still failing."
     else
-        log::info "Docker already has internet access."
+        log::prompt "Would you like to update /etc/docker/daemon.json to use Google DNS (8.8.8.8)? (y/n): " choice
+        read -n1 -r choice
+        echo
+        if flow::is_yes "$choice"; then
+            docker::update_daemon
+            docker::restart
+            log::info "Docker DNS updated. Retesting Docker internet access..."
+            docker::check_internet_access && log::success "Docker internet access is now working!" || log::error "Docker internet access still failing."
+        else
+            log::info "No changes made."
+        fi
     fi
 }
 
-# Calculates resource limit values
-calculate_docker_resource_limits() {
+docker::calculate_resource_limits() {
     # Get total number of CPU cores and calculate CPU quota.
     N=$(nproc)
     # Calculate quota: (N - 0.5) * 100. This value is later appended with '%' .
@@ -164,9 +185,8 @@ calculate_docker_resource_limits() {
     MEM_LIMIT=$(echo "$TOTAL_MEM * 0.8" | bc | cut -d. -f1)M
 }
 
-# Defines file paths for configuration
-define_docker_config_files() {
-    # This slice unit will hold the Docker daemon’s resource limits.
+docker::define_config_files() {
+    # This slice unit will hold the Docker daemon's resource limits.
     SLICE_FILE="/etc/systemd/system/docker.slice"
 
     # The service override drop-in file ensures docker.service is placed in the Docker slice.
@@ -174,8 +194,7 @@ define_docker_config_files() {
     SERVICE_OVERRIDE_FILE="${SERVICE_OVERRIDE_DIR}/slice.conf"
 }
 
-# Update/create the slice unit file
-update_docker_slice_file() {
+docker::update_slice_file() {
     # We want the slice file to contain a [Slice] section with CPUQuota and MemoryMax.
     if [[ ! -f "$SLICE_FILE" ]]; then
         cat <<EOF > "$SLICE_FILE"
@@ -216,8 +235,7 @@ EOF
     fi
 }
 
-# Update/create the docker.service drop-in file
-update_docker_service_override_file() {
+docker::update_service_override_file() {
     # Make sure the directory exists.
     mkdir -p "$SERVICE_OVERRIDE_DIR"
 
@@ -258,7 +276,7 @@ EOF
 # The Docker slice will be defined in /etc/systemd/system/docker.slice,
 # and the docker.service override will be in
 # /etc/systemd/system/docker.service.d/slice.conf.
-setup_docker_resource_limits() {
+docker::configure_resource_limits() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping Docker resource limits setup due to sudo mode"
         return
@@ -267,10 +285,10 @@ setup_docker_resource_limits() {
     log::header "Setting up Docker resource limits"
 
     changed=false
-    calculate_docker_resource_limits
-    define_docker_config_files
-    update_docker_slice_file
-    update_docker_service_override_file
+    docker::calculate_resource_limits
+    docker::define_config_files
+    docker::update_slice_file
+    docker::update_service_override_file
 
     # Reload systemd if changes were made
     if [ "$changed" = true ]; then
@@ -283,10 +301,139 @@ setup_docker_resource_limits() {
     fi
 }
 
-setup_docker() {
-    install_docker
-    start_docker
-    setup_docker_compose
-    setup_docker_internet
-    setup_docker_resource_limits
+docker::setup() {
+    docker::install
+    docker::start
+    docker::setup_docker_compose
+    if ! flow::is_yes "${CI:-}"; then
+        docker::setup_internet_access
+        docker::configure_resource_limits
+    fi
+}
+
+docker::get_compose_file() {
+    if env::in_production; then
+        echo "${DOCKER_COMPOSE_PROD_FILE}"
+    else
+        echo "${DOCKER_COMPOSE_DEV_FILE}"
+    fi
+}
+
+docker::build_images() {
+    log::header "Building Docker images"
+    local compose_file=$(docker::get_compose_file)
+    cd "$ROOT_DIR" || { log::error "Failed to change directory to project root"; exit "$ERROR_BUILD_FAILED"; }
+    if system::is_command "docker compose"; then
+        docker compose -f "$compose_file" build --no-cache --progress=plain
+    elif system::is_command "docker-compose"; then
+        docker-compose -f "$compose_file" build --no-cache
+    else
+        log::error "No Docker Compose available to build images"
+        exit "$ERROR_BUILD_FAILED"
+    fi
+    log::success "Docker images built successfully"
+}
+
+docker::pull_base_images() {
+    log::header "Pulling Docker base images"
+    local base_images=()
+    if env::in_production; then
+        base_images=(
+            "redis:7.4.0-alpine"
+            "pgvector/pgvector:pg15"
+            # add production-only base images here
+        )
+    else
+        base_images=(
+            "redis:7.4.0-alpine"
+            "pgvector/pgvector:pg15"
+            # add development-only base images here
+        )
+    fi
+    for img in "${base_images[@]}"; do
+        docker pull "$img"
+    done
+    log::success "Docker base images pulled successfully"
+}
+
+docker::collect_images() {
+    local images=()
+     if env::in_production; then
+        images=(
+            "ui:prod"
+            "server:prod"
+            "jobs:prod"
+            "redis:7.4.0-alpine"
+            "pgvector/pgvector:pg15"
+        )
+    else
+        images=(
+            "ui:dev"
+            "server:dev"
+            "jobs:dev"
+            "redis:7.4.0-alpine"
+            "pgvector/pgvector:pg15"
+        )
+    fi
+
+    local available_images=()
+    for img in "${images[@]}"; do
+        if docker image inspect "$img" >/dev/null 2>&1; then
+            available_images+=("$img")
+        else
+            log::warning "Image $img not found, skipping"
+        fi
+    done
+    if [[ ${#available_images[@]} -eq 0 ]]; then
+        log::error "No Docker images available to save"
+        exit "$ERROR_BUILD_FAILED"
+    fi
+
+    echo "${available_images[@]}"
+}
+
+docker::save_images() {
+    local local_artifacts_dir="$1"
+    log::header "Saving Docker images"
+    local images=()
+    # Correctly read space-separated image names into the 'images' array
+    read -r -a images <<< "$(docker::collect_images)"
+    local images_tar="$local_artifacts_dir/docker-images.tar"
+
+    # Check if the images array is empty after attempting to populate it
+    if [[ ${#images[@]} -eq 0 ]]; then
+        log::error "No Docker images were collected to save. docker::collect_images might have returned empty or failed."
+        # Optionally, exit here if this is a critical error
+        # exit "$ERROR_BUILD_FAILED" # Ensure ERROR_BUILD_FAILED is defined or use a generic exit code
+        return 1 # Or return an error code
+    fi
+
+    docker save -o "$images_tar" "${images[@]}"
+}
+
+docker::build_artifacts() {
+    local outdir="$1"
+    log::info "Building Docker artifacts..."
+    docker::build_images
+    docker::pull_base_images
+    docker::save_images "$outdir"
+    log::success "Docker images saved to $outdir/docker-images.tar"
+}
+
+docker::load_images_from_tar() {
+    local tar_path="$1"
+
+    if [ ! -f "$tar_path" ]; then
+        log::error "Docker images tarball not found at: ${tar_path}"
+        return 1
+    fi
+
+    log::info "Loading Docker images from ${tar_path}..."
+    if docker load -i "$tar_path"; then
+        log::success "Successfully loaded Docker images from ${tar_path}."
+        return 0
+    else
+        log::error "Failed to load Docker images from ${tar_path}."
+        return 1
+    fi
 }

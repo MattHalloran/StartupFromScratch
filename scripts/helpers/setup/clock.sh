@@ -10,6 +10,8 @@ SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/log.sh"
+# shellcheck disable=SC1091
+source "${SETUP_DIR}/../utils/system.sh"
 
 # Fix the system clock
 clock::fix() {
@@ -26,7 +28,11 @@ clock::fix() {
     log::header "Making sure the system clock is accurate"
     # Only run hwclock if sudo is available
     if [ "$can_sudo" -eq 1 ]; then
-        sudo hwclock -s
+        if system::is_command "hwclock"; then
+            sudo hwclock -s
+        else
+            log::warning "hwclock command not found, skipping hwclock -s."
+        fi
     fi
 
     # Print info

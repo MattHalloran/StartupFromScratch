@@ -7,11 +7,11 @@ SETUP_TARGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${SETUP_TARGET_DIR}/../../utils/log.sh"
 # shellcheck disable=SC1091
-source "${SETUP_TARGET_DIR}/../setupPnpm.sh"
+source "${SETUP_TARGET_DIR}/../../utils/pnpm_tools.sh"
 
 setup_native_linux() {
     log::header "Setting up native Linux development/production..."
 
     # Setup pnpm and generate Prisma client
-    setup_pnpm
+    pnpm_tools::setup
 }

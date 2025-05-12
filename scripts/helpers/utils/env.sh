@@ -41,6 +41,29 @@ env::load_env_file() {
     set +a
 }
 
+# Checks if the HashiCorp Vault CLI ('vault') is installed.
+# If not, prints instructions and exits.
+env::check_vault_cli() {
+    log::info "Checking for Vault CLI..."
+    if system::is_command "vault"; then
+        log::success "Vault CLI is already installed."
+        return 0
+    fi
+
+    # Vault CLI installation is typically manual (downloading binary)
+    # Attempting auto-install via package managers is unreliable
+    log::error "HashiCorp Vault CLI ('vault') not found. Please install it manually from https://developer.hashicorp.com/vault/downloads and ensure it's in your system PATH."
+    exit "${ERROR_DEPENDENCY_MISSING:-5}"
+}
+
+# Main function to check for the Vault CLI.
+env::check_vault_deps() {
+    log::header "⚙️ Checking Vault client dependencies..."
+    env::check_vault_cli
+    log::success "✅ Vault client dependencies checked."
+    return 0
+} 
+
 # Authenticates to Vault using the token method.
 env::authenticate_with_token() {
     : "${VAULT_TOKEN:?Required environment variable VAULT_TOKEN is not set}"
@@ -231,6 +254,7 @@ env::load_secrets() {
             # env::load_env_file function is now redundant as sourcing is done above
             ;;
         v|vault|hashicorp|hashicorp-vault)
+            env::check_vault_deps
             # Call the function to load secrets from Vault
             # This function assumes VAULT_* vars are now set (from file or injected env)
             # It will fetch and export secrets like DB_USER, DB_PASSWORD, etc., potentially overwriting sourced values.
@@ -244,8 +268,13 @@ env::load_secrets() {
 
     # Load JWT keys from their respective PEM files if they haven't been set by the primary source.
     log::info "Checking/Loading JWT keys from PEM files if not already set..."
-    env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${ROOT_DIR}/jwt_priv.pem"
-    env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${ROOT_DIR}/jwt_pub.pem"
+    if env::in_development; then
+        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${STAGING_JWT_PRIV_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${STAGING_JWT_PUB_KEY_FILE}"
+    else
+        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${PRODUCTION_JWT_PRIV_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${PRODUCTION_JWT_PUB_KEY_FILE}"
+    fi
 
     log::success "Secrets loaded and processed."
 }
@@ -263,10 +292,6 @@ env::construct_derived_secrets() {
     export DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@postgres:${PORT_DB:-5432}"
     export REDIS_URL="redis://:${REDIS_PASSWORD}@redis:${PORT_REDIS:-6379}"
     export WORKER_ID=0 # This is fine for single-node deployments, but should be set to the pod ordinal for multi-node deployments.
-}
-
-env::is_running_in_ci() {
-    [[ "$CI" == "true" ]]
 }
 
 env::is_location_remote() {
