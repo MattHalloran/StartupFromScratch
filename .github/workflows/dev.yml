@@ -71,7 +71,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes ${{ secrets.VPS_DEPLOY_USER }}@${{ secrets.VPS_DEPLOY_HOST }} "echo 'SSH OK'"
       - name: Build, zip, and send to staging
         run: |
-          pnpm run build -- \
+          bash scripts/main/build.sh \
             --environment development \
             --ci-cd true \
             --bundles zip \
@@ -84,7 +84,7 @@ jobs:
             --test "${{ env.RUN_TEST == 'true' && 'yes' || 'no' }}"
       - name: Deploy to Staging
         run: |
-          pnpm run deploy -- \
+          bash scripts/main/deploy.sh \
             --environment development \
             --source docker \
             --yes yes
