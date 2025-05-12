@@ -39,21 +39,6 @@ jobs:
         run: echo "${{ secrets.JWT_PRIV_PEM }}" > jwt_priv_staging.pem
       - name: Create jwt_pub.pem from secret
         run: echo "${{ secrets.JWT_PUB_PEM }}" > jwt_pub_staging.pem
-    #   - name: Use Node.js 18
-    #     uses: actions/setup-node@v4
-    #     with:
-    #       node-version: 18
-    #   - name: Enable Corepack & Activate pnpm
-    #     run: |
-    #       corepack enable
-    #       corepack prepare pnpm@latest --activate
-    #   - name: Cache pnpm store
-    #     uses: actions/cache@v3
-    #     with:
-    #       path: ~/.pnpm-store
-    #       key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-    #   - name: pnpm install (frozen lockfile)
-    #     run: pnpm install --frozen-lockfile
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -73,7 +58,7 @@ jobs:
         run: |
           bash scripts/main/build.sh \
             --environment development \
-            --ci-cd true \
+            --ci-cd yes \
             --bundles zip \
             --artifacts docker \
             --binaries none \

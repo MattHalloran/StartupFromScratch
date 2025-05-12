@@ -41,7 +41,7 @@ setup_keystore() {
 
     # Check if keystore file exists
     if [ ! -f "${KEYSTORE_PATH}" ]; then
-        if flow::is_yes "$SKIP_CONFIRMATIONS"; then
+        if flow::is_yes "${YES:-}"; then
             log::info "Keystore file not found. This is needed to upload the app the Google Play store. Creating keystore file..."
             REPLY="y"
         else
@@ -63,7 +63,7 @@ setup_keystore() {
             log::info "5. State or Province: The state or province where your organization is located. Example: New York"
             log::info "6. Country Code: The two-letter ISO code for the country of your organization. Example: US"
             log::info "This information helps to identify the holder of the key."
-            if flow::is_yes "$SKIP_CONFIRMATIONS"; then
+            if flow::is_yes "${YES:-}"; then
                 log::info "Skipping confirmation..."
                 REPLY="y"
             else

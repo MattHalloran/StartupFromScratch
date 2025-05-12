@@ -13,7 +13,7 @@ flow::is_yes() {
     ans=$(echo "$1" | tr '[:upper:]' '[:lower:]')
 
     case "$ans" in
-    y | yes)
+    y | yes | true | 1)
         return 0
         ;;
     *)

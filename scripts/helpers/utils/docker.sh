@@ -153,7 +153,7 @@ docker::setup_internet_access() {
     log::error "Docker cannot access the internet. This may be a DNS issue."
     docker::show_daemon
 
-    if [ "$SKIP_CONFIRMATIONS" = "true" ]; then
+    if flow::is_yes "${YES:-}"; then
         docker::update_daemon
         docker::restart
         log::info "Docker DNS updated. Retesting Docker internet access..."
