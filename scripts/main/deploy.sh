@@ -25,8 +25,6 @@ source "${MAIN_DIR}/../helpers/utils/zip.sh"
 source "${MAIN_DIR}/../helpers/deploy/docker.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/deploy/k8s.sh"
-# shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/deploy/vps.sh"
 
 # Default values set in parse_arguments
 TARGET=""
