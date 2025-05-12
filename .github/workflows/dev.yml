@@ -31,6 +31,9 @@ jobs:
       ENVIRONMENT: development
       RUN_LINT: ${{ github.event.inputs.run_lint != 'false' }}
       RUN_TEST: ${{ github.event.inputs.run_test != 'false' }}
+      SSH_KEY_PATH: ~/.ssh/deploy_key
+      VPS_DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }}
+      VPS_DEPLOY_HOST: ${{ secrets.VPS_DEPLOY_HOST }}
     steps:
       - uses: actions/checkout@v3
       - name: Create .env-dev file from secret
@@ -73,7 +76,3 @@ jobs:
             --environment development \
             --source docker \
             --yes yes
-        env:
-          SSH_KEY_PATH: ~/.ssh/deploy_key
-          VPS_DEPLOY_USER: ${{ secrets.VPS_DEPLOY_USER }}
-          VPS_DEPLOY_HOST: ${{ secrets.VPS_DEPLOY_HOST }}
