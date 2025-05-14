@@ -5,28 +5,55 @@ SCRIPT_PATH="$BATS_TEST_DIRNAME/../utils/flow.sh"
 . "$SCRIPT_PATH"
 
 @test "flow::confirm accepts 'y' input" {
-    echo "y" | {
-        run flow::confirm "Do you want to continue?"
-        [ "$status" -eq 0 ]
-    }
+    # Create a simple shell script that sources flow.sh and runs flow::confirm
+    cat > "${BATS_TEST_TMPDIR}/test_script.sh" << 'EOL'
+#!/bin/bash
+source "$1"
+echo "$2" | flow::confirm "Do you want to continue?"
+exit $?
+EOL
+    chmod +x "${BATS_TEST_TMPDIR}/test_script.sh"
+    run "${BATS_TEST_TMPDIR}/test_script.sh" "$SCRIPT_PATH" "y"
+    [ "$status" -eq 0 ]
 }
+
 @test "flow::confirm accepts 'Y' input" {
-    echo "Y" | {
-        run flow::confirm "Do you want to continue?"
-        [ "$status" -eq 0 ]
-    }
+    # Create a simple shell script that sources flow.sh and runs flow::confirm
+    cat > "${BATS_TEST_TMPDIR}/test_script.sh" << 'EOL'
+#!/bin/bash
+source "$1"
+echo "$2" | flow::confirm "Do you want to continue?"
+exit $?
+EOL
+    chmod +x "${BATS_TEST_TMPDIR}/test_script.sh"
+    run "${BATS_TEST_TMPDIR}/test_script.sh" "$SCRIPT_PATH" "Y"
+    [ "$status" -eq 0 ]
 }
+
 @test "flow::confirm rejects 'n' input" {
-    echo "n" | {
-        run flow::confirm "Do you want to continue?"
-        [ "$status" -eq 1 ]
-    }
+    # Create a simple shell script that sources flow.sh and runs flow::confirm
+    cat > "${BATS_TEST_TMPDIR}/test_script.sh" << 'EOL'
+#!/bin/bash
+source "$1"
+echo "$2" | flow::confirm "Do you want to continue?"
+exit $?
+EOL
+    chmod +x "${BATS_TEST_TMPDIR}/test_script.sh"
+    run "${BATS_TEST_TMPDIR}/test_script.sh" "$SCRIPT_PATH" "n"
+    [ "$status" -eq 1 ]
 }
+
 @test "flow::confirm rejects any other input" {
-    echo "z" | {
-        run flow::confirm "Do you want to continue?"
-        [ "$status" -eq 1 ]
-    }
+    # Create a simple shell script that sources flow.sh and runs flow::confirm
+    cat > "${BATS_TEST_TMPDIR}/test_script.sh" << 'EOL'
+#!/bin/bash
+source "$1"
+echo "$2" | flow::confirm "Do you want to continue?"
+exit $?
+EOL
+    chmod +x "${BATS_TEST_TMPDIR}/test_script.sh"
+    run "${BATS_TEST_TMPDIR}/test_script.sh" "$SCRIPT_PATH" "z"
+    [ "$status" -eq 1 ]
 }
 
 # Tests for flow::exit_with_error function

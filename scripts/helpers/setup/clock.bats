@@ -20,8 +20,8 @@ SCRIPT_PATH="$BATS_TEST_DIRNAME/clock.sh"
 }
 
 @test "clock::fix runs hwclock when sudo is available" {
-    # Stub flow::can_run_sudo to succeed, stub sudo to capture invocation, stub date
-    run bash -c "source '$SCRIPT_PATH'; flow::can_run_sudo(){ return 0; }; sudo(){ echo \"SUDO_CALLED \$*\"; }; date(){ echo 'TEST_DATE'; }; clock::fix"
+    # Stub flow::can_run_sudo to succeed, stub sudo to capture invocation, stub date and system::is_command
+    run bash -c "source '$SCRIPT_PATH'; flow::can_run_sudo(){ return 0; }; sudo(){ echo \"SUDO_CALLED \$*\"; }; date(){ echo 'TEST_DATE'; }; system::is_command(){ return 0; }; clock::fix"
     [ "$status" -eq 0 ]
     # Verify header, sudo invocation, and info output
     echo "$output" | grep -Fq "[HEADER]  Making sure the system clock is accurate"
