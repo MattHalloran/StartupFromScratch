@@ -7,7 +7,7 @@
         "clean": "rimraf dist",
         "copy": "copyfiles -u 1 \"src/**/*.css\" \"src/**/*.md\" dist",
         "dev": "vite",
-        "build:shared": "pnpm --filter @vrooli/shared run build",
+        "build:shared": "pnpm --dir ../shared run build",
         "build:compile": "vite build",
         "build": "run-s clean build:compile",
         "preview": "vite preview",

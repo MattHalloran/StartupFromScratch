@@ -6,8 +6,8 @@
   "main": "dist/index.js",
   "scripts": {
     "clean": "rimraf dist",
-    "build:server": "pnpm --filter @vrooli/server run build",
-    "build:shared": "pnpm --filter @vrooli/shared run build",
+    "build:server": "pnpm --dir ../server run build",
+    "build:shared": "pnpm --dir ../shared run build",
     "build:compile": "swc src -d dist --source-maps --ignore \"**/*.test.*\"",
     "build": "cross-env NODE_ENV=production run-s clean build:compile",
     "test:compile": "swc src -d dist --source-maps",
