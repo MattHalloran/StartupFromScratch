@@ -41,6 +41,14 @@ async function main() {
         res.status(200).send("OK");
     });
 
+    // Add simple routes for smoke testing UI (REMOVE THESE LATER)
+    app.get('/', (req, res) => {
+        res.status(200).send('<meta name="sso-client-id" content="dummy-client-id"/><h2>Home Page</h2>');
+    });
+    app.get('/about', (req, res) => {
+        res.status(200).send('<h2>About Page</h2>');
+    });
+
     // Start Express server
     server.listen(SERVER_PORT);
     logger.info(`🚀 Server running at ${SERVER_URL}`);
