@@ -6,6 +6,10 @@ nameOverride: ""
 fullnameOverride: ""
 
 # Global values
+image:
+  registry: "your-registry/your-project" # FIXME: Update placeholder (e.g., docker.io/myusername)
+  pullPolicy: IfNotPresent
+
 replicaCount:
   ui: 1
   server: 1
@@ -13,9 +17,7 @@ replicaCount:
   adminer: 1
   postgres: 1
   redis: 1
-
-image:
-  pullPolicy: IfNotPresent
+  nsfwDetector: 1 # Default replica, but will be controlled by an enabled flag
 
 # Service-specific configurations
 services:
@@ -23,6 +25,9 @@ services:
     repository: ui
     tag: dev
     port: 3000
+    probes:
+      livenessPath: /healthcheck
+      readinessPath: /healthcheck
     resources:
       requests:
         cpu: 100m
@@ -34,6 +39,9 @@ services:
     repository: server
     tag: dev
     port: 5329
+    probes:
+      livenessPath: /healthcheck
+      readinessPath: /healthcheck
     resources:
       requests:
         cpu: 200m
@@ -45,6 +53,9 @@ services:
     repository: jobs
     tag: dev
     port: 9230
+    probes:
+      livenessPath: /healthcheck
+      readinessPath: /healthcheck
     resources:
       requests:
         cpu: 100m
@@ -52,6 +63,30 @@ services:
       limits:
         cpu: 200m
         memory: 256Mi
+  nsfwDetector:
+    enabled: false # Disabled by default, enable in values-prod.yaml or per environment
+    repository: steelcityamir/safe-content-ai # repository is the image name part here
+    tag: "1.1.0"
+    port: 8000 # Internal port the container listens on
+    probes: # TCP Probe based on docker-compose healthcheck
+      livenessPath: ""
+      readinessPath: ""
+      useTcpSocket: true # Indicates to use TCP socket probe
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+    resources:
+      requests:
+        cpu: 200m       # Base request, adjust as needed
+        memory: 512Mi   # Base request, adjust as needed
+      limits:
+        cpu: 500m       # Base limit, adjust as needed
+        memory: 1Gi     # Base limit, adjust as needed
+    gpu:
+      enabled: false
+      # type: "nvidia.com/gpu" # Common GPU resource type
+      # count: 1
 
 # Configuration parameters (non-sensitive)
 config:

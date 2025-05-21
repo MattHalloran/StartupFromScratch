@@ -8,18 +8,21 @@ replicaCount:
   ui: 3
   server: 2
   jobs: 1
-  adminer: 1
+  adminer: 0 # Disabled adminer in production
   postgres: 1
   redis: 1
+  nsfwDetector: 1 # Number of replicas for NSFW Detector in production
 
 # Image tags override (use immutable tags in prod)
 services:
   ui:
-    tag: "latest"
+    tag: "0.1.0" # Updated from 'latest'
   server:
-    tag: "latest"
+    tag: "0.1.0" # Updated from 'latest'
   jobs:
-    tag: "latest"
+    tag: "0.1.0" # Updated from 'latest'
+  nsfwDetector:
+    enabled: true # Enable NSFW detector in production
 
 # Enable ingress for external access
 ingress:
@@ -27,30 +30,45 @@ ingress:
   annotations:
     kubernetes.io/ingress.class: nginx
   hosts:
-    - host: example.com
+    - host: your-prod-domain.com # FIXME: Update placeholder
       paths:
         - path: /
           pathType: ImplementationSpecific
           service: ui
           port: 3000
   tls:
-    - secretName: tls-secret
+    - secretName: your-prod-tls-secret # FIXME: Update placeholder
       hosts:
-        - example.com
+        - your-prod-domain.com # FIXME: Update placeholder
 
 # Production secrets (populate with real values)
 secrets:
-  DB_PASSWORD: "CHANGE_ME"
+  DB_PASSWORD: "CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE"
   JWT_PRIVATE_KEY: |
     -----BEGIN RSA PRIVATE KEY-----
-    ...
+    CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE
     -----END RSA PRIVATE KEY-----
+  # POSTGRES_DB: "vrooli_prod_db" # Example: Add if your app needs it via env var from secret
+  # POSTGRES_USER: "vrooli_prod_user" # Example
 
 # Persistence defaults for stateful services (override storageClass as needed)
 persistence:
   postgres:
     enabled: true
-    size: 1Gi
+    size: 1Gi # Consider increasing for production
+    storageClass: "your-prod-ssd-storageclass" # FIXME: Specify appropriate SC for prod
   redis:
     enabled: true
-    size: 512Mi 
+    size: 512Mi # Consider increasing for production
+    storageClass: "your-prod-fast-storageclass" # FIXME: Specify appropriate SC for prod
+  nsfwDetector:
+    enabled: true # Enable NSFW detector in production
+    size: "5Gi" # FIXME: Adjust size as needed for NSFW models/data
+    # tag: "1.1.0" # Optional: override tag if different from values.yaml for prod
+    # resources: # Optional: override resources for prod
+    #   requests:
+    gpu: # Optional: Enable and configure GPU for production
+      enabled: false # FIXME: Set to true if GPUs are available and needed
+      # type: "nvidia.com/gpu"
+      # count: 1
+ 

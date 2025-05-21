@@ -3,11 +3,29 @@ Thank you for installing {{ include "vrooli.fullname" . }}!
 
 To check the status of your release, run:
 
-  kubectl get all -l app={{ include "vrooli.fullname" . }}
+  kubectl get all -l app.kubernetes.io/instance={{ .Release.Name }}
 
-Service endpoints:
+Service endpoints (ClusterIPs - use kubectl port-forward or Ingress to access externally):
 {{- range $name, $svc := .Values.services }}
-{{- printf "  %-10s -> %s-%s:%d" (upper $name) (include "vrooli.fullname" $) $name $svc.port }}
-
+  {{- $fullName := include "vrooli.fullname" $ }}
+  {{- $serviceFullName := printf "%s-%s" $fullName $name }}
+{{- printf "  %-15s -> %s:%d" (upper $name) $serviceFullName $svc.port }}
 {{- end }}
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+
+Ingress configured for host: {{ .host }}
+{{- range .paths }}
+  Path: {{ .path }} -> Service: {{ include "vrooli.fullname" $ }}-{{ .service }}:{{ .port }}
+{{- end }}
+{{- if $.Values.ingress.tls }}
+  TLS enabled. Ensure your TLS secret '{{ (index $.Values.ingress.tls 0).secretName }}' is configured.
+{{- end }}
+{{- end }}
+{{- else }}
+
+Ingress is disabled. To enable Ingress, set ingress.enabled to true in your values file.
+{{- end }}
+
 {{- end }} 

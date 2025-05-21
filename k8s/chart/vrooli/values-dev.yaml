@@ -1,5 +1,8 @@
 # values-dev.yaml
-# Overrides for the development environment
+# Overrides for the development environment.
+# This file is intentionally kept for future dev-specific overrides.
+# Currently, all dev defaults are sourced from values.yaml.
+# Add any development-specific value overrides below this line.
 
 config:
   env: development

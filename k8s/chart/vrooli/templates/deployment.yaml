@@ -3,30 +3,41 @@ This template generates Deployments for each service defined in .Values.services
 */ -}}
 
 {{- range $name, $svc := .Values.services }}
+{{- $serviceEnabled := true -}}
+{{- if hasKey $svc "enabled" -}}
+  {{- $serviceEnabled = $svc.enabled -}}
+{{- end -}}
+
+{{- if $serviceEnabled -}}
+{{- if eq $name "nsfwDetector" }}{{/* Specific handling for nsfwDetector if enabled is explicitly checked for it elsewhere or default is false */}}
+{{- if not $svc.enabled }} # Skip nsfwDetector if its specific 'enabled' is false
+{{- continue }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "vrooli.fullname" $ }}-{{ $name }}
   labels:
-    app: {{ include "vrooli.fullname" $ }}
-    component: {{ $name }}
+    {{- include "vrooli.labels" $ | nindent 4 }}
+    {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 4 }}
 spec:
   replicas: {{ index $.Values.replicaCount $name }}
   selector:
     matchLabels:
-      app: {{ include "vrooli.fullname" $ }}
-      component: {{ $name }}
+      {{- include "vrooli.selectorLabels" $ | nindent 6 }}
+      {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 6 }}
   strategy:
     type: RollingUpdate
   template:
     metadata:
       labels:
-        app: {{ include "vrooli.fullname" $ }}
-        component: {{ $name }}
+        {{- include "vrooli.selectorLabels" $ | nindent 8 }}
+        {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 8 }}
     spec:
       containers:
         - name: {{ $name }}
-          image: "{{ $svc.repository }}:{{ $svc.tag }}"
+          image: "{{ if $svc.repositoryOverride }}{{ $svc.repositoryOverride }}{{ else }}{{ $.Values.image.registry }}/{{ $svc.repository }}{{ end }}:{{ $svc.tag }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           ports:
             - containerPort: {{ $svc.port }}
@@ -40,16 +51,41 @@ spec:
             limits:
               cpu: {{ $svc.resources.limits.cpu }}
               memory: {{ $svc.resources.limits.memory }}
+            {{- if and (eq $name "nsfwDetector") $svc.gpu.enabled }}
+              {{ $svc.gpu.type | default "nvidia.com/gpu" }}: {{ $svc.gpu.count | default 1 }}
+            {{- end }}
+        {{- if $svc.probes.useTcpSocket }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ $svc.port }}
+            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ $svc.probes.periodSeconds | default 10 }}
+            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ $svc.port }}
+            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ $svc.probes.periodSeconds | default 20 }}
+            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
+        {{- else }}
           readinessProbe:
             httpGet:
-              path: /healthcheck
+              path: {{ $svc.probes.readinessPath | default "/healthcheck" }}
               port: {{ $svc.port }}
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ $svc.probes.periodSeconds | default 10 }}
+            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
           livenessProbe:
             httpGet:
-              path: /healthcheck
+              path: {{ $svc.probes.livenessPath | default "/healthcheck" }}
               port: {{ $svc.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 20
+            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ $svc.probes.periodSeconds | default 20 }}
+            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
+        {{- end }}
+{{- end }}{{/* if $serviceEnabled */}}
 {{- end }} 

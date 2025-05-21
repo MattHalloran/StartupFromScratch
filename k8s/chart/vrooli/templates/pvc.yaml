@@ -4,6 +4,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ include "vrooli.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "vrooli.labels" $ | nindent 4 }}
+    {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 4 }}
 spec:
   accessModes:
     - ReadWriteOnce

@@ -8,6 +8,7 @@
 .gitignore
 Makefile
 helmfile.yaml
-k8s/
+# k8s/ # Removed for clarity, assume it was for a sub-directory not present or handled differently
 scripts/
 node_modules/
+*.log # Added to ignore log files like setup.log

@@ -2,11 +2,12 @@ apiVersion: v2
 name: vrooli
 description: "A Helm chart for deploying Vrooli microservices"
 type: application
-version: 0.1.1
+version: 0.1.0
 appVersion: "0.1.0"
 # Chart maintainer metadata
 maintainers:
   - name: Vrooli Team
     email: team@vrooli.example.com
 # Define which K8s API versions this chart supports
-kubeVersion: ">=1.19.0-0" 
+kubeVersion: ">=1.19.0-0"
+icon: https://www.example.com/vrooli-icon.png # Placeholder icon 

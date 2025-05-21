@@ -1,0 +1,30 @@
+{{- if (index .Values.services "nsfwDetector").enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "vrooli.fullname" . }}-nsfwdetector-test-connection"
+  labels:
+    app.kubernetes.io/name: "{{ include "vrooli.name" . }}-test"
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    helm.sh/chart: "{{ include "vrooli.chart" . }}"
+    app.kubernetes.io/managed-by: "{{ .Release.Service }}"
+    app.kubernetes.io/component: nsfwdetector-test
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      # Attempting wget; if nsfwDetector is TCP only and has no HTTP endpoint, this will fail.
+      # For a TCP-only check, 'nc -z -w 5 {{ include "vrooli.fullname" . }}-nsfwDetector {{ (index .Values.services "nsfwDetector").port }}' could be used with sh -c,
+      # but busybox nc might not support -z or behave consistently for scripting exit codes.
+      args: [
+        '-qO-',
+        '-T', # Timeout for wget
+        '10',
+        '{{ include "vrooli.fullname" . }}-nsfwDetector:{{ (index .Values.services "nsfwDetector").port }}{{ (index .Values.services "nsfwDetector").probes.readinessPath | default "/healthcheck" }}'
+      ]
+  restartPolicy: Never
+{{- end }} 

@@ -39,7 +39,7 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Common labels
+Standard labels for all resources.
 */}}
 {{- define "vrooli.labels" -}}
 helm.sh/chart: {{ include "vrooli.chart" . }}
@@ -48,12 +48,28 @@ helm.sh/chart: {{ include "vrooli.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: vrooli # Chart name or a higher-level application name
 {{- end -}}
 
 {{/*
-Selector labels
+Standard selector labels.
+These are used by Service objects to select Pods and by workload controllers
+(Deployment, StatefulSet, etc.) to manage Pods.
 */}}
 {{- define "vrooli.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "vrooli.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- "\n" }} {{- /* Ensure newline before end define */}}
+{{- end -}}
+
+{{/*
+Labels for a specific component/service within the chart.
+Pass the component name as .componentName to this template.
+Example: {{ include "vrooli.componentLabels" (dict "componentName" "my-component" "root" .) }}
+*/}}
+{{- define "vrooli.componentLabels" -}}
+{{- if .componentName }}
+app.kubernetes.io/component: {{ .componentName | trunc 63 | trimSuffix "-" }}
+{{- "\n" }} {{- /* Ensure newline before end if/define */}}
+{{- end }}
 {{- end -}} 
