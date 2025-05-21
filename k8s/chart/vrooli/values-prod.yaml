@@ -1,0 +1,56 @@
+# values-prod.yaml
+# Overrides for the production environment
+
+config:
+  env: production
+
+replicaCount:
+  ui: 3
+  server: 2
+  jobs: 1
+  adminer: 1
+  postgres: 1
+  redis: 1
+
+# Image tags override (use immutable tags in prod)
+services:
+  ui:
+    tag: "latest"
+  server:
+    tag: "latest"
+  jobs:
+    tag: "latest"
+
+# Enable ingress for external access
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  hosts:
+    - host: example.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          service: ui
+          port: 3000
+  tls:
+    - secretName: tls-secret
+      hosts:
+        - example.com
+
+# Production secrets (populate with real values)
+secrets:
+  DB_PASSWORD: "CHANGE_ME"
+  JWT_PRIVATE_KEY: |
+    -----BEGIN RSA PRIVATE KEY-----
+    ...
+    -----END RSA PRIVATE KEY-----
+
+# Persistence defaults for stateful services (override storageClass as needed)
+persistence:
+  postgres:
+    enabled: true
+    size: 1Gi
+  redis:
+    enabled: true
+    size: 512Mi 

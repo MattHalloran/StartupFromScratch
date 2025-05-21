@@ -1,0 +1,18 @@
+{{- range $name, $p := .Values.persistence }}
+  {{- if $p.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vrooli.fullname" $ }}-{{ $name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $p.size }}
+  {{- if $p.storageClass }}
+  storageClassName: {{ $p.storageClass }}
+  {{- end }}
+---
+  {{- end }}
+{{- end }} 

@@ -1,0 +1,88 @@
+# Default values for Vrooli chart
+# This file contains configuration that can be overridden per environment
+
+# Chart naming overrides
+nameOverride: ""
+fullnameOverride: ""
+
+# Global values
+replicaCount:
+  ui: 1
+  server: 1
+  jobs: 1
+  adminer: 1
+  postgres: 1
+  redis: 1
+
+image:
+  pullPolicy: IfNotPresent
+
+# Service-specific configurations
+services:
+  ui:
+    repository: ui
+    tag: dev
+    port: 3000
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  server:
+    repository: server
+    tag: dev
+    port: 5329
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 512Mi
+  jobs:
+    repository: jobs
+    tag: dev
+    port: 9230
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Configuration parameters (non-sensitive)
+config:
+  projectDir: /srv/app
+  env: development
+
+# Sensitive values handled as native Kubernetes Secrets
+secrets: {}
+
+# Persistence settings for stateful services
+persistence:
+  postgres:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  redis:
+    enabled: true
+    size: 512Mi
+    storageClass: ""
+  ui:
+    enabled: false
+  server:
+    enabled: false
+  jobs:
+    enabled: false
+  adminer:
+    enabled: false
+
+# Ingress configuration
+ingress:
+  enabled: false
+  annotations: {}
+  hosts: []
+  tls: [] 

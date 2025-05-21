@@ -1,0 +1,13 @@
+{{- if .Release.IsInstall }}
+Thank you for installing {{ include "vrooli.fullname" . }}!
+
+To check the status of your release, run:
+
+  kubectl get all -l app={{ include "vrooli.fullname" . }}
+
+Service endpoints:
+{{- range $name, $svc := .Values.services }}
+{{- printf "  %-10s -> %s-%s:%d" (upper $name) (include "vrooli.fullname" $) $name $svc.port }}
+
+{{- end }}
+{{- end }} 

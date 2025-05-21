@@ -1,0 +1,55 @@
+{{- /*
+This template generates Deployments for each service defined in .Values.services
+*/ -}}
+
+{{- range $name, $svc := .Values.services }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vrooli.fullname" $ }}-{{ $name }}
+  labels:
+    app: {{ include "vrooli.fullname" $ }}
+    component: {{ $name }}
+spec:
+  replicas: {{ index $.Values.replicaCount $name }}
+  selector:
+    matchLabels:
+      app: {{ include "vrooli.fullname" $ }}
+      component: {{ $name }}
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ include "vrooli.fullname" $ }}
+        component: {{ $name }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: "{{ $svc.repository }}:{{ $svc.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc.port }}
+          env:
+            - name: ENV
+              value: "{{ $.Values.config.env }}"
+          resources:
+            requests:
+              cpu: {{ $svc.resources.requests.cpu }}
+              memory: {{ $svc.resources.requests.memory }}
+            limits:
+              cpu: {{ $svc.resources.limits.cpu }}
+              memory: {{ $svc.resources.limits.memory }}
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: {{ $svc.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: {{ $svc.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+{{- end }} 

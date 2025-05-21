@@ -1,0 +1,23 @@
+{{- /*
+This template generates Services for each service defined in .Values.services
+*/ -}}
+
+{{- range $name, $svc := .Values.services }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vrooli.fullname" $ }}-{{ $name }}
+  labels:
+    app: {{ include "vrooli.fullname" $ }}
+    component: {{ $name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ include "vrooli.fullname" $ }}
+    component: {{ $name }}
+{{- end }} 
