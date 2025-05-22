@@ -1,0 +1,6 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server # This must match the name of the Deployment in the base
+spec:
+  replicas: 2 # Staging environment might have 2 replicas for the server 
