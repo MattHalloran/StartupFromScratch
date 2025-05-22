@@ -114,6 +114,10 @@ persistence:
     enabled: false
   adminer:
     enabled: false
+  nsfwDetector:
+    enabled: false
+    size: 5Gi
+    storageClass: ""
 
 # Ingress configuration
 ingress:

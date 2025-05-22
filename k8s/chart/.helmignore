@@ -12,3 +12,4 @@ helmfile.yaml
 scripts/
 node_modules/
 *.log # Added to ignore log files like setup.log
+tests/

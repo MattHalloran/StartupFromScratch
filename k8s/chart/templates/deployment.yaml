@@ -37,8 +37,19 @@ spec:
     spec:
       containers:
         - name: {{ $name }}
-          image: "{{ if $svc.repositoryOverride }}{{ $svc.repositoryOverride }}{{ else }}{{ $.Values.image.registry }}/{{ $svc.repository }}{{ end }}:{{ $svc.tag }}"
-          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          {{- $imageTag := $svc.tag | default $.Chart.AppVersion }}
+          {{- $finalImage := "" }}
+          {{- if $svc.repositoryOverride }}
+            {{- $finalImage = printf "%s:%s" $svc.repositoryOverride $imageTag -}}
+          {{- else }}
+            {{- if contains "/" $svc.repository }}
+              {{- $finalImage = printf "%s:%s" $svc.repository $imageTag -}}
+            {{- else }}
+              {{- $finalImage = printf "%s/%s:%s" $.Values.image.registry $svc.repository $imageTag -}}
+            {{- end }}
+          {{- end }}
+          image: "{{ $finalImage }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: {{ $svc.port }}
           env:

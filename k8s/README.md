@@ -1,86 +1,181 @@
 # Kubernetes Configuration for Vrooli
 
-This directory (`k8s/`) contains all the Kubernetes manifest files required to deploy the Vrooli application. We use [Kustomize](https://kustomize.io/) to manage these configurations, allowing for environment-specific customizations while keeping our base configurations DRY (Don't Repeat Yourself).
+This directory (`k8s/`) contains the Kubernetes configurations required to deploy the Vrooli application. We primarily use [Helm](https://helm.sh/) to package and manage these configurations.
 
 ## What is Kubernetes?
 
 Briefly, Kubernetes (often abbreviated as K8s) is an open-source system for automating deployment, scaling, and management of containerized applications. It groups containers that make up an application into logical units for easy management and discovery.
 
-## What is Kustomize?
+## What is Helm?
 
-Kustomize is a standalone tool to customize Kubernetes objects through a kustomization file. It allows you to define a base set of Kubernetes resource configurations and then apply overlays to customize them for different environments (like staging or production) without altering the original base files.
+Helm is a package manager for Kubernetes. It helps you define, install, and upgrade even the most complex Kubernetes applications. Helm uses a packaging format called "charts."
 
-## Directory Structure
+A **Helm chart** is a collection of files that describe a related set of Kubernetes resources. It allows you to:
+*   Define your application resources (Deployments, Services, ConfigMaps, Secrets, etc.) as templates.
+*   Manage application configuration through values files.
+*   Package and version your application for easy distribution and deployment.
+*   Manage the lifecycle of your deployed applications (install, upgrade, rollback).
 
-Our Kubernetes configurations are organized as follows:
+## Directory Structure Overview
+
+Our Kubernetes configurations are primarily located within the `k8s/chart/` directory, which represents our Helm chart for the Vrooli application:
 
 ```
 k8s/
-├── base/                 # Common, environment-agnostic resource definitions
-│   ├── server/           # Base configs for the 'server' microservice
+├── chart/                # Helm chart for the Vrooli application
+│   ├── Chart.yaml        # Metadata about the chart (name, version, dependencies)
+│   ├── values.yaml       # Default configuration values for the chart
+│   ├── values-dev.yaml   # Environment-specific values for 'development'
+│   ├── values-prod.yaml  # Environment-specific values for 'production'
+│   ├── templates/        # Directory of templates that generate Kubernetes manifests
+│   │   ├── _helpers.tpl
 │   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   ├── jobs/             # Base configs for the 'jobs' microservice
-│   │   └── deployment.yaml
-│   └── ui/               # Base configs for the 'ui' microservice
-│       ├── deployment.yaml
-│       └── service.yaml
+│   │   ├── service.yaml
+│   │   ├── configmap.yaml
+│   │   ├── secret.yaml
+│   │   ├── pvc.yaml
+│   │   ├── ingress.yaml
+│   │   ├── NOTES.txt
+│   │   └── tests/        # Directory for templated test files (e.g., ui-test.yaml)
+│   ├── tests/            # Optional: Directory for other test files (e.g., scripts)
+│   └── .helmignore       # Specifies files to ignore when packaging the chart
 │
-├── overlays/             # Environment-specific customizations
-│   ├── staging/          # Configurations for the 'staging' environment
-│   │   ├── kustomization.yaml
-│   │   ├── server-replicas-patch.yaml
-│   │   └── ... (other patches, ConfigMaps, Secrets for staging)
-│   └── production/       # Configurations for the 'production' environment
-│       ├── kustomization.yaml
-│       ├── server-replicas-patch.yaml
-│       └── ... (other patches, ConfigMaps, Secrets for production)
-│
-└── README.md             # This file
+└── README.md             # This file (explaining the k8s directory structure)
 ```
 
-### `base/` Directory
+## Vrooli Helm Chart Details (`k8s/chart/`)
 
-*   **Purpose:** Contains the foundational Kubernetes manifest files for each microservice (`server`, `jobs`, `ui`). These files describe the desired state of each service in a generic way.
-*   **Contents:**
-    *   `deployment.yaml`: Defines how to run the service (e.g., Docker image, replicas, resource requests/limits, health probes). The Docker image specified here is usually a placeholder like `your-container-registry/your-app-server:latest` and will be overridden by overlays.
-    *   `service.yaml`: Defines how the service is exposed within the Kubernetes cluster or externally.
-*   **Key Idea:** These are the "master templates." They should not contain environment-specific values directly.
+This section provides specific details about the Vrooli Helm chart located in the `k8s/chart/` directory.
 
-### `overlays/` Directory
+### Prerequisites
 
-*   **Purpose:** Customizes the configurations from the `base/` directory for specific target environments (e.g., `staging`, `production`).
-*   **Contents (for each environment like `staging/` or `production/`):**
-    *   `kustomization.yaml`: This is the control file for Kustomize within an overlay. It specifies:
-        *   Which `base/` resources to use.
-        *   Which patch files to apply.
-        *   The correct Docker image tags for this specific environment.
-        *   Common labels to apply to all resources in this environment.
-        *   How to generate or reference `ConfigMaps` (for configuration data) and `Secrets` (for sensitive data) specific to this environment.
-    *   **Patch Files** (e.g., `server-replicas-patch.yaml`): These are small YAML files that define *only the changes* to be applied to a base resource for this environment. For example, a patch might change the number of `replicas` for a deployment or adjust resource limits.
+- Kubernetes 1.19+ cluster
+- Helm 3.x installed
+- Container images (`ui`, `server`, `jobs`, etc.) available in your configured container registry (see `image.registry` value in `k8s/chart/values.yaml`)
 
-## How to Use These Configurations
+### Chart Structure (within `k8s/chart/`)
 
-To deploy the application to a specific environment (e.g., staging) using these Kustomize configurations, you would typically use `kubectl` with the `-k` flag:
+The primary components of the Helm chart in `k8s/chart/` are:
+*   `Chart.yaml`: Contains metadata about the chart.
+*   `values.yaml`: Provides default configuration values.
+*   `values-dev.yaml`, `values-prod.yaml`: Offer environment-specific overrides for `values.yaml`.
+*   `.helmignore`: Specifies patterns for files to exclude when packaging.
+*   `templates/`: This directory contains the core Kubernetes manifest templates:
+    *   `_helpers.tpl`: Common helper templates and partials.
+    *   `deployment.yaml`: Template for Kubernetes Deployments.
+    *   `service.yaml`: Template for Kubernetes Services.
+    *   `configmap.yaml`: Template for ConfigMaps (non-sensitive configuration).
+    *   `secret.yaml`: Template for Secrets (sensitive configuration).
+    *   `pvc.yaml`: Template for PersistentVolumeClaims.
+    *   `ingress.yaml`: Template for Ingress resources.
+    *   `NOTES.txt`: Contains post-installation notes displayed to the user.
+    *   `templates/tests/`: This subdirectory holds templated test files that Helm can run to verify a release (e.g., `ui-test.yaml`, `server-test.yaml`).
+*   `tests/`: This optional top-level directory within the chart can contain other non-templated test files or scripts (e.g., `test-golden-files.sh`).
 
+
+### Installing the Chart
+
+1.  **Package the Chart (Optional, if not deploying from the directory directly):**
+    ```bash
+    helm package k8s/chart/
+    ```
+    This creates a versioned `.tgz` file of your chart.
+
+2.  **Install or Upgrade a Release:**
+
+    *   **Development/Staging Environment Example:**
+        To install the chart with the release name `vrooli-dev` into a specific namespace (e.g., `staging`), using development values:
+        ```bash
+        helm install vrooli-dev k8s/chart/ \
+          -f k8s/chart/values.yaml \
+          -f k8s/chart/values-dev.yaml \
+          --namespace staging --create-namespace
+        ```
+        This command installs the chart from the `k8s/chart/` directory, names the release `vrooli-dev`, uses overrides from `values-dev.yaml` (layered on top of `values.yaml`), and deploys it into the `staging` namespace (creating it if it doesn't exist).
+
+    *   **Production Environment Example:**
+        To install or upgrade the chart with the release name `vrooli-prod` into a specific namespace (e.g., `production`), using production-specific values:
+        ```bash
+        helm upgrade --install vrooli-prod k8s/chart/ \
+          -f k8s/chart/values.yaml \
+          -f k8s/chart/values-prod.yaml \
+          --namespace production --create-namespace
+        ```
+        The `helm upgrade --install` command will install the chart if it's not already present, or upgrade it if it is.
+        **Note:** Ensure you have thoroughly reviewed and customized `k8s/chart/values-prod.yaml` (especially image tags, hostnames, secrets, and resource allocations) before deploying to production.
+
+### Uninstalling the Chart
+
+To uninstall a release (e.g., `vrooli-dev` from the `staging` namespace):
 ```bash
-kubectl apply -k k8s/overlays/staging
+helm uninstall vrooli-dev --namespace staging
+helm uninstall vrooli-prod --namespace production
 ```
 
-This command tells `kubectl` to use Kustomize to build the final set of manifests for the staging environment by applying the staging overlays to the base configurations, and then apply those manifests to your Kubernetes cluster.
+### Configuration Parameters
 
-To deploy to production:
+The following table lists some of the key configurable parameters of the Vrooli chart and their default values as typically defined in `k8s/chart/values.yaml`. Refer to the actual `values.yaml`, `values-dev.yaml`, and `values-prod.yaml` files in the `k8s/chart/` directory for the most up-to-date and complete list of configurations.
 
-```bash
-kubectl apply -k k8s/overlays/production
-```
+| Parameter                             | Description                                                                 | Default Value (from chart README)           |
+| ------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
+| `nameOverride`                        | String to override the chart name component of resource names               | `""`                                        |
+| `fullnameOverride`                    | String to fully override the `Release.Name-chartName` aresource names       | `""`                                        |
+| `image.registry`                      | Global image registry prefix (e.g., `docker.io/myusername`)                 | `"your-registry/your-project"` (FIXME)      |
+| `image.pullPolicy`                    | Global image pull policy for all services                                   | `IfNotPresent`                              |
+| `replicaCount.ui`                     | Number of replicas for the UI service                                       | `1`                                         |
+| `replicaCount.server`                 | Number of replicas for the Server service                                   | `1`                                         |
+| `replicaCount.jobs`                   | Number of replicas for the Jobs service                                     | `1`                                         |
+| `services.ui.repository`              | Image name (without registry) for UI service                              | `ui`                                        |
+| `services.ui.tag`                     | Image tag for UI service                                                    | `dev`                                       |
+| `services.ui.port`                    | Container port for UI service                                               | `3000`                                      |
+| `services.ui.probes.livenessPath`     | Liveness probe HTTP path for UI service                                     | `/healthcheck`                              |
+| `services.server.repository`          | Image name (without registry) for Server service                          | `server`                                    |
+| `services.server.tag`                 | Image tag for Server service                                                | `dev`                                       |
+| `services.server.port`                | Container port for Server service                                           | `5329`                                      |
+| `services.jobs.repository`            | Image name (without registry) for Jobs service                            | `jobs`                                      |
+| `services.jobs.tag`                   | Image tag for Jobs service                                                  | `dev`                                       |
+| `config.env`                          | Environment setting (e.g., development, production)                       | `development`                               |
+| `secrets`                             | Key-value pairs for Kubernetes Secrets (sensitive data). Empty by default.  | `{}`                                        |
+| `persistence.postgres.enabled`        | Enable PersistentVolumeClaim for PostgreSQL                                 | `true`                                      |
+| `persistence.postgres.size`           | Size for PostgreSQL PVC                                                     | `1Gi`                                       |
+| `persistence.redis.enabled`           | Enable PersistentVolumeClaim for Redis                                      | `true`                                      |
+| `persistence.redis.size`              | Size for Redis PVC                                                          | `512Mi`                                     |
+| `ingress.enabled`                     | Enable Ingress resource                                                     | `false`                                     |
+| `ingress.hosts`                       | Array of host rules for Ingress.                                            | `[]`                                        |
 
-## Important Placeholders & Next Steps
+*(This is a subset of parameters. Refer to `k8s/chart/values.yaml` for all options.)*
 
-*   **Container Registry:** In the `kustomization.yaml` files within the `overlays/` directories (and potentially in base image definitions if not overridden), you will find image names like `your-container-registry/startupfromscratch-server:latest`. You **must** replace `your-container-registry/` with your actual container registry URL (e.g., `docker.io/yourusername`, `gcr.io/your-project-id`).
-*   **Image Names & Tags:** Ensure the image names (`startupfromscratch-server`, etc.) and tags (`staging-latest`, `prod-latest`) match the images you build and push to your registry.
-*   **ConfigMaps and Secrets:** The base deployments reference `ConfigMaps` (e.g., `server-config`) and `Secrets` (e.g., `server-secret`). These need to be defined, typically within the `kustomization.yaml` of each overlay (using `configMapGenerator` or `secretGenerator`) or as separate YAML files referenced by the Kustomization file. This is crucial for injecting environment-specific configurations and secrets into your application pods.
-*   **Health Checks:** Review the `livenessProbe` and `readinessProbe` paths and ports in the base deployment files to ensure they match actual health check endpoints in your applications.
-*   **Resource Allocation:** The CPU and memory `requests` and `limits` in the base deployments are starting points. You should monitor your application's performance in each environment and adjust these values as needed.
+### Important Operational Notes (from chart README)
 
-This Kustomize setup provides a robust and maintainable way to manage your Kubernetes deployments as the Vrooli application evolves. 
+*   **Container Registry & Image Tags:** The Docker image repositories and tags for your services (`server`, `jobs`, `ui`) are configured within the Helm chart's values files (e.g., `values.yaml`, `values-dev.yaml`). Ensure these point to your actual container registry and the correct image versions.
+    *Example in `values.yaml` (structure may vary based on chart design):*
+    ```yaml
+    image:
+      registry: your-registry/your-project # FIXME
+      pullPolicy: IfNotPresent
+    services:
+      server:
+        repository: server # Appends to image.registry if services.server.repositoryOverride is not set
+        tag: latest
+      ui:
+        repository: ui
+        tag: latest
+    # ... and so on for other services
+    ```
+*   **Configuration Values:** Thoroughly review and customize `k8s/chart/values.yaml` and the environment-specific `values-*.yaml` files to match your application's requirements for each environment. This includes database connection strings, API keys, resource requests/limits, replica counts, etc.
+*   **Secrets Management:** Sensitive data (like API keys, passwords) should be managed securely. Helm charts can integrate with Kubernetes Secrets. Often, secrets are created outside the chart (e.g., manually via `kubectl create secret` or using external secret managers like HashiCorp Vault), with the chart then referencing these externally managed secrets. The `secrets` field in `values.yaml` might be used to populate a Secret managed by the chart, but ensure this is appropriate for your security model.
+*   **Health Checks & Probes:** Ensure that the liveness and readiness probes defined in your Helm templates (e.g., in `templates/deployment.yaml`) correctly point to health check endpoints in your applications. The paths like `/healthcheck` are common defaults but might need adjustment.
+*   **Resource Allocation:** The CPU and memory `requests` and `limits` defined in the chart's templates (and configurable via `values.yaml` or environment-specific values files) are crucial for stable operation. Monitor your application's performance and adjust these as needed for each environment.
+*   **Stateful Services (PostgreSQL, Redis):**
+    The chart includes PVC configuration for PostgreSQL and Redis in `values.yaml` (enabled by default in the original chart README). However, the base chart templates might not include `StatefulSet` definitions for these services. If you intend to deploy PostgreSQL or Redis as part of this Helm release (rather than using externally managed instances):
+    1.  Ensure `StatefulSet` and `Service` manifest files exist in `k8s/chart/templates/` for each.
+    2.  Configure their respective sections within `values.yaml` (e.g., under `.Values.services.postgres` or a dedicated `.Values.postgresql` section) so that the `StatefulSet` templates can access image, port, resources, and environment variable configurations.
+    3.  Ensure the `replicaCount` for `postgres` and `redis` are set appropriately in your values files.
+    Alternatively, if you are using external database services, ensure `persistence.postgres.enabled` and `persistence.redis.enabled` (or similar flags) are set to `false` in your values files to prevent unused PVC creation, and manage their connection strings via secrets.
+*   **NSFW Detector GPU Usage (if applicable):**
+    If the `nsfwDetector` service is part of your stack and can use GPUs:
+    -   This requires your Kubernetes nodes to have GPUs and the appropriate device plugins (e.g., NVIDIA device plugin) installed and configured.
+    -   Enable GPU usage by setting the relevant flags in your values file (e.g., `services.nsfwDetector.gpu.enabled: true`).
+    -   Optionally, adjust GPU type (e.g., `services.nsfwDetector.gpu.type: "nvidia.com/gpu"`) and count.
+
+This Helm chart provides a structured and maintainable way to manage your Kubernetes deployments as the Vrooli application evolves. 

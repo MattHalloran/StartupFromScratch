@@ -1,5 +1,6 @@
 {{- range $name, $p := .Values.persistence }}
-  {{- if $p.enabled }}
+  {{- if and $p (hasKey $p "enabled") $p.enabled }}
+{{/* Ensure the service itself is defined and relevant for PVC -- THIS CHECK WAS REMOVED AS IT WAS BUGGY FOR DATABASES */}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

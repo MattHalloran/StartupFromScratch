@@ -17,7 +17,7 @@
 #
 # Prerequisites:
 #   - Helm CLI installed and in PATH.
-#   - Script must be run from the chart's root directory (e.g., k8s/chart/vrooli/)
+#   - Script must be run from the chart's root directory (e.g., k8s/chart/)
 #     or adjust paths accordingly.
 
 set -e # Exit immediately if a command exits with a non-zero status.

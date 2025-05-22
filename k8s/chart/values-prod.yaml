@@ -64,11 +64,4 @@ persistence:
   nsfwDetector:
     enabled: true # Enable NSFW detector in production
     size: "5Gi" # FIXME: Adjust size as needed for NSFW models/data
-    # tag: "1.1.0" # Optional: override tag if different from values.yaml for prod
-    # resources: # Optional: override resources for prod
-    #   requests:
-    gpu: # Optional: Enable and configure GPU for production
-      enabled: false # FIXME: Set to true if GPUs are available and needed
-      # type: "nvidia.com/gpu"
-      # count: 1
  
