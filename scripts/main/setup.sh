@@ -19,8 +19,6 @@ source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/jwt.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/locations.sh"
-# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/ports.sh"
@@ -29,9 +27,9 @@ source "${MAIN_DIR}/../helpers/utils/proxy.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/targetMatcher.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/setup/index.sh"
+source "${MAIN_DIR}/../helpers/utils/var.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/setup/target/index.sh"
+source "${MAIN_DIR}/../helpers/setup/index.sh"
 
 setup::parse_arguments() {
     args::reset
@@ -65,11 +63,13 @@ setup::parse_arguments() {
         exit 0
     fi
 
-    args::parse "$@" >/dev/null
-    
+    # Capture positional arguments to prevent stray output
+    local -a POSITIONAL_ARGS
+    POSITIONAL_ARGS=($(args::parse "$@"))
+
     export TARGET=$(args::get "target")
     export CLEAN=$(args::get "clean")
-    export CI=$(args::get "ci-cd")
+    export IS_CI=$(args::get "ci-cd")
     export SUDO_MODE=$(args::get "sudo-mode")
     export YES=$(args::get "yes")
     export LOCATION=$(args::get "location")
@@ -78,10 +78,16 @@ setup::parse_arguments() {
 
 setup::main() {
     setup::parse_arguments "$@"
+    # Validate target and canonicalize
+    if ! canonical=$(match_target "$TARGET"); then
+        args::usage "$DESCRIPTION"
+        exit "$ERROR_USAGE"
+    fi
+    export TARGET="$canonical"
     log::header "🔨 Starting project setup for $(match_target "$TARGET")..."
 
     # Prepare the system
-    if ! flow::is_yes "$CI"; then
+    if ! flow::is_yes "$IS_CI"; then
         permissions::make_scripts_executable
         clock::fix
         internet::check_connection
@@ -95,7 +101,7 @@ setup::main() {
         clean::main
     fi
 
-    if ! flow::is_yes "$CI"; then
+    if ! flow::is_yes "$IS_CI"; then
         jwt::generate_key_pair
     fi
 
@@ -103,7 +109,7 @@ setup::main() {
     check_location_if_not_set
     env::construct_derived_secrets
 
-    if ! flow::is_yes "$CI" && env::is_location_remote; then
+    if ! flow::is_yes "$IS_CI" && env::is_location_remote; then
         system::purge_apt_update_notifier
 
         ports::check_and_free "${PORT_DB:-5432}"
@@ -116,25 +122,31 @@ setup::main() {
         firewall::setup
     fi
 
-    if ! flow::is_yes "$CI" && env::is_location_local; then
+    if ! flow::is_yes "$IS_CI" && env::is_location_local; then
         ci::generate_key_pair
     fi
 
     # Both CI and development environments can run tests
-    if flow::is_yes "$CI" || env::in_development; then
+    if flow::is_yes "$IS_CI" || env::in_development; then
         bats::install
         shellcheck::install
     fi
 
     docker::setup
 
-    # Run the setup script for the target
-    execute_for_target "$TARGET" "setup_" || exit "${ERROR_USAGE:-1}"
+    # Run the target-specific setup script
+    TARGET_SCRIPT="${MAIN_DIR}/../helpers/setup/target/${TARGET//-/_}.sh"
+    if [[ ! -f "$TARGET_SCRIPT" ]]; then
+        log::error "Target setup script not found: $TARGET_SCRIPT"
+        exit "${ERROR_FUNCTION_NOT_FOUND}"
+    fi
+    bash "$TARGET_SCRIPT" "$@" || exit $?
+
     log::success "✅ Setup complete. You can now run 'pnpm run develop' or 'bash scripts/main/develop.sh'"
 
     # Schedule backups if production environment file exists
-    if ! flow::is_yes "$CI" && env::prod_file_exists; then
-        "${HERE}/backup.sh"
+    if ! flow::is_yes "$IS_CI" && env::prod_file_exists; then
+        "${MAIN_DIR}/backup.sh"
     fi
 }
 

@@ -41,15 +41,35 @@ ingress:
       hosts:
         - your-prod-domain.com # FIXME: Update placeholder
 
-# Production secrets (populate with real values)
-secrets:
-  DB_PASSWORD: "CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE"
-  JWT_PRIVATE_KEY: |
-    -----BEGIN RSA PRIVATE KEY-----
-    CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE
-    -----END RSA PRIVATE KEY-----
-  # POSTGRES_DB: "vrooli_prod_db" # Example: Add if your app needs it via env var from secret
-  # POSTGRES_USER: "vrooli_prod_user" # Example
+# Production secrets are now managed by Vault Secrets Operator (VSO).
+# The configuration for which secrets to fetch from Vault is in values.yaml under vso.secrets.
+# Ensure that vso.enabled is true below and that your Vault instance contains
+# the production secrets at the paths specified in vso.secrets (e.g., secret/data/vrooli/postgres).
+# # secrets:
+# #   DB_PASSWORD: "CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE"
+# #   JWT_PRIVATE_KEY: |
+# #     -----BEGIN RSA PRIVATE KEY-----
+# #     CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE
+# #     -----END RSA PRIVATE KEY-----
+# #   # POSTGRES_DB: "vrooli_prod_db" # Example: Add if your app needs it via env var from secret
+# #   # POSTGRES_USER: "vrooli_prod_user" # Example
+
+# Enable Vault Secrets Operator for production
+vso:
+  enabled: true
+  # Production-specific VSO overrides can go here if needed.
+  # For example, if using a different Vault role or address for prod:
+  # vaultAddr: "http://prod-vault.example.com:8200"
+  # k8sAuthRole: "vrooli-app-prod"
+  # It is highly recommended to use different Vault paths for production secrets.
+  # Ensure these paths are correctly populated in your production Vault instance.
+  secrets: # You can override specific secret paths for production here
+    postgres:
+      vaultPath: "secret/data/vrooli-prod/postgres" # Example: Ensure this path is correct for prod
+    app:
+      vaultPath: "secret/data/vrooli-prod/app-config"   # Example: Ensure this path is correct for prod
+    dockerhub:
+      vaultPath: "secret/data/vrooli-prod/dockerhub-creds" # Example: Ensure this path is correct for prod
 
 # Persistence defaults for stateful services (override storageClass as needed)
 persistence:

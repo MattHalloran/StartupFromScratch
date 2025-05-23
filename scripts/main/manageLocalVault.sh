@@ -9,11 +9,11 @@ MAIN_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/locations.sh"
-# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/system.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/var.sh"
 
 # --- Configuration ---
 # Default Vault address for local dev instance
@@ -160,7 +160,7 @@ stop_local_vault() {
 # Seeds default development credentials into Vault's KV engine at the 'secret/vrooli/dev' path.
 seed_local_dev_secrets() {
     log::header "🌱 Seeding .env-dev variables into Vault KV at 'secret/vrooli/dev'..."
-    local env_file="$ENV_DEV_FILE"
+    local env_file="$var_ENV_DEV_FILE"
     if [ ! -f "$env_file" ]; then
         log::warning "No .env-dev file found at $env_file; skipping seeding."
         return 0
@@ -180,14 +180,14 @@ seed_local_dev_secrets() {
     # -- NEW JWT HANDLING USING HELPER FUNCTION --
     log::info "Preparing JWT keys from PEM files for Vault seeding..."
     local jwt_priv_kv_entry
-    jwt_priv_kv_entry=$(prepare_pem_for_kv_pairs "JWT_PRIV" "${ROOT_DIR}/jwt_priv.pem")
+    jwt_priv_kv_entry=$(prepare_pem_for_kv_pairs "JWT_PRIV" "${var_ROOT_DIR}/jwt_priv.pem")
     if [ -n "$jwt_priv_kv_entry" ]; then
         kv_pairs+=("$jwt_priv_kv_entry")
         log::info "JWT_PRIV prepared for Vault seeding (content newline-escaped)."
     fi
 
     local jwt_pub_kv_entry
-    jwt_pub_kv_entry=$(prepare_pem_for_kv_pairs "JWT_PUB" "${ROOT_DIR}/jwt_pub.pem")
+    jwt_pub_kv_entry=$(prepare_pem_for_kv_pairs "JWT_PUB" "${var_ROOT_DIR}/jwt_pub.pem")
     if [ -n "$jwt_pub_kv_entry" ]; then
         kv_pairs+=("$jwt_pub_kv_entry")
         log::info "JWT_PUB prepared for Vault seeding (content newline-escaped)."

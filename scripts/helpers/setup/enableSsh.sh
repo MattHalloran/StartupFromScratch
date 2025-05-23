@@ -10,20 +10,28 @@ source "${SETUP_DIR}/../utils/flow.sh"
 source "${SETUP_DIR}/../utils/log.sh"
 
 # enable PasswordAuthentication for ssh
-enable_password_authentication() {
+enableSsh::enable_password_authentication() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping PasswordAuthentication setup due to sudo mode"
         return
     fi
 
+    # Determine sed inline-edit options for portability
+    local sed_opts
+    if sed --version >/dev/null 2>&1; then
+        sed_opts=(-i)
+    else
+        sed_opts=(-i '')
+    fi
+
     log::header "Enabling PasswordAuthentication"
-    sudo sed -i 's/#\?PasswordAuthentication .*/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-    sudo sed -i 's/#\?PubkeyAuthentication .*/PubkeyAuthentication yes/g' /etc/ssh/sshd_config
-    sudo sed -i 's/#\?AuthorizedKeysFile .*/AuthorizedKeysFile .ssh\/authorized_keys/g' /etc/ssh/sshd_config
+    sudo sed "${sed_opts[@]}" 's/#\?PasswordAuthentication .*/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+    sudo sed "${sed_opts[@]}" 's/#\?PubkeyAuthentication .*/PubkeyAuthentication yes/g' /etc/ssh/sshd_config
+    sudo sed "${sed_opts[@]}" 's/#\?AuthorizedKeysFile .*/AuthorizedKeysFile .ssh\/authorized_keys/g' /etc/ssh/sshd_config
 }
 
 # Ensure .ssh directory and authorized_keys file exist with correct permissions
-ensure_ssh_files() {
+enableSsh::ensure_ssh_files() {
     mkdir -p ~/.ssh
     touch ~/.ssh/authorized_keys
     chmod 700 ~/.ssh
@@ -31,7 +39,7 @@ ensure_ssh_files() {
 }
 
 # Try restarting SSH service, checking for both common service names
-restart_ssh() {
+enableSsh::restart_ssh() {
     if ! flow::can_run_sudo; then
         log::warning "Skipping SSH restart due to sudo mode"
         return
@@ -45,11 +53,16 @@ restart_ssh() {
     fi
 }
 
-setup_ssh() {
+enableSsh::setup_ssh() {
     log::header "Setting up SSH"
 
-    ensure_ssh_files
-    enable_password_authentication
-    restart_ssh
+    enableSsh::ensure_ssh_files
+    enableSsh::enable_password_authentication
+    enableSsh::restart_ssh
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    enableSsh::setup_ssh "$@"
+fi
 

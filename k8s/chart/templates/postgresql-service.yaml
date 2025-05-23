@@ -1,0 +1,20 @@
+{{- if .Values.persistence.postgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vrooli.fullname" . }}-postgres-headless
+  labels:
+    {{- include "vrooli.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None # This makes it a headless service
+  ports:
+    - port: {{ .Values.postgresql.port }}
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    {{- include "vrooli.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+{{- end }} 

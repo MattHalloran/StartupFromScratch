@@ -5,9 +5,16 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# Docker Hub username - used to construct the image registry URL
+# This should be overridden with the actual Docker Hub username.
+# The DOCKERHUB_TOKEN for this user will be fetched from Vault to create an imagePullSecret.
+dockerhubUsername: "matthalloran8"
+
 # Global values
 image:
-  registry: "your-registry/your-project" # FIXME: Update placeholder (e.g., docker.io/myusername)
+  # Constructed using dockerhubUsername, assuming Docker Hub as the registry host.
+  # Example: docker.io/your_dockerhub_username
+  registry: "docker.io/{{ .Values.dockerhubUsername }}"
   pullPolicy: IfNotPresent
 
 replicaCount:
@@ -88,13 +95,78 @@ services:
       # type: "nvidia.com/gpu" # Common GPU resource type
       # count: 1
 
+# PostgreSQL specific configurations for StatefulSet
+postgresql:
+  image:
+    repository: "pgvector/pgvector"
+    tag: "pg15"
+  port: 5432
+  # auth: # This section is now managed via vso.secrets.postgres
+  #   enabled: true
+  #   existingSecretName: ""
+  #   userKey: "POSTGRES_USER"
+  #   passwordKey: "POSTGRES_PASSWORD"
+  probes:
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  # nodeSelector: {}
+  # affinity: {}
+  # tolerations: []
+
+# Redis specific configurations for StatefulSet
+redis:
+  image:
+    repository: "redis"
+    tag: "7.4.0-alpine"
+  port: 6379
+  # auth: # This section is now managed via vso.secrets.redis
+  #   enabled: true
+  #   existingSecretName: ""
+  #   passwordKey: "REDIS_PASSWORD"
+  probes:
+    liveness:
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  # nodeSelector: {}
+  # affinity: {}
+  # tolerations: []
+
 # Configuration parameters (non-sensitive)
 config:
   projectDir: /srv/app
   env: development
 
 # Sensitive values handled as native Kubernetes Secrets
-secrets: {}
+# secrets: {} # This section is now managed via vso.secrets entries if needed for general app secrets
 
 # Persistence settings for stateful services
 persistence:
@@ -124,4 +196,73 @@ ingress:
   enabled: false
   annotations: {}
   hosts: []
-  tls: [] 
+  tls: []
+
+# Vault Secrets Operator (VSO) integration
+vso:
+  enabled: false # Set to true to enable VSO integration and deploy VSO CRDs
+  vaultAddr: "http://vault.vault.svc:8200" # Address of the in-cluster Vault service
+  k8sAuthMount: "kubernetes" # Path where Kubernetes auth method is mounted in Vault
+  k8sAuthRole: "vrooli-app" # Vault role for this application/VSO to assume
+
+  # Define secret groups to be synced from Vault
+  secrets:
+    # Example for Redis credentials
+    redis:
+      enabled: true
+      # Path in Vault KVv2 engine (e.g., secret/data/vrooli/redis)
+      # For KVv1, it would be (e.g., secret/vrooli/redis)
+      vaultPath: "secret/data/vrooli/redis"
+      # Name of the Kubernetes Secret to be created by VSO
+      k8sSecretName: "vrooli-redis-creds"
+      # Optional: if you want to use a specific VaultAuth CRD other than the default one for this chart
+      # vaultAuthRef: "custom-vault-auth"
+
+    # Example for PostgreSQL credentials
+    postgres:
+      enabled: true
+      vaultPath: "secret/data/vrooli/postgres"
+      k8sSecretName: "vrooli-postgres-creds"
+
+    # Example for other application secrets (e.g., JWT keys)
+    app:
+      enabled: true
+      vaultPath: "secret/data/vrooli/app-config"
+      k8sSecretName: "vrooli-app-secrets"
+
+    # Docker Hub credentials for image pulling
+    dockerhub:
+      enabled: true
+      vaultPath: "secret/data/vrooli/dockerhub-creds" # Matches where you stored DOCKERHUB_USERNAME & DOCKERHUB_TOKEN
+      k8sSecretName: "vrooli-dockerhub-pull-secret"   # Name of the K8s secret VSO will create
+      # VSO needs to create a specific type of secret for Docker registry authentication.
+      # The data field in the VaultSecret CRD should be templated to produce the .dockerconfigjson format.
+      # This requires custom templating in the VaultSecret CRD which VSO supports.
+      # The specific format depends on how VSO handles templating for dockerconfigjson secrets.
+      # Typically, you'd provide a template that VSO uses to construct the K8s secret data.
+      # For a dockerconfigjson secret, VSO needs to create a key named ".dockerconfigjson"
+      # with the appropriate JSON content.
+      # Example (conceptual, exact VSO template might differ):
+      # template: |
+      #   {
+      #     "auths": {
+      #       "https://index.docker.io/v1/": {
+      #         "username": "{{ .username }}",
+      #         "password": "{{ .token }}",
+      #         "auth": "{{ printf "%s:%s" .username .token | b64enc }}"
+      #       }
+      #     }
+      #   }
+      # As an alternative, if VSO can directly create kubernetes.io/dockerconfigjson secrets from
+      # username/password fields, that would be simpler. Check VSO documentation for best practice.
+      # For now, we'll assume VSO creates a generic secret, and we'll need a template for it.
+      # If Vault Secrets Operator has direct support for `kubernetes.io/dockerconfigjson` type via specific annotations
+      # or by detecting `username` and `password` fields from Vault, that is preferred.
+      # Let's assume we'll handle the templating for `.dockerconfigjson` content within the VSO Custom Resource, potentially outside this values file or via a more advanced VSO setup.
+      # The key is that VSO will create a secret named "vrooli-dockerhub-pull-secret".
+      # We will refer to this secret in imagePullSecrets.
+      # It's also common to have VSO create a generic secret, and then have a small job or operator
+      # that transforms this generic secret into a proper .dockerconfigjson secret if VSO doesn't directly support it well.
+      # However, the VSO documentation implies it can handle this by setting the type on the Kubernetes Secret object it generates.
+      # We will need to ensure the `VaultSecret` CRD generated by the Helm template for this entry specifies `type: kubernetes.io/dockerconfigjson`
+      # and correctly maps the Vault fields to the data expected by this secret type. 

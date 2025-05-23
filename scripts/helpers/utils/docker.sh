@@ -6,13 +6,15 @@ UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/env.sh"
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/flow.sh"
+source "${UTILS_DIR}/exit_codes.sh"
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
+source "${UTILS_DIR}/flow.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/system.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/var.sh"
 
 docker::install() {
     if ! flow::can_run_sudo; then
@@ -305,7 +307,7 @@ docker::setup() {
     docker::install
     docker::start
     docker::setup_docker_compose
-    if ! flow::is_yes "${CI:-}"; then
+    if ! flow::is_yes "${IS_CI:-}"; then
         docker::setup_internet_access
         docker::configure_resource_limits
     fi
@@ -313,16 +315,16 @@ docker::setup() {
 
 docker::get_compose_file() {
     if env::in_production; then
-        echo "${DOCKER_COMPOSE_PROD_FILE}"
+        echo "${var_DOCKER_COMPOSE_PROD_FILE}"
     else
-        echo "${DOCKER_COMPOSE_DEV_FILE}"
+        echo "${var_DOCKER_COMPOSE_DEV_FILE}"
     fi
 }
 
 docker::build_images() {
     log::header "Building Docker images"
     local compose_file=$(docker::get_compose_file)
-    cd "$ROOT_DIR" || { log::error "Failed to change directory to project root"; exit "$ERROR_BUILD_FAILED"; }
+    cd "$var_ROOT_DIR" || { log::error "Failed to change directory to project root"; exit "$ERROR_BUILD_FAILED"; }
     if system::is_command "docker compose"; then
         docker compose -f "$compose_file" build --no-cache --progress=plain
     elif system::is_command "docker-compose"; then
@@ -409,15 +411,13 @@ docker::save_images() {
     fi
 
     docker save -o "$images_tar" "${images[@]}"
+    log::success "Docker images saved to $images_tar"
 }
 
 docker::build_artifacts() {
-    local outdir="$1"
-    log::info "Building Docker artifacts..."
+    log::header "Building Docker artifacts..."
     docker::build_images
     docker::pull_base_images
-    docker::save_images "$outdir"
-    log::success "Docker images saved to $outdir/docker-images.tar"
 }
 
 docker::load_images_from_tar() {
@@ -436,4 +436,59 @@ docker::load_images_from_tar() {
         log::error "Failed to load Docker images from ${tar_path}."
         return 1
     fi
+}
+
+# Docker login. Required for sending images to Docker Hub.
+docker::login_to_dockerhub() {
+    log::header "Logging into Docker Hub..."
+    if [ -z "${DOCKERHUB_USERNAME:-}" ] || [ -z "${DOCKERHUB_TOKEN:-}" ]; then
+        log::error "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set."
+        exit "$ERROR_DOCKER_LOGIN_FAILED"
+    fi
+    echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+    log::success "Successfully logged into Docker Hub."
+}
+
+# Tags and pushes Docker images to Docker Hub. Required for deploying to K8s, 
+# since we can't send zipped images like we can for deployment to a single VPS.
+docker::tag_and_push_images() {
+    log::header "Tagging and pushing Docker images..."
+  
+    if [ -z "${DOCKERHUB_USERNAME:-}" ]; then
+        log::error "DOCKERHUB_USERNAME must be set."
+        exit "$ERROR_DOCKER_LOGIN_FAILED"
+    fi
+    if [ -z "${PROJECT_VERSION:-}" ]; then
+        log::warning "PROJECT_VERSION is not set. Using 'latest' as the tag."
+        PROJECT_VERSION="latest"
+    fi
+  
+    local services=("server" "ui" "jobs") # Define services with Docker images
+    local image_name # local variable for image name
+    local docker_image_tag # local variable for docker image tag
+  
+    for service in "${services[@]}"; do
+        image_name="@vrooli/${service}" # This is the local image name convention used by pnpm + Docker
+        docker_image_tag="${DOCKERHUB_USERNAME}/${service}:${PROJECT_VERSION}"
+    
+        log::info "Tagging image ${image_name} as ${docker_image_tag}"
+        if ! docker tag "${image_name}" "${docker_image_tag}"; then
+            log::error "Failed to tag image ${image_name}. Does the local image exist?"
+            # Optionally, attempt to build if not found, or simply error out.
+            # For now, we assume images are built by prior 'pnpm run build' steps which should create them.
+            # Example: pnpm --filter @vrooli/server build should create @vrooli/server
+            # Docker build commands within package.json scripts should name images like @vrooli/server, not just 'server'
+            continue # Skip to next service if tagging fails
+        fi
+    
+        log::info "Pushing image ${docker_image_tag} to Docker Hub..."
+        if ! docker push "${docker_image_tag}"; then
+            log::error "Failed to push image ${docker_image_tag}."
+            # Consider retry logic or specific error handling
+        else
+            log::success "Successfully pushed ${docker_image_tag}"
+        fi
+    done
+  
+    log::success "Finished tagging and pushing images."
 }

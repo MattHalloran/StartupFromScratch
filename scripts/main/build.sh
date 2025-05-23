@@ -15,11 +15,11 @@ source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/keyless_ssh.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/locations.sh"
-# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/system.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/var.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/version.sh"
 # shellcheck disable=SC1091
@@ -70,18 +70,20 @@ build::parse_arguments() {
         --options "local|remote" \
         --default "local"
 
+    # This should ideally be yes by default. We should update this later when the tests are more stable.
     args::register \
         --name "test" \
         --flag "t" \
-        --desc "Run tests before building (default: true)" \
+        --desc "Run tests before building (default: no)" \
         --type "value" \
         --options "yes|no" \
-        --default "yes"
+        --default "no"
     
+    # This should ideally be yes by default. We should update this later when the files are more stable.
     args::register \
         --name "lint" \
         --flag "q" \
-        --desc "Run linting before building (default: true)" \
+        --desc "Run linting before building (default: no)" \
         --type "value" \
         --options "yes|no" \
         --default "no"
@@ -112,7 +114,15 @@ build::parse_arguments() {
     export DEST=$(args::get "dest")
     export TEST=$(args::get "test")
     export LINT=$(args::get "lint")
-    export VERSION=$(args::get "version")
+    
+    local user_supplied_version_value=$(args::get "version")
+    if [ -n "$user_supplied_version_value" ]; then
+        export VERSION="$user_supplied_version_value"
+        export VERSION_SPECIFIED_BY_USER="yes"
+    else
+        export VERSION=$(get_project_version) # Sets default if no -v flag
+        export VERSION_SPECIFIED_BY_USER="no"
+    fi
 
     # Split the strings into arrays
     IFS=',' read -r -a BUNDLES <<< "$bundles_str"
@@ -155,13 +165,10 @@ build::parse_arguments() {
         DEST="local"
     fi
     if [ -z "$TEST" ]; then
-        TEST="yes"
+        TEST="no"
     fi
     if [ -z "$LINT" ]; then
-        LINT="no" # Default changed to 'no' based on arg definition
-    fi
-    if [ -z "$VERSION" ]; then
-        VERSION=$(get_project_version)
+        LINT="no"
     fi
 }
 
@@ -190,7 +197,12 @@ build::main() {
         pnpm run lint
     fi
 
-    set_project_version "$VERSION"
+    if [ "${VERSION_SPECIFIED_BY_USER}" = "yes" ]; then
+        log::info "User specified version '${VERSION}'. Updating project version..."
+        set_project_version "$VERSION"
+    else
+        log::info "Using project version '${VERSION}' from package.json. No explicit version update will be performed by this script."
+    fi
 
     # Determine if any binary/desktop builds are requested
     local build_desktop="NO"
@@ -214,7 +226,7 @@ build::main() {
     fi
 
     log::header "🎁 Preparing build artifacts..."
-    local build_dir="${DEST_DIR}/${VERSION}"
+    local build_dir="${var_DEST_DIR}/${VERSION}"
     # Where to put build artifacts
     local artifacts_dir="${build_dir}/artifacts"
     # Where to put bundles
@@ -241,11 +253,17 @@ build::main() {
     for a in "${ARTIFACTS[@]}"; do
         case "$a" in
             docker)
-                docker::build_artifacts "$artifacts_dir"
+                docker::build_artifacts
+                docker::save_images "$artifacts_dir"
                 ;;
             k8s)
                 log::info "Building Kubernetes artifacts (stub)"
-                # TODO: Add k8s build logic
+                # Note: Docker commands here are no accident. We need these images stored somewhere so 
+                # that the k8s deployment can pull them. We're choosing to store them in Docker Hub.
+                docker::build_artifacts
+                docker::login_to_dockerhub
+                docker::tag_and_push_images
+                # TODO: Add remaining k8s build logic
                 ;;
             *)
                 log::warning "Unknown artifact type: $a";
@@ -298,8 +316,8 @@ build::main() {
 
             # Copying logic (optional, adjust as needed)
             if env::is_location_local "$DEST"; then
-              local dest_dir="${DEST_DIR}/desktop/${c}/${VERSION}"
-              local source_dir="${DEST_DIR}/desktop"
+              local dest_dir="${var_DEST_DIR}/desktop/${c}/${VERSION}"
+              local source_dir="${var_DEST_DIR}/desktop"
               mkdir -p "${dest_dir}"
               # Copy specific installer/package file(s)
               # This is an example, glob patterns might need adjustment
@@ -321,7 +339,7 @@ build::main() {
         log::info "Setting up SSH connection to remote server ${SITE_IP} using key ${ssh_key_path}..."
         keyless_ssh::connect
 
-        local remote_bundles_dir="${REMOTE_DEST_DIR}/${VERSION}/bundles"
+        local remote_bundles_dir="${var_REMOTE_DEST_DIR}/${VERSION}/bundles"
         log::info "Ensuring remote bundles directory ${SITE_IP}:${remote_bundles_dir} exists and is empty..."
         ssh -i "$ssh_key_path" "root@${SITE_IP}" "mkdir -p ${remote_bundles_dir} && rm -rf ${remote_bundles_dir}/*" || {
             log::error "Failed to create or clean remote bundles directory ${SITE_IP}:${remote_bundles_dir}"

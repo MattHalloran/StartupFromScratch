@@ -10,10 +10,12 @@ source "${BUILD_DIR}/../utils/flow.sh"
 source "${BUILD_DIR}/../utils/log.sh"
 # shellcheck disable=SC1091
 source "${BUILD_DIR}/../utils/system.sh"
+# shellcheck disable=SC1091
+source "${BUILD_DIR}/../utils/var.sh"
 
-get_env_vars() {
+googlePlayStore::get_env_vars() {
     if [ -z "${KEYSTORE_PATH:-}" ]; then
-        KEYSTORE_PATH="${ROOT_DIR}/upload-keystore.jks"
+        KEYSTORE_PATH="${var_ROOT_DIR}/upload-keystore.jks"
     fi
     if [ -z "${KEYSTORE_ALIAS:-}" ]; then
         KEYSTORE_ALIAS="upload"
@@ -25,7 +27,7 @@ get_env_vars() {
 
 # Check for keytool and install JDK if it's not available. This is
 # used for signing the app in the Google Play store
-install_jdk() {
+googlePlayStore::install_jdk() {
     if ! system::is_command "keytool"; then
         system::should_run_update && system::update
         system::install_pkg "default-jdk"
@@ -36,8 +38,8 @@ install_jdk() {
 }
 
 # Sets up the keystore file for the Google Play Store
-setup_keystore() {
-    get_env_vars
+googlePlayStore::setup_keystore() {
+    googlePlayStore::get_env_vars
 
     # Check if keystore file exists
     if [ ! -f "${KEYSTORE_PATH}" ]; then
@@ -50,7 +52,7 @@ setup_keystore() {
             echo
         fi
         if flow::is_yes "$REPLY"; then
-            setup_keystore
+            googlePlayStore::setup_keystore
 
             # Generate the keystore file
             log::header "Generating keystore file..."
@@ -77,16 +79,15 @@ setup_keystore() {
     fi
 }
 
-
-
-create_assetlinks_file() {
-    get_env_vars
+# TODO I don't think is is being used. Probably should be used somewhere?
+googlePlayStore::create_assetlinks_file() {
+    googlePlayStore::get_env_vars
 
     # Create assetlinks.json file for Google Play Store
     if [ -f "${KEYSTORE_PATH}" ]; then
         log::header "Creating dist/.well-known/assetlinks.json file so Google can verify the app with the website..."
         # Export the PEM file from keystore
-        PEM_PATH="${ROOT_DIR}/upload_certificate.pem"
+        PEM_PATH="${var_ROOT_DIR}/upload_certificate.pem"
         if ! keytool -export -rfc -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -file "${PEM_PATH}" -storepass "${KEYSTORE_PASSWORD}"; then
             log::warning "PEM file could not be generated. The app cannot be uploaded to the Google Play store without it."
             return 1
@@ -103,8 +104,8 @@ create_assetlinks_file() {
         # Create assetlinks.json file for Google Play Store
         if [ -n "${GOOGLE_PLAY_FINGERPRINT}" ]; then
             log::info "Creating dist/.well-known/assetlinks.json file for Google Play Trusted Web Activity (TWA)..."
-            mkdir -p "${ROOT_DIR}/packages/ui/dist/.well-known"
-            cd "${ROOT_DIR}/packages/ui/dist/.well-known"
+            mkdir -p "${var_ROOT_DIR}/packages/ui/dist/.well-known"
+            cd "${var_ROOT_DIR}/packages/ui/dist/.well-known"
             {
               echo "[{"
               echo "    \"relation\": [\"delegate_permission/common.handle_all_urls\"],"

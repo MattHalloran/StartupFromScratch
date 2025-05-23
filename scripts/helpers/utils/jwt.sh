@@ -5,11 +5,11 @@ set -euo pipefail
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
+source "${UTILS_DIR}/exit_codes.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/exit_codes.sh"
+source "${UTILS_DIR}/var.sh"
 
 jwt::do_keys_exist() {
     # Check existence of staging and production JWT key pairs; report if missing or partial

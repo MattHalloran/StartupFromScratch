@@ -13,7 +13,7 @@ source "${BUILD_BINARIES_DIR}/../../utils/system.sh"
 
 # Installs WineHQ Stable branch following recommended procedures
 # https://wiki.winehq.org/Ubuntu
-install_wine_robustly() {
+windows::install_wine_robustly() {
     log::header "🍷 Installing WineHQ Stable for Windows builds"
 
     local wine_keyring="/etc/apt/keyrings/winehq-archive.key"
@@ -83,3 +83,8 @@ install_wine_robustly() {
 
     log::success "WineHQ Stable installation completed."
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    windows::install_wine_robustly "$@"
+fi

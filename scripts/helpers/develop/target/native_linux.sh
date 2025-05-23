@@ -7,23 +7,23 @@ DEVELOP_TARGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${DEVELOP_TARGET_DIR}/../../utils/flow.sh"
 # shellcheck disable=SC1091
-source "${DEVELOP_TARGET_DIR}/../../utils/locations.sh"
-# shellcheck disable=SC1091
 source "${DEVELOP_TARGET_DIR}/../../utils/log.sh"
+# shellcheck disable=SC1091
+source "${DEVELOP_TARGET_DIR}/../../utils/var.sh"
 
-start_development_native_linux() {
+nativeLinux::start_development_native_linux() {
     log::header "🚀 Starting native Linux development environment..."
-    cd "$ROOT_DIR"
+    cd "$var_ROOT_DIR"
 
-    cleanup() {
-        log::info "🔧 Cleaning up development environment at $ROOT_DIR..."
-        cd "$ROOT_DIR"
+    nativeLinux::cleanup() {
+        log::info "🔧 Cleaning up development environment at $var_ROOT_DIR..."
+        cd "$var_ROOT_DIR"
         docker-compose down
         cd "$ORIGINAL_DIR"
         exit 0
     }
     if ! flow::is_yes "$DETACHED"; then
-        trap cleanup SIGINT SIGTERM
+        trap nativeLinux::cleanup SIGINT SIGTERM
     fi
 
     log::info "Starting database containers (Postgres and Redis)..."
@@ -57,3 +57,8 @@ start_development_native_linux() {
             "${watchers[@]}"
     fi
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    nativeLinux::start_development_native_linux "$@"
+fi

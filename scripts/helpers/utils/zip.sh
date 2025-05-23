@@ -4,9 +4,9 @@ set -euo pipefail
 BUILD_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${BUILD_DIR}/../utils/locations.sh"
-# shellcheck disable=SC1091
 source "${BUILD_DIR}/../utils/log.sh"
+# shellcheck disable=SC1091
+source "${BUILD_DIR}/../utils/var.sh"
 
 # Zips a folder into a tarball
 zip::folder() {
@@ -48,7 +48,7 @@ zip::build_artifacts() {
   
     mkdir -p "$outdir"
     # Copy (not zip - that happens later) each package's dist folder
-    for pkg in "${PACKAGES_DIR}/"*; do
+    for pkg in "${var_PACKAGES_DIR}/"*; do
         if [ -d "$pkg/dist" ]; then
             log::info "Copying $(basename "$pkg") distribution..."
             cp -r "$pkg/dist" "$outdir/$(basename "$pkg")-dist"
@@ -58,7 +58,7 @@ zip::build_artifacts() {
 
 zip::undo_build_artifacts() {
     local artifacts_dir="$1"
-    for pkg in "${PACKAGES_DIR}/"*; do
+    for pkg in "${var_PACKAGES_DIR}/"*; do
         # Remove existing dist folder
         rm -rf "$pkg/dist"
         # Copy dist folder from artifacts directory
@@ -84,7 +84,7 @@ zip::copy_project() {
     local outdir="$1"
     mkdir -p "$outdir"
     log::header "Preparing project (minus Docker/Kubernetes files) for deployment..."
-    zip::copy_project_files "$ROOT_DIR" "$outdir"
+    zip::copy_project_files "$var_ROOT_DIR" "$outdir"
     zip::build_artifacts "$outdir"
     log::success "Project artifacts have been copies to $outdir"
 }
@@ -109,8 +109,8 @@ zip::unzip_artifacts() {
 
 zip::load_artifacts() {
     local infile="$1"
-    log::info "Loading artifacts from $infile into $ROOT_DIR..."
-    zip::copy_project_files "$infile" "$ROOT_DIR"
+    log::info "Loading artifacts from $infile into $var_ROOT_DIR..."
+    zip::copy_project_files "$infile" "$var_ROOT_DIR"
     zip::undo_build_artifacts "$infile"
-    log::success "Loaded artifacts from $infile into $ROOT_DIR"
+    log::success "Loaded artifacts from $infile into $var_ROOT_DIR"
 }

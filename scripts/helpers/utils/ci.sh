@@ -5,11 +5,11 @@ set -euo pipefail
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
+source "${UTILS_DIR}/exit_codes.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/exit_codes.sh"
+source "${UTILS_DIR}/var.sh"
 
 ci::do_keys_exist() {
     # Check existence of staging and production key pairs; report if missing or partial
@@ -61,16 +61,16 @@ ci::generate_key_pair() {
 1. SSH into your staging server and authorize the staging public key:
    ssh <staging-user>@<staging-host>
    bash scripts/main/authorize_key.sh
-   # Paste the contents of $STAGING_CI_SSH_PUB_KEY_FILE when prompted, then press Ctrl-D
+   # Paste the contents of $var_STAGING_CI_SSH_PUB_KEY_FILE when prompted, then press Ctrl-D
 
 2. SSH into your production server and authorize the production public key:
    ssh <production-user>@<production-host>
    bash scripts/main/authorize_key.sh
-   # Paste the contents of $PRODUCTION_CI_SSH_PUB_KEY_FILE when prompted, then press Ctrl-D
+   # Paste the contents of $var_PRODUCTION_CI_SSH_PUB_KEY_FILE when prompted, then press Ctrl-D
 
 3. Add private keys to GitHub Actions environment secrets:
-   - For staging: set VPS_SSH_PRIVATE_KEY = contents of $STAGING_CI_SSH_PRIV_KEY_FILE
-   - For production: set VPS_SSH_PRIVATE_KEY = contents of $PRODUCTION_CI_SSH_PRIV_KEY_FILE
+   - For staging: set VPS_SSH_PRIVATE_KEY = contents of $var_STAGING_CI_SSH_PRIV_KEY_FILE
+   - For production: set VPS_SSH_PRIVATE_KEY = contents of $var_PRODUCTION_CI_SSH_PRIV_KEY_FILE
 
 4. Ensure each environment secret set also includes:
    VPS_DEPLOY_USER, VPS_DEPLOY_HOST, JWT_PRIV_PEM, JWT_PUB_PEM, ENV_FILE_CONTENT

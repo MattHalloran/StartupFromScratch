@@ -14,9 +14,9 @@ source "${MAIN_DIR}/../helpers/utils/args.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/locations.sh"
-# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/var.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/version.sh"
 # shellcheck disable=SC1091
@@ -76,7 +76,7 @@ deploy::parse_arguments() {
         exit "$EXIT_SUCCESS"
     fi
 
-    args::parse "$@" >/dev/null
+    args::parse "$@"
 
     export SUDO_MODE=$(args::get "sudo-mode")
     export YES=$(args::get "yes")
@@ -107,7 +107,7 @@ deploy::main() {
     source "${MAIN_DIR}/setup.sh" "$@"
 
     log::header "🎁 Loading build artifacts..."
-    local build_dir="${DEST_DIR}/${VERSION}"
+    local build_dir="${var_DEST_DIR}/${VERSION}"
     # Where to put build artifacts
     local artifacts_dir="${build_dir}/artifacts"
     # Where to put bundles
@@ -115,7 +115,7 @@ deploy::main() {
 
     mkdir -p "$artifacts_dir"
     zip::unzip_artifacts "${bundles_dir}/artifacts.zip.gz" "$artifacts_dir"
-    zip::load_artifacts "$artifacts_dir" "$DEST_DIR"
+    zip::load_artifacts "$artifacts_dir" "$var_DEST_DIR"
 
     if env::is_location_remote; then
         proxy::setup
@@ -128,10 +128,10 @@ deploy::main() {
     log::info "Deploying $SOURCE_TYPE (Version: $VERSION)..."
     case "$SOURCE_TYPE" in
         docker)
-            deploy_docker "$artifacts_dir"
+            deploy::deploy_docker "$artifacts_dir"
             ;;
         k8s)
-            deploy_k8s "$artifacts_dir"
+            deploy::deploy_k8s "$ENVIRONMENT"
             ;;
         windows)
             log::info "Deploying Windows binary (stub) from $artifacts_dir"

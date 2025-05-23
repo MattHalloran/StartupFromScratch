@@ -8,11 +8,17 @@ SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/locations.sh"
-# shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/log.sh"
+# shellcheck disable=SC1091
+source "${SETUP_DIR}/../utils/var.sh"
 
-BATS_DEPENDENCIES_DIR="${SCRIPT_TESTS_DIR}/helpers"
+# Ensure var_SCRIPT_TESTS_DIR is defined
+if [ -z "${var_SCRIPT_TESTS_DIR:-}" ]; then
+    log::error "var_SCRIPT_TESTS_DIR not defined—please check var.sh"
+    exit 1
+fi
+
+BATS_DEPENDENCIES_DIR="${var_SCRIPT_TESTS_DIR}/helpers"
 
 # Function to determine and export BATS_PREFIX based on environment and sudo mode
 bats::determine_prefix() {
@@ -61,7 +67,12 @@ bats::install_core() {
     if [ ! -d "bats-core" ]; then
         git clone https://github.com/bats-core/bats-core.git
         cd bats-core
-        mkdir -p "$BATS_PREFIX"
+        # Ensure the BATS installation prefix exists (use sudo if required for system paths)
+        if flow::can_run_sudo && [[ "$BATS_PREFIX" = "/usr/local"* ]]; then
+            sudo mkdir -p "$BATS_PREFIX"
+        else
+            mkdir -p "$BATS_PREFIX"
+        fi
         if flow::can_run_sudo; then
             log::info "Installing Bats-core into $BATS_PREFIX (with sudo)"
             sudo ./install.sh "$BATS_PREFIX"
@@ -102,3 +113,8 @@ bats::install() {
 
     log::success "Bats and dependencies installed successfully"
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    bats::install "$@"
+fi

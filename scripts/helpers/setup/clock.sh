@@ -38,3 +38,8 @@ clock::fix() {
     # Print info
     log::info "System clock is now: $(date)"
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    clock::fix "$@"
+fi

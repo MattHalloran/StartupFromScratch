@@ -35,6 +35,11 @@ spec:
         {{- include "vrooli.selectorLabels" $ | nindent 8 }}
         {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 8 }}
     spec:
+      {{- /* Add imagePullSecrets if VSO is enabled and dockerhub secret is configured */}}
+      {{- if and $.Values.vso.enabled $.Values.vso.secrets.dockerhub $.Values.vso.secrets.dockerhub.enabled }}
+      imagePullSecrets:
+        - name: {{ $.Values.vso.secrets.dockerhub.k8sSecretName }}
+      {{- end }}
       containers:
         - name: {{ $name }}
           {{- $imageTag := $svc.tag | default $.Chart.AppVersion }}
@@ -55,6 +60,11 @@ spec:
           env:
             - name: ENV
               value: "{{ $.Values.config.env }}"
+          {{- if and $.Values.vso.enabled $.Values.vso.secrets.app .Values.vso.secrets.app.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ $.Values.vso.secrets.app.k8sSecretName }}
+          {{- end }}
           resources:
             requests:
               cpu: {{ $svc.resources.requests.cpu }}

@@ -5,13 +5,13 @@ set -euo pipefail
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
+source "${UTILS_DIR}/var.sh"
 
 # Finds the project version using the root package.json file.
 get_project_version() {
     # Extract the current version number from the package.json file
     local version
-    version=$(cat ${ROOT_DIR}/package.json | grep version | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
+    version=$(cat ${var_ROOT_DIR}/package.json | grep version | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
     echo "$version"
 }
 
@@ -28,9 +28,9 @@ set_project_version() {
     if [ "$version" != "$target_version" ]; then
         log::info "Updating project version to $target_version"
         # Update all package.json files in the project
-        find ${ROOT_DIR}/packages -name package.json -exec sed -i '' "s/\"version\": \"$version\"/\"version\": \"$target_version\"/g" {} +
+        find ${var_ROOT_DIR}/packages -name package.json -exec sed -i '' "s/\"version\": \"$version\"/\"version\": \"$target_version\"/g" {} +
         # Update root package.json file too
-        sed -i '' "s/\"version\": \"$version\"/\"version\": \"$target_version\"/g" ${ROOT_DIR}/package.json
+        sed -i '' "s/\"version\": \"$version\"/\"version\": \"$target_version\"/g" ${var_ROOT_DIR}/package.json
     else
         log::info "Version $target_version is already set, skipping"
     fi

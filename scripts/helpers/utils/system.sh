@@ -253,3 +253,43 @@ system::check_and_install() {
         exit "${ERROR_DEPENDENCY_MISSING}"
     fi
 }
+
+# Cross-platform path canonicalization: resolves symlinks if possible, else lexical fallback
+system::canonicalize() {
+  local input="$1"
+  # Use realpath if available to fully resolve symlinks
+  if system::is_command realpath; then
+    realpath "$input"
+  elif system::is_command readlink; then
+    # readlink -f resolves symlinks and canonicalizes
+    readlink -f "$input"
+  else
+    # Pure Bash fallback: expand relative paths and normalize . and .. components
+    if [[ "$input" != /* ]]; then
+      input="$PWD/$input"
+    fi
+    # Remove '/./' segments
+    input="${input//\/\.\//\/}"
+    # Split into components
+    local IFS='/'
+    read -r -a _segments <<< "$input"
+    local _result=()
+    for _seg in "${_segments[@]}"; do
+      case "$_seg" in
+        ''|'.') continue ;;
+        '..')
+          if (( ${#_result[@]} > 0 )); then
+            unset '_result[${#_result[@]}-1]'
+          fi
+          ;;
+        *) _result+=("$_seg") ;;
+      esac
+    done
+    # Reconstruct the path
+    local canonical="/"
+    for _seg in "${_result[@]}"; do
+      canonical="${canonical%/}/$_seg"
+    done
+    echo "$canonical"
+  fi
+}

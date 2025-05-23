@@ -76,16 +76,5 @@ bash scripts/main/deploy.sh staging --type k8s
 
 ## Kubernetes Manifests
 
-Manifests are stored under `k8s/`:
-```
-k8s/
-└── staging/
-    ├ deployment.yaml
-    └ service.yaml
-└── production/
-    ├ deployment.yaml
-    └ service.yaml
-```
-Customize resource counts (replicas, CPU/memory) per environment.
-
+Manifests are stored under `k8s/chart` (we're using Helm). Please refer to [the k8s README](./k8s/README.md) for more details.
 --- 

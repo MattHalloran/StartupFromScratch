@@ -9,7 +9,7 @@ source "${DEVELOP_TARGET_DIR}/../../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${DEVELOP_TARGET_DIR}/../../utils/log.sh"
 
-start_development_native_win() {
+nativeWin::start_development_native_win() {
     log::header "Starting native Windows development environment..."
 
     # Check if running on Windows
@@ -28,13 +28,13 @@ start_development_native_win() {
         pnpm install
     fi
 
-    cleanup() {
+    nativeWin::cleanup() {
         log::info "Cleaning up development environment..."
         kill $TYPE_CHECK_PID $LINT_PID
         exit 0
     }
     if ! flow::is_yes "$DETACHED"; then
-        trap cleanup SIGINT SIGTERM
+        trap nativeWin::cleanup SIGINT SIGTERM
     fi
 
     # Run TypeScript type checking in watch mode in background
@@ -53,3 +53,8 @@ start_development_native_win() {
 
     log::success "Development environment started successfully!"
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    nativeWin::start_development_native_win "$@"
+fi

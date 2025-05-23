@@ -18,4 +18,19 @@ services:
 
 # Ingress disabled by default in dev
 ingress:
-  enabled: false 
+  enabled: false
+
+# Enable Vault Secrets Operator for development
+vso:
+  enabled: true
+  # Development-specific VSO overrides can go here if needed
+  # For example, if using a different Vault role or address for dev:
+  # vaultAddr: "http://dev-vault.example.com:8200"
+  # k8sAuthRole: "vrooli-app-dev"
+  # secrets:
+  #   postgres:
+  #     vaultPath: "secret/data/vrooli-dev/postgres"
+  #   app:
+  #     vaultPath: "secret/data/vrooli-dev/app-config"
+  #   dockerhub:
+  #     vaultPath: "secret/data/vrooli-dev/dockerhub-creds" 
