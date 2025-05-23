@@ -1,13 +1,19 @@
 # values-dev.yaml
-# Overrides for the development environment.
-# This file is intentionally kept for future dev-specific overrides.
-# Currently, all dev defaults are sourced from values.yaml.
-# Add any development-specific value overrides below this line.
+# This file contains configuration overrides specifically for the DEVELOPMENT environment.
+# It is used in conjunction with the base `values.yaml` file.
+# When deploying to a development environment, Helm will merge the values from this file
+# over the defaults in `values.yaml`, allowing for environment-specific settings without
+# modifying the base configuration.
 
+# --- General Configuration Overrides ---
 config:
+  # Sets the environment identifier to 'development'.
+  # Applications can use this to enable debug modes, connect to development databases, etc.
   env: development
 
-# Image tags override
+# --- Image Tag Overrides for Development ---
+# Specifies 'dev' tags for services in the development environment.
+# This allows using images specifically built for development (e.g., with debug symbols, hot reloading).
 services:
   ui:
     tag: dev
@@ -15,22 +21,32 @@ services:
     tag: dev
   jobs:
     tag: dev
+  # Note: nsfwDetector, postgresql, redis, adminer will use tags from values.yaml unless overridden here.
 
-# Ingress disabled by default in dev
+# --- Ingress Configuration for Development ---
+# Ingress is typically disabled by default in development environments,
+# as services might be accessed via `kubectl port-forward` or NodePort services.
 ingress:
   enabled: false
 
-# Enable Vault Secrets Operator for development
+# --- Vault Secrets Operator (VSO) Configuration for Development ---
+# Enable VSO integration for development environments.
+# This assumes a VSO instance and a Vault instance are available and configured for development use.
 vso:
-  enabled: true
-  # Development-specific VSO overrides can go here if needed
-  # For example, if using a different Vault role or address for dev:
-  # vaultAddr: "http://dev-vault.example.com:8200"
-  # k8sAuthRole: "vrooli-app-dev"
+  enabled: true # Enable VSO to manage secrets.
+  # Development-specific VSO overrides can be placed here if needed.
+  # For example, if the development Vault instance has a different address, role, or secret paths:
+  # vaultAddr: "http://dev-vault.internal:8200" # Example: Different Vault address for dev.
+  # k8sAuthRole: "vrooli-app-dev" # Example: Different Vault role for dev.
   # secrets:
   #   postgres:
+  #     # Path in Vault for PostgreSQL credentials specific to the development environment.
   #     vaultPath: "secret/data/vrooli-dev/postgres"
+  #   redis:
+  #     vaultPath: "secret/data/vrooli-dev/redis"
   #   app:
+  #     # Path in Vault for general application secrets specific to development.
   #     vaultPath: "secret/data/vrooli-dev/app-config"
   #   dockerhub:
+  #     # Path in Vault for Docker Hub credentials, potentially using a dev-specific account or token.
   #     vaultPath: "secret/data/vrooli-dev/dockerhub-creds" 

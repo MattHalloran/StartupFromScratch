@@ -1,47 +1,72 @@
-# Default values for Vrooli chart
-# This file contains configuration that can be overridden per environment
+# Default values for Vrooli chart.
+# This file provides the default configuration settings for the Vrooli Helm chart.
+# These values can be overridden by environment-specific files (e.g., values-dev.yaml, values-prod.yaml)
+# or by using the '--set' flag during Helm installation or upgrade.
 
-# Chart naming overrides
+# --- Chart Naming ---
+# These values allow for customizing the names of resources created by the chart.
+# `nameOverride` replaces the chart name component in resource names.
+# `fullnameOverride` completely replaces the generated full name of resources.
 nameOverride: ""
 fullnameOverride: ""
 
-# Docker Hub username - used to construct the image registry URL
-# This should be overridden with the actual Docker Hub username.
-# The DOCKERHUB_TOKEN for this user will be fetched from Vault to create an imagePullSecret.
-dockerhubUsername: "matthalloran8"
+# --- Docker Hub Configuration ---
+# Configuration related to pulling images from Docker Hub.
+# `dockerhubUsername` is used to construct the image registry URL.
+# A Kubernetes Secret (ImagePullSecret) named 'vrooli-dockerhub-pull-secret' is expected to be created
+# by the Vault Secrets Operator (VSO), containing credentials for this Docker Hub user.
+# This secret allows Kubernetes to pull private images from the specified user's Docker Hub repositories.
+dockerhubUsername: "matthalloran8" # TODO: Replace with your actual Docker Hub username if different or manage via CI/CD
 
-# Global values
+# --- Global Image Settings ---
+# These settings apply to all container images deployed by the chart, unless overridden at the service level.
 image:
-  # Constructed using dockerhubUsername, assuming Docker Hub as the registry host.
-  # Example: docker.io/your_dockerhub_username
+  # `registry` specifies the Docker registry host and path.
+  # It dynamically uses the `dockerhubUsername` value. For example, "docker.io/matthalloran8".
+  # This assumes Docker Hub is the registry. For other registries (e.g., GCR, ECR, Quay.io), this needs to be adjusted.
   registry: "docker.io/{{ .Values.dockerhubUsername }}"
+  # `pullPolicy` defines when Kubernetes should attempt to pull the image.
+  # - IfNotPresent: Pull only if the image is not already on the node.
+  # - Always: Always pull the image, even if present. Useful for 'latest' tags or frequent updates.
+  # - Never: Never pull the image; assume it's already on the node.
   pullPolicy: IfNotPresent
 
+# --- Replica Counts ---
+# Defines the default number of replicas (pods) for each service.
+# These can be adjusted based on load and availability requirements for each environment.
 replicaCount:
   ui: 1
   server: 1
   jobs: 1
-  adminer: 1
-  postgres: 1
-  redis: 1
-  nsfwDetector: 1 # Default replica, but will be controlled by an enabled flag
+  adminer: 1 # Adminer is a database management tool, typically 1 replica is sufficient for development/debugging.
+  postgres: 1 # For simple setups. Production might require a more complex HA setup.
+  redis: 1    # For simple setups. Production might require a more complex HA setup.
+  nsfwDetector: 1 # Default replica count for NSFW detector. Its deployment is controlled by 'services.nsfwDetector.enabled'.
 
-# Service-specific configurations
+# --- Service-Specific Configurations ---
+# This section defines configurations for each microservice component of the Vrooli application.
+# Each service has settings for its Docker image, port, health probes, and resource allocation.
 services:
+  # --- UI Service ---
   ui:
-    repository: ui
-    tag: dev
-    port: 3000
+    repository: ui # Name of the UI image repository (appended to `image.registry`).
+    tag: dev       # Default image tag (e.g., version or 'latest'). Often overridden per environment.
+    port: 3000     # The port the UI container listens on.
+    # Health probes (liveness and readiness) for the UI service.
+    # Kubernetes uses these probes to determine if the container is healthy and ready to receive traffic.
     probes:
-      livenessPath: /healthcheck
-      readinessPath: /healthcheck
+      livenessPath: /healthcheck  # Path for the liveness probe (is the app running?).
+      readinessPath: /healthcheck # Path for the readiness probe (is the app ready to serve requests?).
+    # Resource requests and limits for the UI service.
+    # `requests` are guaranteed resources, while `limits` are the maximum allowed.
     resources:
       requests:
-        cpu: 100m
-        memory: 128Mi
+        cpu: 100m    # 0.1 CPU core
+        memory: 128Mi # 128 Megabytes
       limits:
         cpu: 200m
         memory: 256Mi
+  # --- Server Service ---
   server:
     repository: server
     tag: dev
@@ -56,6 +81,7 @@ services:
       limits:
         cpu: 400m
         memory: 512Mi
+  # --- Jobs Service ---
   jobs:
     repository: jobs
     tag: dev
@@ -70,42 +96,55 @@ services:
       limits:
         cpu: 200m
         memory: 256Mi
+  # --- NSFW Detector Service ---
   nsfwDetector:
-    enabled: false # Disabled by default, enable in values-prod.yaml or per environment
-    repository: steelcityamir/safe-content-ai # repository is the image name part here
-    tag: "1.1.0"
-    port: 8000 # Internal port the container listens on
-    probes: # TCP Probe based on docker-compose healthcheck
-      livenessPath: ""
-      readinessPath: ""
-      useTcpSocket: true # Indicates to use TCP socket probe
-      initialDelaySeconds: 60
-      periodSeconds: 30
-      timeoutSeconds: 10
-      failureThreshold: 3
+    enabled: false # Controls whether the NSFW detector service is deployed. Set to 'true' in environments where it's needed.
+    # Image repository for the NSFW detector service.
+    # Note: This example uses a public image. For private images, ensure `image.registry` is correctly set up.
+    repository: steelcityamir/safe-content-ai
+    tag: "1.1.0" # Specific version tag for the NSFW detector image.
+    port: 8000   # Internal port the NSFW detector container listens on.
+    # Health probes for the NSFW detector.
+    # This example uses TCP socket probes, which are suitable if the application doesn't expose an HTTP health endpoint.
+    probes:
+      livenessPath: ""  # HTTP path not used for TCP probes.
+      readinessPath: "" # HTTP path not used for TCP probes.
+      useTcpSocket: true # Indicates to use TCP socket probe instead of HTTP.
+      initialDelaySeconds: 60 # Delay before the first probe.
+      periodSeconds: 30       # How often to probe.
+      timeoutSeconds: 10        # When the probe times out.
+      failureThreshold: 3     # Number of failures before marking as unhealthy/not ready.
     resources:
       requests:
-        cpu: 200m       # Base request, adjust as needed
-        memory: 512Mi   # Base request, adjust as needed
+        cpu: 200m
+        memory: 512Mi
       limits:
-        cpu: 500m       # Base limit, adjust as needed
-        memory: 1Gi     # Base limit, adjust as needed
+        cpu: 500m
+        memory: 1Gi
+    # GPU configuration for the NSFW detector (if it supports GPU acceleration).
     gpu:
-      enabled: false
-      # type: "nvidia.com/gpu" # Common GPU resource type
-      # count: 1
+      enabled: false # Set to true if GPUs are available and needed.
+      # type: "nvidia.com/gpu" # Kubernetes resource type for NVIDIA GPUs.
+      # count: 1                # Number of GPUs to request.
 
-# PostgreSQL specific configurations for StatefulSet
+# --- PostgreSQL Specific Configurations ---
+# Configuration for deploying PostgreSQL as a StatefulSet.
+# StatefulSets are used for stateful applications like databases, providing stable network identifiers and persistent storage.
 postgresql:
   image:
-    repository: "pgvector/pgvector"
-    tag: "pg15"
-  port: 5432
-  # auth: # This section is now managed via vso.secrets.postgres
+    repository: "pgvector/pgvector" # Image with pgvector extension for vector similarity search.
+    tag: "pg15"                     # PostgreSQL version 15.
+  port: 5432                        # Standard PostgreSQL port.
+  # Authentication for PostgreSQL is managed via VSO (Vault Secrets Operator).
+  # The `vso.secrets.postgres` section defines how VSO syncs credentials from Vault to a Kubernetes Secret.
+  # This Secret is then used by the PostgreSQL deployment.
+  # auth:
   #   enabled: true
-  #   existingSecretName: ""
-  #   userKey: "POSTGRES_USER"
-  #   passwordKey: "POSTGRES_PASSWORD"
+  #   existingSecretName: "" # If using an existing K8s secret, specify its name here.
+  #   userKey: "POSTGRES_USER" # Key in the secret for the username.
+  #   passwordKey: "POSTGRES_PASSWORD" # Key in the secret for the password.
+  # Health probes for PostgreSQL.
+  # These typically use `pg_isready` or a similar command executed within the container.
   probes:
     liveness:
       initialDelaySeconds: 30
@@ -124,17 +163,21 @@ postgresql:
     limits:
       cpu: "500m"
       memory: "512Mi"
-  # nodeSelector: {}
-  # affinity: {}
-  # tolerations: []
+  # Advanced scheduling options (uncomment and configure if needed).
+  # nodeSelector: {} # Selects specific nodes for PostgreSQL pods.
+  # affinity: {}     # Pod affinity/anti-affinity rules.
+  # tolerations: []  # Allows scheduling on nodes with specific taints.
 
-# Redis specific configurations for StatefulSet
+# --- Redis Specific Configurations ---
+# Configuration for deploying Redis as a StatefulSet.
 redis:
   image:
-    repository: "redis"
-    tag: "7.4.0-alpine"
-  port: 6379
-  # auth: # This section is now managed via vso.secrets.redis
+    repository: "redis" # Official Redis image.
+    tag: "7.4.0-alpine" # Specific Redis version.
+  port: 6379            # Standard Redis port.
+  # Authentication for Redis is managed via VSO (Vault Secrets Operator).
+  # See `vso.secrets.redis` for details.
+  # auth:
   #   enabled: true
   #   existingSecretName: ""
   #   passwordKey: "REDIS_PASSWORD"
@@ -160,24 +203,37 @@ redis:
   # affinity: {}
   # tolerations: []
 
-# Configuration parameters (non-sensitive)
+# --- General Application Configuration ---
+# Non-sensitive configuration parameters that can be passed to application containers,
+# typically as environment variables or mounted into a ConfigMap.
 config:
-  projectDir: /srv/app
-  env: development
+  projectDir: /srv/app # Example: Base directory for the application within containers.
+  env: development     # Default environment identifier (e.g., development, staging, production).
+                       # This can be used by applications to load environment-specific settings.
 
-# Sensitive values handled as native Kubernetes Secrets
-# secrets: {} # This section is now managed via vso.secrets entries if needed for general app secrets
+# --- Secrets Management (Legacy) ---
+# This section was previously used for defining native Kubernetes Secrets directly in values.yaml.
+# It is now DEPRECATED in favor of using the Vault Secrets Operator (VSO) for secure secret management.
+# See the `vso` section below for the current approach.
+# secrets: {}
 
-# Persistence settings for stateful services
+# --- Persistence Settings ---
+# Configures PersistentVolumeClaims (PVCs) for stateful services.
+# PVCs request persistent storage from the Kubernetes cluster (e.g., for databases).
 persistence:
+  # PostgreSQL persistence settings.
   postgres:
-    enabled: true
-    size: 1Gi
-    storageClass: ""
+    enabled: true      # Enable PVC for PostgreSQL.
+    size: 1Gi          # Requested storage size.
+    storageClass: ""   # Specify a StorageClass name if needed (e.g., "gp2", "standard").
+                       # If empty, the default StorageClass of the cluster is used.
+  # Redis persistence settings.
   redis:
     enabled: true
     size: 512Mi
     storageClass: ""
+  # Persistence for stateless services (UI, Server, Jobs) is typically disabled
+  # as they don't store data that needs to survive pod restarts.
   ui:
     enabled: false
   server:
@@ -185,84 +241,185 @@ persistence:
   jobs:
     enabled: false
   adminer:
-    enabled: false
+    enabled: false # Adminer is stateless.
+  # Persistence for NSFW Detector (if it needs to store models or cache data).
   nsfwDetector:
     enabled: false
-    size: 5Gi
+    size: 5Gi          # Example size if it were enabled.
     storageClass: ""
 
-# Ingress configuration
+# --- Ingress Configuration ---
+# Configures Kubernetes Ingress resources for exposing services externally (e.g., via HTTP/HTTPS).
+# An Ingress controller (like Nginx Ingress or Traefik) must be running in the cluster.
 ingress:
-  enabled: false
-  annotations: {}
-  hosts: []
-  tls: []
+  enabled: false # Set to true to create Ingress resources. Typically enabled for production/staging.
+  # annotations: {} # Additional annotations for the Ingress resource (e.g., for cert-manager, custom Nginx settings).
+  # className: "" # Specify IngressClass name if required by your Ingress controller (e.g., "nginx").
+  # hosts: # Define host rules for routing traffic to services.
+  #   - host: chart-example.local # Example hostname.
+  #     paths:
+  #       - path: /ui # Path for the UI service.
+  #         pathType: ImplementationSpecific # Or Prefix, Exact.
+  #         service: # Must match the service name generated by Helm.
+  #           name: ui # This will typically be {{ include "vrooli.fullname" . }}-ui
+  #           port:
+  #             number: 3000 # Matches services.ui.port
+  #       - path: /api # Path for the server (API) service.
+  #         pathType: ImplementationSpecific
+  #         service:
+  #           name: server # {{ include "vrooli.fullname" . }}-server
+  #           port:
+  #             number: 5329 # Matches services.server.port
+  # tls: [] # TLS configuration for Ingress (e.g., for HTTPS).
+  #   - hosts:
+  #       - chart-example.local
+  #     secretName: chart-example-tls # Name of the Kubernetes Secret containing the TLS certificate and key.
 
-# Vault Secrets Operator (VSO) integration
+# --- Vault Secrets Operator (VSO) Integration ---
+# Configuration for integrating with HashiCorp Vault via the Vault Secrets Operator.
+# VSO automates the synchronization of secrets from Vault to Kubernetes Secrets.
 vso:
-  enabled: false # Set to true to enable VSO integration and deploy VSO CRDs
-  vaultAddr: "http://vault.vault.svc:8200" # Address of the in-cluster Vault service
-  k8sAuthMount: "kubernetes" # Path where Kubernetes auth method is mounted in Vault
-  k8sAuthRole: "vrooli-app" # Vault role for this application/VSO to assume
+  enabled: false # Set to true to enable VSO integration. This will create VSO Custom Resources (VaultAuth, VaultConnection, VaultSecret).
+  # Address of the Vault instance. For in-cluster Vault, this is typically a Kubernetes service DNS name.
+  vaultAddr: "http://vault.vault.svc:8200"
+  # Path where the Kubernetes authentication method is enabled in Vault.
+  k8sAuthMount: "kubernetes"
+  # Vault role that VSO (or the application pods, depending on auth method) will assume to access secrets.
+  # This role must be configured in Vault and bound to appropriate Kubernetes service accounts.
+  k8sAuthRole: "vrooli-app"
 
-  # Define secret groups to be synced from Vault
+  # Defines groups of secrets to be synced from Vault.
+  # Each entry here will result in a `VaultSecret` Custom Resource being created.
   secrets:
-    # Example for Redis credentials
+    # --- Redis Credentials ---
     redis:
-      enabled: true
-      # Path in Vault KVv2 engine (e.g., secret/data/vrooli/redis)
-      # For KVv1, it would be (e.g., secret/vrooli/redis)
+      enabled: true # Enable syncing Redis credentials.
+      # Path to the secret in Vault's KV (Key/Value) secrets engine.
+      # For KV version 2, paths are typically prefixed with `secret/data/`.
+      # For KV version 1, it would be `secret/`.
       vaultPath: "secret/data/vrooli/redis"
-      # Name of the Kubernetes Secret to be created by VSO
+      # Name of the Kubernetes `Secret` object that VSO will create in the release namespace.
+      # This secret will contain the data fetched from `vaultPath`.
       k8sSecretName: "vrooli-redis-creds"
-      # Optional: if you want to use a specific VaultAuth CRD other than the default one for this chart
+      # Optional: Reference a specific `VaultAuth` CRD if you have multiple authentication methods or roles.
+      # If not specified, VSO typically uses a default `VaultAuth` configured for the chart or namespace.
       # vaultAuthRef: "custom-vault-auth"
 
-    # Example for PostgreSQL credentials
+    # --- PostgreSQL Credentials ---
     postgres:
       enabled: true
       vaultPath: "secret/data/vrooli/postgres"
       k8sSecretName: "vrooli-postgres-creds"
 
-    # Example for other application secrets (e.g., JWT keys)
+    # --- General Application Secrets ---
+    # For other application-specific secrets, e.g., API keys, JWT signing keys.
     app:
       enabled: true
-      vaultPath: "secret/data/vrooli/app-config"
+      vaultPath: "secret/data/vrooli/app-config" # Example path for general app configuration secrets.
       k8sSecretName: "vrooli-app-secrets"
 
-    # Docker Hub credentials for image pulling
+    # --- Docker Hub Pull Secret ---
+    # Configuration for creating a Kubernetes `Secret` of type `kubernetes.io/dockerconfigjson`
+    # to allow pulling images from a private Docker Hub repository.
     dockerhub:
-      enabled: true
-      vaultPath: "secret/data/vrooli/dockerhub-creds" # Matches where you stored DOCKERHUB_USERNAME & DOCKERHUB_TOKEN
-      k8sSecretName: "vrooli-dockerhub-pull-secret"   # Name of the K8s secret VSO will create
-      # VSO needs to create a specific type of secret for Docker registry authentication.
-      # The data field in the VaultSecret CRD should be templated to produce the .dockerconfigjson format.
-      # This requires custom templating in the VaultSecret CRD which VSO supports.
-      # The specific format depends on how VSO handles templating for dockerconfigjson secrets.
-      # Typically, you'd provide a template that VSO uses to construct the K8s secret data.
-      # For a dockerconfigjson secret, VSO needs to create a key named ".dockerconfigjson"
-      # with the appropriate JSON content.
-      # Example (conceptual, exact VSO template might differ):
-      # template: |
-      #   {
-      #     "auths": {
-      #       "https://index.docker.io/v1/": {
-      #         "username": "{{ .username }}",
-      #         "password": "{{ .token }}",
-      #         "auth": "{{ printf "%s:%s" .username .token | b64enc }}"
-      #       }
-      #     }
-      #   }
-      # As an alternative, if VSO can directly create kubernetes.io/dockerconfigjson secrets from
-      # username/password fields, that would be simpler. Check VSO documentation for best practice.
-      # For now, we'll assume VSO creates a generic secret, and we'll need a template for it.
-      # If Vault Secrets Operator has direct support for `kubernetes.io/dockerconfigjson` type via specific annotations
-      # or by detecting `username` and `password` fields from Vault, that is preferred.
-      # Let's assume we'll handle the templating for `.dockerconfigjson` content within the VSO Custom Resource, potentially outside this values file or via a more advanced VSO setup.
-      # The key is that VSO will create a secret named "vrooli-dockerhub-pull-secret".
-      # We will refer to this secret in imagePullSecrets.
-      # It's also common to have VSO create a generic secret, and then have a small job or operator
-      # that transforms this generic secret into a proper .dockerconfigjson secret if VSO doesn't directly support it well.
-      # However, the VSO documentation implies it can handle this by setting the type on the Kubernetes Secret object it generates.
-      # We will need to ensure the `VaultSecret` CRD generated by the Helm template for this entry specifies `type: kubernetes.io/dockerconfigjson`
-      # and correctly maps the Vault fields to the data expected by this secret type. 
+      enabled: true # Enable creating the Docker Hub pull secret via VSO.
+      # Path in Vault where Docker Hub credentials (username and token/password) are stored.
+      # It's assumed that Vault stores `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (or password) at this path.
+      vaultPath: "secret/data/vrooli/dockerhub-creds"
+      # Name of the Kubernetes `Secret` that VSO will create.
+      k8sSecretName: "vrooli-dockerhub-pull-secret"
+      # The `VaultSecret` CRD for this entry needs to be specifically templated by VSO
+      # to generate the correct `.dockerconfigjson` format required by Kubernetes for image pull secrets.
+      # This typically involves VSO using a template to construct the JSON content for the '.dockerconfigjson' key
+      # within the Kubernetes Secret, using the username and token fetched from `vaultPath`.
+      # The actual templating logic is handled by VSO based on its capabilities and the structure of the `VaultSecret` CRD.
+      # Example (conceptual, actual VSO template syntax for `VaultSecret` CRD might differ):
+      # The `VaultSecret` definition in `templates/vso-secrets.yaml` would contain logic like:
+      # template:
+      #   data:
+      #     .dockerconfigjson: |
+      #       {{- $username := .Data.DOCKERHUB_USERNAME -}}
+      #       {{- $password := .Data.DOCKERHUB_TOKEN -}}
+      #       {{- $auth := printf "%s:%s" $username $password | b64enc -}}
+      #       {{- $registry := printf "https://index.docker.io/v1/" -}}
+      #       {{- dict "auths" (dict $registry (dict "auth" $auth)) | toJson -}}
+      # This templating should happen within the VaultSecret CRD itself, which is generated by templates/vso-secrets.yaml
+
+# --- Adminer Configuration (Optional Database Management Tool) ---
+# Adminer is a lightweight database management tool similar to phpMyAdmin.
+# It can be useful for development and debugging to inspect database contents.
+adminer:
+  enabled: false # Set to true to deploy Adminer. Typically only for development environments.
+  image:
+    repository: "adminer" # Official Adminer image.
+    tag: "latest"
+  port: 8080 # Port Adminer listens on.
+  # Ingress configuration for Adminer (if ingress.enabled is true globally).
+  # This allows accessing Adminer via a specific path on your Ingress host.
+  ingress:
+    enabled: false # Set to true to expose Adminer via Ingress.
+    # path: /adminer # Path to access Adminer (e.g., http://your-host/adminer).
+    # host: "" # Optional: specific host for Adminer, defaults to global ingress host if not set.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  # Environment variables for Adminer.
+  # `ADMINER_DEFAULT_SERVER` should point to your PostgreSQL service name (e.g., {{ include "vrooli.fullname" . }}-postgresql).
+  # `ADMINER_DESIGN` sets the visual theme.
+  env:
+    ADMINER_DEFAULT_SERVER: "{{ .Release.Name }}-postgresql" # Dynamically sets the default PostgreSQL server.
+    ADMINER_DESIGN: "rm" # Example theme.
+    # For other database types or custom drivers, refer to Adminer documentation.
+
+# --- Service Account Configuration ---
+# Configures Kubernetes ServiceAccounts for pods.
+# ServiceAccounts provide an identity for processes running in a Pod.
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created for each service.
+  create: true
+  # Annotations to add to the service account.
+  # Useful for tools like IAM Roles for Service Accounts (IRSA) on AWS EKS,
+  # or Workload Identity on GKE.
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template.
+  # If create is false, this specifies an existing ServiceAccount to use.
+  # name: "" # Example: "my-custom-service-account"
+
+# --- Pod Security Context ---
+# Defines security settings that apply to all pods deployed by this chart.
+# These can be overridden at the container level if needed.
+podSecurityContext: {}
+  # fsGroup: 2000 # Example: Set the group ID for the pod's file system.
+
+# --- Container Security Context ---
+# Defines security settings that apply to all containers within pods.
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000 # Example: Run containers as a non-root user.
+
+# --- Node Affinity and Tolerations ---
+# Global settings for node selection, pod affinity/anti-affinity, and tolerations.
+# These can be used to influence where pods are scheduled in the Kubernetes cluster.
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+# --- Resources (Global Defaults) ---
+# Default resource requests and limits for services if not specified at the service level.
+# It's generally better to define these per-service for more fine-grained control.
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi 

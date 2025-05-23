@@ -1,50 +1,75 @@
 # values-prod.yaml
-# Overrides for the production environment
+# This file contains configuration overrides specifically for the PRODUCTION environment.
+# It is used in conjunction with the base `values.yaml` file and typically loaded after it.
+# Helm merges values from this file over the defaults in `values.yaml` and any development-specific
+# values, ensuring that production deployments use appropriate settings for stability, performance, and security.
 
+# --- General Configuration Overrides for Production ---
 config:
+  # Sets the environment identifier to 'production'.
+  # Applications use this to enable production-specific behaviors (e.g., optimized logging, stricter error handling).
   env: production
 
+# --- Replica Count Overrides for Production ---
+# Defines the number of replicas for each service in the production environment.
+# These values are typically higher than in development to ensure high availability and handle production load.
 replicaCount:
-  ui: 3
-  server: 2
-  jobs: 1
-  adminer: 0 # Disabled adminer in production
-  postgres: 1
-  redis: 1
-  nsfwDetector: 1 # Number of replicas for NSFW Detector in production
+  ui: 3       # Example: 3 replicas for the UI service for load balancing and HA.
+  server: 2   # Example: 2 replicas for the server/API for load balancing and HA.
+  jobs: 1     # Example: 1 replica for the jobs service, adjust based on job workload and concurrency needs.
+  adminer: 0  # Adminer (database management tool) is disabled in production for security reasons.
+  postgres: 1 # For a simple setup. Production databases often require more complex HA/replication strategies (e.g., Patroni, cloud provider RDS).
+  redis: 1    # For a simple setup. Production Redis might use clustering or sentinel for HA.
+  nsfwDetector: 1 # Number of replicas for the NSFW Detector service in production. Adjust based on load.
 
-# Image tags override (use immutable tags in prod)
+# --- Image Tag Overrides for Production ---
+# Specifies immutable image tags (e.g., specific versions) for services in production.
+# Using 'latest' or mutable tags in production is generally discouraged as it can lead to unpredictable deployments.
 services:
   ui:
-    tag: "0.1.0" # Updated from 'latest'
+    tag: "0.1.0" # FIXME: Replace with the actual production-ready image tag for the UI service.
   server:
-    tag: "0.1.0" # Updated from 'latest'
+    tag: "0.1.0" # FIXME: Replace with the actual production-ready image tag for the server service.
   jobs:
-    tag: "0.1.0" # Updated from 'latest'
+    tag: "0.1.0" # FIXME: Replace with the actual production-ready image tag for the jobs service.
   nsfwDetector:
-    enabled: true # Enable NSFW detector in production
+    enabled: true # Enable the NSFW detector service in the production environment.
+    # tag: "1.1.0" # Assuming values.yaml has the correct production tag for nsfwDetector, or override here.
 
-# Enable ingress for external access
+# --- Ingress Configuration for Production ---
+# Enable and configure Ingress for exposing services externally in production.
+# This typically involves setting up hostnames, paths, and TLS termination.
 ingress:
-  enabled: true
+  enabled: true # Enable Ingress to allow external traffic to reach the application.
+  # Annotations for the Ingress resource, often specific to the Ingress controller being used (e.g., Nginx, Traefik).
   annotations:
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: nginx # Example: Specifies that the Nginx Ingress controller should handle this Ingress.
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod" # Example: If using cert-manager for automatic TLS certificates.
   hosts:
-    - host: your-prod-domain.com # FIXME: Update placeholder
+    - host: your-prod-domain.com # FIXME: Replace with your actual production domain name.
       paths:
-        - path: /
-          pathType: ImplementationSpecific
-          service: ui
-          port: 3000
+        - path: / # Route all traffic from the root path.
+          pathType: ImplementationSpecific # Or Prefix, Exact. Depends on Ingress controller behavior.
+          service: ui # Route traffic to the UI service.
+          port: 3000  # Port of the UI service.
+        # - path: /api # Example: If server/API is exposed on a different path.
+        #   pathType: ImplementationSpecific
+        #   service: server
+        #   port: 5329
+  # TLS configuration for enabling HTTPS.
   tls:
-    - secretName: your-prod-tls-secret # FIXME: Update placeholder
+    - secretName: your-prod-tls-secret # FIXME: Replace with the name of the Kubernetes Secret containing your TLS certificate and key for the production domain.
+                                       # This secret is often managed by cert-manager or manually created.
       hosts:
-        - your-prod-domain.com # FIXME: Update placeholder
+        - your-prod-domain.com # FIXME: Replace with your actual production domain name.
 
-# Production secrets are now managed by Vault Secrets Operator (VSO).
-# The configuration for which secrets to fetch from Vault is in values.yaml under vso.secrets.
-# Ensure that vso.enabled is true below and that your Vault instance contains
-# the production secrets at the paths specified in vso.secrets (e.g., secret/data/vrooli/postgres).
+# --- Secrets Management for Production (via VSO) ---
+# Production secrets (e.g., database passwords, API keys, JWT keys) are managed by the Vault Secrets Operator (VSO).
+# The base configuration for which secrets to fetch from Vault is defined in `values.yaml` under the `vso.secrets` section.
+# This section in `values-prod.yaml` ensures VSO is enabled and can override specific Vault paths if production secrets
+# are stored in different locations within Vault compared to development/default paths.
+
+# Legacy secrets block (commented out as VSO is preferred):
 # # secrets:
 # #   DB_PASSWORD: "CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE"
 # #   JWT_PRIVATE_KEY: |
@@ -54,34 +79,45 @@ ingress:
 # #   # POSTGRES_DB: "vrooli_prod_db" # Example: Add if your app needs it via env var from secret
 # #   # POSTGRES_USER: "vrooli_prod_user" # Example
 
-# Enable Vault Secrets Operator for production
+# --- Vault Secrets Operator (VSO) Configuration for Production ---
 vso:
-  enabled: true
-  # Production-specific VSO overrides can go here if needed.
-  # For example, if using a different Vault role or address for prod:
-  # vaultAddr: "http://prod-vault.example.com:8200"
-  # k8sAuthRole: "vrooli-app-prod"
-  # It is highly recommended to use different Vault paths for production secrets.
-  # Ensure these paths are correctly populated in your production Vault instance.
-  secrets: # You can override specific secret paths for production here
-    postgres:
-      vaultPath: "secret/data/vrooli-prod/postgres" # Example: Ensure this path is correct for prod
-    app:
-      vaultPath: "secret/data/vrooli-prod/app-config"   # Example: Ensure this path is correct for prod
-    dockerhub:
-      vaultPath: "secret/data/vrooli-prod/dockerhub-creds" # Example: Ensure this path is correct for prod
+  enabled: true # Ensure VSO is enabled for production to manage secrets securely.
+  # Production-specific VSO overrides can be placed here if needed.
+  # For example, if the production Vault instance has a different address, role, or requires specific secret paths.
+  # vaultAddr: "https://prod-vault.example.com" # Example: Production Vault address (should be secure HTTPS).
+  # k8sAuthRole: "vrooli-app-prod" # Example: A dedicated Vault role for production applications.
 
-# Persistence defaults for stateful services (override storageClass as needed)
+  # It is highly recommended to use different Vault paths for production secrets to isolate them from other environments.
+  # Ensure these paths are correctly populated in your production Vault instance and are accessible by the `k8sAuthRole`.
+  secrets: # Override specific secret paths for production here.
+    postgres:
+      # Path in Vault for PostgreSQL credentials specific to the production environment.
+      vaultPath: "secret/data/vrooli-prod/postgres" # FIXME: Ensure this path is correct for your production Vault setup.
+    # redis: # Assuming redis uses the same vso.secrets.redis.vaultPath from values.yaml unless overridden
+    #   vaultPath: "secret/data/vrooli-prod/redis"
+    app:
+      # Path in Vault for general application secrets specific to production.
+      vaultPath: "secret/data/vrooli-prod/app-config"   # FIXME: Ensure this path is correct for your production Vault setup.
+    dockerhub:
+      # Path in Vault for Docker Hub credentials, potentially using a production-specific account or token.
+      vaultPath: "secret/data/vrooli-prod/dockerhub-creds" # FIXME: Ensure this path is correct for your production Vault setup.
+
+# --- Persistence Settings for Production ---
+# Configures PersistentVolumeClaims (PVCs) for stateful services in production.
+# It's crucial to use appropriate storage sizes and StorageClasses suitable for production workloads (e.g., SSDs, high IOPS).
 persistence:
   postgres:
     enabled: true
-    size: 1Gi # Consider increasing for production
-    storageClass: "your-prod-ssd-storageclass" # FIXME: Specify appropriate SC for prod
+    size: 10Gi # FIXME: Increase storage size for PostgreSQL based on production data volume. Consider monitoring and auto-scaling if supported.
+    # Specify a StorageClass optimized for production database workloads (e.g., high IOPS SSD).
+    storageClass: "your-prod-ssd-storageclass" # FIXME: Replace with the name of an appropriate StorageClass in your production Kubernetes cluster.
   redis:
     enabled: true
-    size: 512Mi # Consider increasing for production
-    storageClass: "your-prod-fast-storageclass" # FIXME: Specify appropriate SC for prod
+    size: 1Gi  # FIXME: Increase storage size for Redis if using persistence for caching or session data, based on production needs.
+    # Specify a StorageClass optimized for fast caching workloads if Redis persistence is critical.
+    storageClass: "your-prod-fast-storageclass" # FIXME: Replace with the name of an appropriate StorageClass.
   nsfwDetector:
-    enabled: true # Enable NSFW detector in production
-    size: "5Gi" # FIXME: Adjust size as needed for NSFW models/data
+    enabled: true # Enable persistence for NSFW detector if it downloads/caches models or data.
+    size: "10Gi"  # FIXME: Adjust size as needed for NSFW models/data in production.
+    storageClass: "your-prod-standard-storageclass" # FIXME: Specify appropriate StorageClass for model storage.
  
