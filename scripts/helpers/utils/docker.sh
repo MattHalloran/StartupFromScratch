@@ -343,12 +343,14 @@ docker::pull_base_images() {
         base_images=(
             "redis:7.4.0-alpine"
             "pgvector/pgvector:pg15"
+            "steelcityamir/safe-content-ai:1.1.0"
             # add production-only base images here
         )
     else
         base_images=(
             "redis:7.4.0-alpine"
             "pgvector/pgvector:pg15"
+            "steelcityamir/safe-content-ai:1.1.0"
             # add development-only base images here
         )
     fi
