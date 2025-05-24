@@ -261,6 +261,8 @@ build::main() {
                 # Note: Docker commands here are no accident. We need these images stored somewhere so
                 # that the k8s deployment can pull them. We're choosing to store them in Docker Hub.
                 docker::build_artifacts
+
+                export PROJECT_VERSION="$VERSION" # Ensure $VERSION is used for Docker image tagging
                 docker::login_to_dockerhub
                 docker::tag_and_push_images
 
