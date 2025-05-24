@@ -17,7 +17,7 @@ deploy::deploy_k8s() {
     log::error "Kubernetes Helm deployment: target environment (e.g., dev, staging, prod) not specified as the first argument."
     exit 1
   fi
-  log::header "🚀 Starting Kubernetes Helm deployment: env=$target_env"
+  log::header "🚀 Starting Kubernetes Helm deployment: env=$target_env Version=$VERSION"
 
   # Check for Helm
   if ! command -v helm >/dev/null 2>&1; then
@@ -25,36 +25,48 @@ deploy::deploy_k8s() {
     exit 1
   fi
 
-  local chart_path="$var_ROOT_DIR/k8s/chart"
-  local release_name="vrooli-$target_env"
-  local namespace="$target_env" # Use target environment as namespace
-  local base_values_file="$chart_path/values.yaml"
-
-  # Select appropriate values file
-  local env_values_file="$chart_path/values-$target_env.yaml"
-  if [[ ! -f "$env_values_file" ]]; then
-    log::warning "Environment-specific Helm values file '$env_values_file' not found. Only base '$base_values_file' will be used if it exists."
-    # Set env_values_file to empty if not found, so it can be conditionally omitted from helm command if desired,
-    # or ensure the helm command handles a non-existent -f path gracefully (helm usually ignores non-existent -f files)
-    # For simplicity, we'll let helm handle it, or rely on base_values_file only.
-    # A more robust check would ensure at least one values file is valid.
-    env_values_file="" # Helm typically ignores -f for a non-existent file.
+  # --- MODIFIED: Use packaged chart ---
+  local chart_name="vrooli" # Assuming chart name is 'vrooli' as determined in build.sh
+  if [ -z "$VERSION" ]; then
+      log::error "Project version (VERSION) is not set. Cannot locate packaged Helm chart."
+      exit 1 # Or handle error appropriately
   fi
+  # Construct path to the packaged chart .tgz file
+  # Assumes zip::load_artifacts in deploy.sh makes the 'artifacts' dir available under $var_DEST_DIR/$VERSION/
+  # Corrected path based on zip.sh logic (strip-components=1 removes k8s-chart-packages dir level)
+  local packaged_chart_path="${var_DEST_DIR}/${VERSION}/artifacts/${chart_name}-${VERSION}.tgz"
 
-  if [[ ! -f "$base_values_file" ]]; then
-    log::error "Base Helm values file '$base_values_file' not found. Cannot proceed."
+  if [[ ! -f "$packaged_chart_path" ]]; then
+    log::error "Packaged Helm chart not found at: $packaged_chart_path"
+    log::error "Ensure build.sh ran correctly and artifacts.zip.gz was created and unpacked by deploy.sh."
     exit 1
   fi
+  local chart_path="$packaged_chart_path" # Use the .tgz file for helm commands
+  # --- END MODIFIED ---
 
-  log::info "Using Helm chart: $chart_path"
+  local release_name="vrooli-$target_env"
+  local namespace="$target_env" # Use target environment as namespace
+
+  # --- MODIFIED: Values files are inside the chart .tgz, Helm handles this automatically when given a .tgz ---
+  # No need to explicitly point to base_values_file or env_values_file if using a packaged chart.
+  # Helm will use values.yaml from the chart and can still accept overrides via -f for external files if needed,
+  # or --set for specific values. For simplicity, we'll rely on the chart's internal values.yaml
+  # and the --set overrides for image tags.
+  # If you still need to load external values-dev.yaml or values-prod.yaml with a packaged chart,
+  # those files would also need to be part of the artifact bundle and referenced with -f.
+  # For now, this simplification assumes primary config is within the chart or via --set.
+
+  log::info "Using Helm chart package: $chart_path"
+  # --- END MODIFIED ---
+
   log::info "Release name: $release_name"
   log::info "Target namespace: $namespace (will be created if it doesn't exist)"
-  log::info "Using base values file: $base_values_file"
-  if [[ -n "$env_values_file" && -f "$env_values_file" ]]; then
-    log::info "Using environment values file: $env_values_file"
-  fi
+  # log::info "Using base values file: $base_values_file" # Removed, handled by chart package
+  # if [[ -n "$env_values_file" && -f "$env_values_file" ]]; then # Removed
+  #   log::info "Using environment values file: $env_values_file" # Removed
+  # fi
 
-  log::info "Linting Helm chart: $chart_path"
+  log::info "Linting Helm chart package: $chart_path"
   if ! helm lint "$chart_path"; then
     log::error "Helm chart linting failed. Please fix the chart issues before proceeding."
     exit 1
@@ -111,8 +123,6 @@ deploy::deploy_k8s() {
   if helm upgrade --install "$release_name" "$chart_path" \
     --namespace "$namespace" \
     --create-namespace \
-    -f "$base_values_file" \
-    ${env_values_file:+-f "$env_values_file"} \
     "${image_tag_overrides[@]}" \
     --atomic \
     --timeout 10m; then # Wait for resources to be ready, adjust timeout as needed

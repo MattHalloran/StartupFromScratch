@@ -257,13 +257,48 @@ build::main() {
                 docker::save_images "$artifacts_dir"
                 ;;
             k8s)
-                log::info "Building Kubernetes artifacts (stub)"
-                # Note: Docker commands here are no accident. We need these images stored somewhere so 
+                log::info "Building Kubernetes artifacts..."
+                # Note: Docker commands here are no accident. We need these images stored somewhere so
                 # that the k8s deployment can pull them. We're choosing to store them in Docker Hub.
                 docker::build_artifacts
                 docker::login_to_dockerhub
                 docker::tag_and_push_images
-                # TODO: Add remaining k8s build logic
+
+                # --- START NEW K8S BUILD LOGIC ---
+                log::info "Packaging Helm chart..."
+                local chart_source_path="${var_ROOT_DIR}/k8s/chart"
+                local chart_destination_path="${artifacts_dir}/k8s-chart-packages" # Store .tgz in a sub-directory
+
+                if [ ! -d "$chart_source_path" ]; then
+                    log::error "Helm chart source directory not found: $chart_source_path"
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+                mkdir -p "$chart_destination_path"
+
+                # Ensure HELM_VERSION is available, ideally it's the same as PROJECT_VERSION
+                # The `version` variable in build.sh (set as PROJECT_VERSION) should be used.
+                if [ -z "$VERSION" ]; then
+                    log::error "Project version (VERSION) is not set. Cannot package Helm chart."
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+
+                # Get chart name from Chart.yaml to predict the .tgz filename
+                # This requires yq or similar, or a simpler grep if Chart.yaml is simple
+                local chart_name
+                chart_name=$(grep '^name:' "${chart_source_path}/Chart.yaml" | awk '{print $2}')
+                if [ -z "$chart_name" ]; then
+                    log::warning "Could not determine chart name from ${chart_source_path}/Chart.yaml. Using a default or failing."
+                    # Handle error or set a default, e.g. chart_name="vrooli"
+                    chart_name="vrooli" # Defaulting, consider making this more robust
+                fi
+
+                if helm package "$chart_source_path" --version "$VERSION" --app-version "$VERSION" --destination "$chart_destination_path"; then
+                    log::success "Helm chart packaged successfully to $chart_destination_path/${chart_name}-${VERSION}.tgz"
+                else
+                    log::error "Helm chart packaging failed."
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+                # --- END NEW K8S BUILD LOGIC ---
                 ;;
             *)
                 log::warning "Unknown artifact type: $a";
