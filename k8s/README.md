@@ -33,12 +33,9 @@ k8s/
 │   │   ├── deployment.yaml # For ui, server, jobs, nsfwDetector
 │   │   ├── service.yaml    # For ui, server, jobs, nsfwDetector services
 │   │   ├── configmap.yaml  # For general application configuration
-│   │   ├── pvc.yaml        # For PersistentVolumeClaims (e.g., for databases)
 │   │   ├── ingress.yaml    # For exposing services externally
-│   │   ├── postgresql-statefulset.yaml # StatefulSet for PostgreSQL
-│   │   ├── postgresql-service.yaml     # Service for PostgreSQL
-│   │   ├── redis-statefulset.yaml      # StatefulSet for Redis
-│   │   ├── redis-service.yaml          # Service for Redis
+│   │   ├── pgo-postgrescluster.yaml    # CR for CrunchyData PostgreSQL Operator
+│   │   ├── spotahome-redis-failover.yaml # CR for Spotahome Redis Operator
 │   │   ├── vso-auth.yaml         # VaultAuth CR for Vault Secrets Operator
 │   │   ├── vso-connection.yaml   # VaultConnection CR for VSO
 │   │   ├── vso-secrets.yaml      # VaultSecret CRs for VSO (syncs Vault secrets to K8s)
@@ -77,9 +74,8 @@ The primary components of the Helm chart in `k8s/chart/` are:
     *   `deployment.yaml`: Generates Kubernetes Deployments for services like `ui`, `server`, `jobs`, and `nsfwDetector` based on configurations in `values.yaml`.
     *   `service.yaml`: Generates Kubernetes Services to expose the deployments internally within the cluster.
     *   `configmap.yaml`: Creates a ConfigMap for non-sensitive application configuration.
-    *   `postgresql-statefulset.yaml` & `redis-statefulset.yaml`: Define Kubernetes StatefulSets for deploying PostgreSQL and Redis, ensuring stable network identifiers and persistent storage.
-    *   `postgresql-service.yaml` & `redis-service.yaml`: Define Kubernetes Services to expose PostgreSQL and Redis within the cluster.
-    *   `pvc.yaml`: Generates PersistentVolumeClaims for services requiring persistent storage, primarily used by the StatefulSets.
+    *   `pgo-postgrescluster.yaml`: Defines a `PostgresCluster` Custom Resource for the [CrunchyData PostgreSQL Operator (PGO)](https://www.crunchydata.com/products/crunchy-postgresql-for-kubernetes/). PGO manages the deployment, high availability, backups, and other operational aspects of PostgreSQL.
+    *   `spotahome-redis-failover.yaml`: Defines a `RedisFailover` Custom Resource for the [Spotahome Redis Operator](https://github.com/spotahome/redis-operator). This operator manages a Redis master-replica setup with Sentinel for automatic failover.
     *   `ingress.yaml`: Defines Ingress rules for managing external access to the services (e.g., HTTP/HTTPS routing).
     *   `vso-auth.yaml`, `vso-connection.yaml`, `vso-secrets.yaml`: These files define Custom Resources for the [Vault Secrets Operator (VSO)](https://developer.hashicorp.com/vault/docs/platform/k8s/vso). They configure how VSO authenticates with Vault (`VaultAuth`), where Vault is located (`VaultConnection`), and which secrets to sync from Vault into Kubernetes `Secret` objects (`VaultSecret`).
     *   `NOTES.txt`: Contains informative notes displayed to the user after a successful Helm chart installation.
@@ -95,9 +91,9 @@ The number of files in the Helm chart might seem extensive at first, but this mo
 *   **Modularity and Reusability:** Helper templates in `_helpers.tpl` allow for common patterns (like label generation or name formatting) to be defined once and reused across multiple templates, reducing redundancy and ensuring consistency.
 *   **Resource Specialization:** Different Kubernetes resources have distinct schemas, purposes, and lifecycles. For example:
     *   `Deployments` are ideal for stateless applications that can be easily scaled and updated.
-    *   `StatefulSets` (like `postgresql-statefulset.yaml` and `redis-statefulset.yaml`) are essential for stateful applications requiring persistent storage and stable network identities (e.g., databases).
+    *   Stateful applications like PostgreSQL and Redis are managed by dedicated Kubernetes Operators (CrunchyData PGO for PostgreSQL, Spotahome Redis Operator for Redis). These operators utilize Custom Resource Definitions (`PostgresCluster`, `RedisFailover`) defined in `pgo-postgrescluster.yaml` and `spotahome-redis-failover.yaml` respectively. This approach encapsulates complex stateful set management, HA, and operational logic within the operators.
     *   The Vault Secrets Operator (VSO) utilizes its own Custom Resource Definitions (`VaultAuth`, `VaultConnection`, `VaultSecret`), which are naturally managed in separate files according to their specific schemas.
-*   **Configuration Abstraction:** The template files (`templates/`) define the *structure* and *logic* of your application's deployment, while `values.yaml` (and its environment-specific overrides like `values-dev.yaml` and `values-prod.yaml`) provide the *data* and *configuration parameters*. This clear separation allows for deploying the same application with different settings (e.g., for dev, staging, prod) without modifying the core templates.
+*   **Configuration Abstraction:** The template files (`templates/`) define the *structure* and *logic* of your application's deployment, including the Custom Resources for operators. The `values.yaml` (and its environment-specific overrides like `values-dev.yaml` and `values-prod.yaml`) provide the *data* and *configuration parameters* for these operators and other resources. This clear separation allows for deploying the same application with different settings (e.g., for dev, staging, prod) without modifying the core templates.
 *   **Targeted Testing:** Test definitions are logically separated:
     *   `templates/tests/` for Helm's built-in testing framework, allowing for tests that are templatized and run as part of the Helm lifecycle.
     *   `tests/` (at the chart root) for broader, potentially non-templated testing mechanisms like the `test-golden-files.sh` script.
@@ -139,22 +135,22 @@ The following table lists some of the key configurable parameters of the Vrooli 
 | ------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
 | `nameOverride`                        | String to override the chart name component of resource names               | `""`                                        |
 | `fullnameOverride`                    | String to fully override the `Release.Name-chartName` aresource names       | `""`                                        |
-| `image.registry`                      | Global image registry prefix (e.g., `docker.io/myusername`)                 | `"your-registry/your-project"` (FIXME)      |
+| `image.registry`                      | Global image registry (e.g., `docker.io/yourusername`). Combined with service repo names unless repo is a full path. | `docker.io/{{ .Values.dockerhubUsername }}`      |
 | `image.pullPolicy`                    | Global image pull policy for all services                                   | `IfNotPresent`                              |
 | `replicaCount.ui`                     | Number of replicas for the UI service                                       | `1`                                         |
 | `replicaCount.server`                 | Number of replicas for the Server service                                   | `1`                                         |
 | `replicaCount.jobs`                   | Number of replicas for the Jobs service                                     | `1`                                         |
-| `services.ui.repository`              | Image name (without registry) for UI service                              | `ui`                                        |
+| `services.ui.repository`              | Image name or full path for UI service. If name, combined with `image.registry`. | `ui`                                        |
 | `services.ui.tag`                     | Image tag for UI service                                                    | `dev` (typically overridden by env values)  |
 | `services.ui.port`                    | Container port for UI service                                               | `3000`                                      |
-| `services.ui.probes.livenessPath`     | Liveness probe HTTP path for UI service                                     | `/` (or specific health endpoint)           |
-| `services.ui.probes.readinessPath`    | Readiness probe HTTP path for UI service                                    | `/` (or specific health endpoint)           |
-| `services.server.repository`          | Image name (without registry) for Server service                          | `server`                                    |
+| `services.ui.probes.livenessPath`     | Liveness probe HTTP path for UI service                                     | `/healthcheck` (or specific health endpoint)|
+| `services.ui.probes.readinessPath`    | Readiness probe HTTP path for UI service                                    | `/healthcheck` (or specific health endpoint)|
+| `services.server.repository`          | Image name or full path for Server service. If name, combined with `image.registry`. | `server`                                    |
 | `services.server.tag`                 | Image tag for Server service                                                | `dev` (typically overridden by env values)  |
 | `services.server.port`                | Container port for Server service                                           | `5329`                                      |
 | `services.server.probes.livenessPath` | Liveness probe HTTP path for Server service                                 | `/healthcheck`                              |
 | `services.server.probes.readinessPath`| Readiness probe HTTP path for Server service                                | `/healthcheck`                              |
-| `services.jobs.repository`            | Image name (without registry) for Jobs service                            | `jobs`                                      |
+| `services.jobs.repository`            | Image name or full path for Jobs service. If name, combined with `image.registry`. | `jobs`                                      |
 | `services.jobs.tag`                   | Image tag for Jobs service                                                  | `dev` (typically overridden by env values)  |
 | `services.jobs.probes.livenessPath`   | Liveness probe HTTP path for Jobs service                                   | `/healthcheck` (if applicable)              |
 | `services.jobs.probes.readinessPath`  | Readiness probe HTTP path for Jobs service                                  | `/healthcheck` (if applicable)              |
@@ -188,19 +184,32 @@ The following table lists some of the key configurable parameters of the Vrooli 
 
 ### Important Operational Notes (from chart README)
 
-*   **Container Registry & Image Tags:** The Docker image repositories and tags for your services (`server`, `jobs`, `ui`) are configured within the Helm chart's values files (e.g., `values.yaml`, `values-dev.yaml`). Ensure these point to your actual container registry and the correct image versions.
+*   **Container Registry & Image Tags:** The Docker image repositories and tags for your services (`server`, `jobs`, `ui`, `nsfwDetector`) are configured within the Helm chart's values files (e.g., `values.yaml`, `values-dev.yaml`).
+    *   A global registry is defined in `.Values.image.registry` (e.g., `docker.io/yourusername`).
+    *   Each service (under `.Values.services.<serviceName>`) has a `repository` field.
+        *   If `repository` is a simple name (e.g., `server`), it's combined with the global registry (e.g., `docker.io/yourusername/server`).
+        *   If `repository` is a full image path (e.g., `another-registry.com/namespace/image`), it's used directly, ignoring the global registry. This is how the `nsfwDetector` is configured, for example.
+    *   Ensure these settings point to your actual container registry and the correct image versions for each service and environment.
     *Example in `values.yaml` (structure may vary based on chart design):*
     ```yaml
     image:
-      registry: your-registry/your-project # FIXME
+      registry: "docker.io/{{ .Values.dockerhubUsername }}" # Defaults to Docker Hub, using dockerhubUsername
       pullPolicy: IfNotPresent
+
+    dockerhubUsername: "your_dockerhub_username_here" # Change this to your Docker Hub username
+
     services:
       server:
-        repository: server # Appends to image.registry if services.server.repositoryOverride is not set
+        # 'server' will be combined with image.registry: e.g., docker.io/your_dockerhub_username_here/server
+        repository: server
         tag: latest
       ui:
         repository: ui
         tag: latest
+      nsfwDetector:
+        # This is a full path and will be used as-is, ignoring image.registry
+        repository: steelcityamir/safe-content-ai
+        tag: "1.1.0"
     # ... and so on for other services
     ```
 *   **Configuration Values:** Thoroughly review and customize `k8s/chart/values.yaml` and the environment-specific `values-*.yaml` files to match your application's requirements for each environment. This includes database connection strings, API keys, resource requests/limits, replica counts, etc.
@@ -219,14 +228,15 @@ The following table lists some of the key configurable parameters of the Vrooli 
 *   **Health Checks & Probes:** Ensure that the liveness and readiness probes defined in your Helm templates (e.g., in `templates/deployment.yaml`, and configurable via `services.<name>.probes` in `values.yaml`) correctly point to health check endpoints in your applications. The paths like `/healthcheck` or `/` are common defaults but might need adjustment based on your application's specific health endpoints.
 *   **Resource Allocation:** The CPU and memory `requests` and `limits` defined in the chart's templates (and configurable via `services.<name>.resources` in `values.yaml` or environment-specific values files) are crucial for stable operation. Monitor your application's performance and adjust these as needed for each environment.
 *   **Stateful Services (PostgreSQL, Redis):**
-    The chart includes templates for deploying PostgreSQL and Redis as stateful applications using Kubernetes `StatefulSet` resources (`k8s/chart/templates/postgresql-statefulset.yaml`, `k8s/chart/templates/redis-statefulset.yaml`) and corresponding `Service` definitions (`k8s/chart/templates/postgresql-service.yaml`, `k8s/chart/templates/redis-service.yaml`).
-    PersistentVolumeClaims (PVCs) are configured via `k8s/chart/templates/pvc.yaml` and enabled/sized through the `persistence` section in your `values.yaml` file (e.g., `persistence.postgres.enabled`, `persistence.redis.enabled`).
-    This setup ensures that your databases have stable network identifiers and persistent storage, which is crucial for data integrity. Ensure you configure:
-    1.  Their respective sections within `values.yaml` (under `services.postgres` and `services.redis` if they are managed like other services, or dedicated sections like `postgresql` and `redis` if structured differently in your values) for image, port, resources, and any specific environment variables. Check your `values.yaml` for the exact structure.
-    2.  The `replicaCount` for `postgres` and `redis` (typically 1 for simple setups, but can be configured for replication if the images and configurations support it). These might be controlled under `replicaCount.postgres` and `replicaCount.redis` or within their specific service blocks in `values.yaml`.
+    High availability and lifecycle management for PostgreSQL and Redis are handled by dedicated Kubernetes Operators:
+    *   **PostgreSQL:** Managed by the [CrunchyData PostgreSQL Operator (PGO)](https://www.crunchydata.com/products/crunchy-postgresql-for-kubernetes/). Configuration is defined via a `PostgresCluster` Custom Resource, templated in `k8s/chart/templates/pgo-postgrescluster.yaml`. PGO handles instance provisioning, replication, failover, backups (with pgBackRest), and connection pooling (with pgBouncer). Configuration for PGO (instance count, storage, users, backups, etc.) is managed under the `pgoPostgresql` section in your `values.yaml` file.
+    *   **Redis:** Managed by the [Spotahome Redis Operator](https://github.com/spotahome/redis-operator). Configuration is defined via a `RedisFailover` Custom Resource, templated in `k8s/chart/templates/spotahome-redis-failover.yaml`. The operator sets up a master-replica Redis deployment with Sentinel for monitoring and automatic failover. Configuration for the Redis Operator (replica counts, storage, auth, Sentinel settings) is managed under the `spotahomeRedis` section in your `values.yaml` file.
+
+    Persistent storage for these operator-managed services is defined within their respective Custom Resource configurations in `values.yaml` and realized by the operators themselves.
+    Ensure you configure:
+    1.  The `pgoPostgresql` and `spotahomeRedis` sections in your `values.yaml` file (and environment-specific overrides) for images, ports, resources, instance/replica counts, persistence, authentication, and any operator-specific settings.
     Alternatively, if you are using external database services (e.g., managed cloud databases), ensure the chart reflects this:
-    *   Set `persistence.postgres.enabled: false` and `persistence.redis.enabled: false` in your values files to prevent unused PVC creation.
-    *   If the chart deploys PostgreSQL/Redis pods by default (check `services.postgres.enabled` or similar in `values.yaml`), set these to `false` as well.
+    *   Set `pgoPostgresql.enabled: false` and `spotahomeRedis.enabled: false` in your values files.
     *   Manage connection strings to your external databases via secrets (ideally through VSO).
 
 *   **NSFW Detector GPU Usage (if applicable):**
@@ -385,7 +395,9 @@ This section assumes you are deploying to a local Minikube setup, potentially wi
             # values-dev.yaml (or values-local.yaml)
             vso:
               enabled: true
-              vaultAddr: "http://vault.vault.svc.cluster.local:8200" # Default for in-cluster dev Vault
+              # Default for in-cluster dev Vault, assumes Vault service 'vault' in namespace 'vault'.
+              # '.cluster.local' is the default cluster domain, often optional for in-cluster resolution.
+              vaultAddr: "http://vault.vault.svc.cluster.local:8200"
               k8sAuthMount: "kubernetes" # Default k8s auth mount path in Vault
               k8sAuthRole: "vrooli-app"  # Role configured in Vault for your app/VSO
               secrets:

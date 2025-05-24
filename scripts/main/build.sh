@@ -120,7 +120,7 @@ build::parse_arguments() {
         export VERSION="$user_supplied_version_value"
         export VERSION_SPECIFIED_BY_USER="yes"
     else
-        export VERSION=$(get_project_version) # Sets default if no -v flag
+        export VERSION=$(version::get_project_version) # Sets default if no -v flag
         export VERSION_SPECIFIED_BY_USER="no"
     fi
 
@@ -199,7 +199,7 @@ build::main() {
 
     if [ "${VERSION_SPECIFIED_BY_USER}" = "yes" ]; then
         log::info "User specified version '${VERSION}'. Updating project version..."
-        set_project_version "$VERSION"
+        version::set_project_version "$VERSION"
     else
         log::info "Using project version '${VERSION}' from package.json. No explicit version update will be performed by this script."
     fi

@@ -41,6 +41,8 @@ Thumbs.db
 # Bats test helpers (e.g. bats-core)
 scripts/tests/helpers
 scripts/tests/tmp
+scripts/__tests/helpers
+scripts/__tests/tmp
 
 # Source map analytics
 source-tree*.html

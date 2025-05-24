@@ -88,7 +88,7 @@ deploy::parse_arguments() {
 
     # Set default version if not provided
     if [ -z "$VERSION" ]; then
-        VERSION=$(get_project_version "../../package.json") # Assumes get_project_version can take a path
+        VERSION=$(version::get_project_version)
         if [ -z "$VERSION" ]; then
           log::error "Could not determine project version from ../../package.json. Please specify with -v."
           exit "$ERROR_CONFIGURATION"

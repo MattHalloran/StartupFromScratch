@@ -1,52 +1,38 @@
 # values-dev.yaml
-# This file contains configuration overrides specifically for the DEVELOPMENT environment.
-# It is used in conjunction with the base `values.yaml` file.
-# When deploying to a development environment, Helm will merge the values from this file
-# over the defaults in `values.yaml`, allowing for environment-specific settings without
-# modifying the base configuration.
+# This file contains configuration overrides specifically for the DEVELOPMENT environment,
+# aiming for a lighter setup compared to the HA-ready defaults in values.yaml.
 
-# --- General Configuration Overrides ---
-config:
-  # Sets the environment identifier to 'development'.
-  # Applications can use this to enable debug modes, connect to development databases, etc.
-  env: development
+# General config (already in values.yaml, but can be reiterated if desired)
+# config:
+#   env: development
 
-# --- Image Tag Overrides for Development ---
-# Specifies 'dev' tags for services in the development environment.
-# This allows using images specifically built for development (e.g., with debug symbols, hot reloading).
-services:
-  ui:
-    tag: dev
-  server:
-    tag: dev
-  jobs:
-    tag: dev
-  # Note: nsfwDetector, postgresql, redis, adminer will use tags from values.yaml unless overridden here.
+# Reduce replicas for resource-intensive stateful sets in dev
+pgoPostgresql:
+  instances:
+    count: 1 # Single PostgreSQL instance for dev
+    storage:
+      size: "2Gi" # Smaller storage for dev Postgres
+  pgBouncer:
+    replicas: 1 # Single pgBouncer for dev
+  # Backups can use default PVC for dev (from values.yaml)
 
-# --- Ingress Configuration for Development ---
-# Ingress is typically disabled by default in development environments,
-# as services might be accessed via `kubectl port-forward` or NodePort services.
-ingress:
-  enabled: false
+spotahomeRedis:
+  redis:
+    replicas: 1 # Single Redis instance for dev
+    storage:
+      persistentVolumeClaim:
+        spec:
+          resources:
+            requests:
+              storage: "1Gi" # Smaller storage for dev Redis
+  sentinel:
+    replicas: 1 # Minimal Sentinels for dev (operator might require at least 1)
+  # keepAfterDeletion for Redis PVCs can remain false for dev (from values.yaml)
 
-# --- Vault Secrets Operator (VSO) Configuration for Development ---
-# Enable VSO integration for development environments.
-# This assumes a VSO instance and a Vault instance are available and configured for development use.
-vso:
-  enabled: true # Enable VSO to manage secrets.
-  # Development-specific VSO overrides can be placed here if needed.
-  # For example, if the development Vault instance has a different address, role, or secret paths:
-  # vaultAddr: "http://dev-vault.internal:8200" # Example: Different Vault address for dev.
-  # k8sAuthRole: "vrooli-app-dev" # Example: Different Vault role for dev.
-  # secrets:
-  #   postgres:
-  #     # Path in Vault for PostgreSQL credentials specific to the development environment.
-  #     vaultPath: "secret/data/vrooli-dev/postgres"
-  #   redis:
-  #     vaultPath: "secret/data/vrooli-dev/redis"
-  #   app:
-  #     # Path in Vault for general application secrets specific to development.
-  #     vaultPath: "secret/data/vrooli-dev/app-config"
-  #   dockerhub:
-  #     # Path in Vault for Docker Hub credentials, potentially using a dev-specific account or token.
-  #     vaultPath: "secret/data/vrooli-dev/dockerhub-creds" 
+# VSO is enabled by default in values.yaml, which is fine for dev.
+# vso:
+#   enabled: true
+
+# Adminer is enabled by default in values.yaml, which is fine for dev.
+# adminer:
+#   enabled: true

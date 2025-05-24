@@ -22,91 +22,140 @@ metadata:
     {{- include "vrooli.labels" $ | nindent 4 }}
     {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 4 }}
 spec:
-  replicas: {{ index $.Values.replicaCount $name }}
+  replicas: {{ index $.Values.replicaCount $name | default 1 }}
   selector:
     matchLabels:
       {{- include "vrooli.selectorLabels" $ | nindent 6 }}
-      {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 6 }}
-  strategy:
-    type: RollingUpdate
+      app.kubernetes.io/component: {{ $name }}
   template:
     metadata:
       labels:
         {{- include "vrooli.selectorLabels" $ | nindent 8 }}
-        {{- include "vrooli.componentLabels" (dict "componentName" $name "root" $) | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
     spec:
-      {{- /* Add imagePullSecrets if VSO is enabled and dockerhub secret is configured */}}
-      {{- if and $.Values.vso.enabled $.Values.vso.secrets.dockerhub $.Values.vso.secrets.dockerhub.enabled }}
+      {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:
-        - name: {{ $.Values.vso.secrets.dockerhub.k8sSecretName }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
+      serviceAccountName: {{ include "vrooli.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ $name }}
-          {{- $imageTag := $svc.tag | default $.Chart.AppVersion }}
-          {{- $finalImage := "" }}
-          {{- if $svc.repositoryOverride }}
-            {{- $finalImage = printf "%s:%s" $svc.repositoryOverride $imageTag -}}
-          {{- else }}
-            {{- if contains "/" $svc.repository }}
-              {{- $finalImage = printf "%s:%s" $svc.repository $imageTag -}}
-            {{- else }}
-              {{- $finalImage = printf "%s/%s:%s" $.Values.image.registry $svc.repository $imageTag -}}
-            {{- end }}
-          {{- end }}
-          image: "{{ $finalImage }}"
-          imagePullPolicy: {{ $.Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.registry }}/{{ $svc.repository }}:{{ $svc.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ $svc.port }}
+            - name: http # Assuming all services expose an HTTP port, adjust if not
+              containerPort: {{ $svc.port }}
+              protocol: TCP
           env:
             - name: ENV
-              value: "{{ $.Values.config.env }}"
-          {{- if and $.Values.vso.enabled $.Values.vso.secrets.app .Values.vso.secrets.app.enabled }}
-          envFrom:
-            - secretRef:
-                name: {{ $.Values.vso.secrets.app.k8sSecretName }}
+              value: {{ $.Values.config.env | quote }}
+            {{- if and (or (eq $name "server") (eq $name "jobs")) $.Values.pgoPostgresql.enabled }}
+            # PGO PostgreSQL Connection Details
+            - name: POSTGRES_HOST
+              value: {{ printf "%s-primary" $.Values.pgoPostgresql.clusterName }} # Default primary service name convention for PGO
+            - name: POSTGRES_PORT
+              value: "5432" # PGO default
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName (index $.Values.pgoPostgresql.users 0).name }} # PGO default secret name for user
+                  key: user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName (index $.Values.pgoPostgresql.users 0).name }}
+                  key: password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName (index $.Values.pgoPostgresql.users 0).name }}
+                  key: dbname # PGO user secret also contains the initial database name
+            {{- end }}
+
+            {{- if and (or (eq $name "server") (eq $name "jobs")) $.Values.spotahomeRedis.enabled }}
+            # Spotahome Redis (Sentinel) Connection Details
+            - name: REDIS_SENTINEL_HOSTS
+              value: "rfs-{{ $.Values.spotahomeRedis.name }}" # Service name for Sentinels created by Spotahome operator
+            - name: REDIS_SENTINEL_PORT
+              value: "26379" # Default Sentinel port
+            - name: REDIS_MASTER_NAME
+              value: "mymaster" # Default master name used by Spotahome operator, verify if changed in Sentinel config
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.spotahomeRedis.auth.secretPath }}
+                  key: password # Assuming the secret has a 'password' key
+            {{- end }}
+
+            {{- if $svc.env }}
+            {{- range $key, $value := $svc.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+          {{- with $svc.probes }}
+          {{- if .useTcpSocket }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ $svc.port }}
+            initialDelaySeconds: {{ .initialDelaySeconds | default 15 }}
+            periodSeconds: {{ .periodSeconds | default 20 }}
+            timeoutSeconds: {{ .timeoutSeconds | default 5 }}
+            failureThreshold: {{ .failureThreshold | default 3 }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ $svc.port }}
+            initialDelaySeconds: {{ .initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .periodSeconds | default 10 }}
+            timeoutSeconds: {{ .timeoutSeconds | default 5 }}
+            failureThreshold: {{ .failureThreshold | default 3 }}
+          {{- else }}
+          livenessProbe:
+            httpGet:
+              path: {{ .livenessPath | default "/healthz" }}
+              port: http
+            initialDelaySeconds: {{ .initialDelaySeconds | default 15 }}
+            periodSeconds: {{ .periodSeconds | default 20 }}
+            timeoutSeconds: {{ .timeoutSeconds | default 5 }}
+            failureThreshold: {{ .failureThreshold | default 3 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .readinessPath | default "/readyz" }}
+              port: http
+            initialDelaySeconds: {{ .initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .periodSeconds | default 10 }}
+            timeoutSeconds: {{ .timeoutSeconds | default 5 }}
+            failureThreshold: {{ .failureThreshold | default 3 }}
+          {{- end }}
           {{- end }}
           resources:
-            requests:
-              cpu: {{ $svc.resources.requests.cpu }}
-              memory: {{ $svc.resources.requests.memory }}
-            limits:
-              cpu: {{ $svc.resources.limits.cpu }}
-              memory: {{ $svc.resources.limits.memory }}
-            {{- if and (eq $name "nsfwDetector") $svc.gpu.enabled }}
-              {{ $svc.gpu.type | default "nvidia.com/gpu" }}: {{ $svc.gpu.count | default 1 }}
-            {{- end }}
-        {{- if $svc.probes.useTcpSocket }}
-          readinessProbe:
-            tcpSocket:
-              port: {{ $svc.port }}
-            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 10 }}
-            periodSeconds: {{ $svc.probes.periodSeconds | default 10 }}
-            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
-            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
-          livenessProbe:
-            tcpSocket:
-              port: {{ $svc.port }}
-            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 30 }}
-            periodSeconds: {{ $svc.probes.periodSeconds | default 20 }}
-            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
-            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
-        {{- else }}
-          readinessProbe:
-            httpGet:
-              path: {{ $svc.probes.readinessPath | default "/healthcheck" }}
-              port: {{ $svc.port }}
-            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 10 }}
-            periodSeconds: {{ $svc.probes.periodSeconds | default 10 }}
-            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
-            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
-          livenessProbe:
-            httpGet:
-              path: {{ $svc.probes.livenessPath | default "/healthcheck" }}
-              port: {{ $svc.port }}
-            initialDelaySeconds: {{ $svc.probes.initialDelaySeconds | default 30 }}
-            periodSeconds: {{ $svc.probes.periodSeconds | default 20 }}
-            timeoutSeconds: {{ $svc.probes.timeoutSeconds | default 5 }}
-            failureThreshold: {{ $svc.probes.failureThreshold | default 3 }}
-        {{- end }}
-{{- end }}{{/* if $serviceEnabled */}}
+            {{- toYaml $svc.resources | nindent 12 }}
+          {{- if and (eq $name "nsfwDetector") $svc.gpu.enabled }}
+          limits:
+            {{ $svc.gpu.resourceKey | default "nvidia.com/gpu" }}: {{ $svc.gpu.count | default 1 }}
+          {{- end }}
+          {{- if and (eq $name "nsfwDetector") $svc.gpu.enabled }}
+          volumeMounts:
+            - name: dshm # Required by some CUDA applications
+              mountPath: /dev/shm
+          {{- end }}
+      {{- if and (eq $name "nsfwDetector") $svc.gpu.enabled }}
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+      {{- with $svc.gpu }}
+      {{- if .enabled }}
+      {{- if .nodeSelector }}
+      nodeSelector:
+        {{- toYaml .nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+{{- end }}
 {{- end }} 

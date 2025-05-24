@@ -13,14 +13,14 @@ type: application
 version: 0.1.0
 # The version of the application being deployed by this chart. Also follows SemVer.
 # This can be independent of the chart's version if, for example, you update the app without changing the chart structure.
-appVersion: "0.1.0"
+appVersion: "0.1.0" # Changed automatically during build process by version.sh
 # Chart maintainer metadata
 # Lists the individuals or teams responsible for maintaining this Helm chart.
 maintainers:
   - name: Vrooli Team
-    email: team@vrooli.example.com
+    email: support@vrooli.com
 # Define which K8s API versions this chart supports
 # Specifies the compatible Kubernetes versions. Helm will check this during installation.
 kubeVersion: ">=1.19.0-0"
 # A URL to an icon file that represents the application.
-icon: https://www.example.com/vrooli-icon.png # Placeholder icon 
+icon: https://vrooli.com/favicon.ico

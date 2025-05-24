@@ -116,10 +116,18 @@ Vrooli is designed to use HashiCorp Vault for secrets management, integrated int
     *   **Refer extensively to your project's `k8s/README.md` file.** It contains detailed information and configurations for setting up VSO, `VaultAuth`, `VaultConnection`, and `VaultSecret` resources.
 
 ### c. Persistent Storage
-Vrooli's PostgreSQL and Redis instances (if deployed as part of the chart) require persistent storage.
-*   Managed Kubernetes services like DOKS provide default `StorageClass` resources. DigitalOcean Block Storage is typically used.
-*   Your Helm chart (`k8s/chart/templates/pvc.yaml` and the `persistence` sections in `values.yaml`) defines PersistentVolumeClaims (PVCs). These should automatically bind to available persistent storage in DOKS using the default storage class.
-*   If you encounter issues, you might need to check the available storage classes in your cluster (`kubectl get storageclass`) and ensure your PVCs or `values.yaml` specify a valid one if the default is not suitable.
+PostgreSQL (managed by PGO) and Redis (managed by Spotahome Operator) require persistent storage. Configuration for this is handled within their respective sections (`pgoPostgresql` and `spotahomeRedis`) in the Helm chart's `values.yaml`.
+*   Managed Kubernetes services like DOKS provide default `StorageClass` resources (e.g., using DigitalOcean Block Storage). The operators will typically use these defaults if no specific `storageClassName` is provided in the `values.yaml` for their storage requests.
+*   **PostgreSQL Backups (pgBackRest with PGO):**
+    *   The default configuration in `values.yaml` for PGO's pgBackRest uses a PersistentVolumeClaim (PVC) for storing backups. This is suitable for development and testing.
+    *   **For production environments, it is critical to configure pgBackRest to use external, durable object storage like AWS S3, Google Cloud Storage (GCS), or Azure Blob Storage.** This ensures backup data is safe from cluster-level failures.
+    *   To do this, you would need to:
+        1.  Set up an S3 bucket (or equivalent) and create appropriate access credentials (e.g., IAM user/role with necessary S3 permissions).
+        2.  Store these credentials securely, for example, in HashiCorp Vault, and configure VSO to sync them as a Kubernetes Secret.
+        3.  Modify the `pgoPostgresql.backups.pgBackRest.repos` section in your `values-prod.yaml` to define an S3 repository type, referencing the bucket name, region, endpoint (if not AWS S3 standard), and the Kubernetes Secret containing the credentials. Refer to the [Crunchy Data PGO documentation](https://access.crunchydata.com/documentation/postgres-operator/latest/tutorial/backups/) for detailed S3 configuration examples.
+*   **Redis Persistence:**
+    *   The Spotahome Redis Operator also uses PVCs for Redis data. Ensure the `spotahomeRedis.redis.storage.keepAfterDeletion` is set to `true` in `values-prod.yaml` to prevent data loss if the `RedisFailover` custom resource is accidentally deleted.
+*   If you encounter issues with PVC binding, check available storage classes (`kubectl get storageclass`) and ensure your `values.yaml` (or environment-specific overrides) correctly specify a `storageClassName` if the default is not suitable.
 
 ### d. Ingress Controller (for External Access)
 To expose Vrooli services (especially the UI and server API) to the internet via HTTP/HTTPS, you'll typically use an Ingress controller.
@@ -222,4 +230,52 @@ After the `deploy.sh` script completes, use `kubectl` to check the status of you
     *   If `helm upgrade --install` fails, `deploy::deploy_k8s.sh` attempts to show `helm status` and `helm history`. Review this output.
     *   Common Helm issues: Templating errors in the chart, incorrect values in `values.yaml`, CRDs not yet available in the cluster.
 
-This guide should provide a solid starting point for deploying Vrooli to a managed Kubernetes cluster. Remember to consult the specific documentation for your chosen cloud provider and the Vrooli project's `k8s/README.md` for more detailed configuration options. 
+This guide should provide a solid starting point for deploying Vrooli to a managed Kubernetes cluster. Remember to consult the specific documentation for your chosen cloud provider and the Vrooli project's `k8s/README.md` for more detailed configuration options.
+
+## 9. Future Steps: Global Distribution with GSLB
+
+As Vrooli grows and requires a global presence with higher availability and lower latency for users in different parts of the world, you'll need to consider solutions that operate above individual Kubernetes clusters. Single Kubernetes clusters, even highly available ones within a region, are typically bound to that specific geographic location.
+
+**Global Server Load Balancing (GSLB)** is the technology that addresses this. GSLB solutions distribute user traffic across multiple, geographically dispersed application endpoints, which in this case would be your Vrooli deployments running in Kubernetes clusters in different regions (e.g., one DOKS cluster in North America, another in Europe, and one in Asia).
+
+### Benefits of GSLB for Vrooli:
+
+*   **Improved Availability & Disaster Recovery:** If one regional cluster becomes unavailable (e.g., due to a datacenter outage), GSLB can automatically redirect traffic to healthy clusters in other regions, minimizing downtime.
+*   **Lower Latency:** Users can be directed to the cluster geographically closest to them, reducing request times and improving their experience.
+*   **Increased Capacity:** Distributes the load across multiple clusters, allowing Vrooli to handle a larger number of concurrent users.
+
+### k8gb: A Kubernetes-Native GSLB Solution
+
+One promising open-source solution for implementing GSLB in a Kubernetes environment is **k8gb** ([http://www.k8gb.io/](http://www.k8gb.io/)).
+
+Key features of k8gb relevant to Vrooli could include:
+
+*   **DNS-Based Load Balancing:** It uses the robust and widely adopted DNS protocol to direct traffic.
+*   **Cloud-Native:** Designed to work natively with Kubernetes. Configuration is managed via a `Gslb` Custom Resource Definition (CRD) within your clusters.
+*   **Multiple Strategies:** Supports strategies like:
+    *   **Failover:** Designate a primary region and one or more backup regions. Traffic automatically fails over if the primary becomes unhealthy.
+    *   **GeoIP:** Route users to the nearest cluster based on their IP address (often requires integration with a DNS provider that supports this).
+*   **Health Checks:** Utilizes Kubernetes Liveness and Readiness probes to determine the health of your Vrooli application in each cluster, making informed load balancing decisions.
+*   **No Single Point of Failure:** k8gb is designed to be decentralized, avoiding a single management cluster that could bring down the GSLB capabilities.
+
+### How k8gb Might Work with Vrooli on DOKS:
+
+1.  **Multiple DOKS Clusters:** You would set up Vrooli on DOKS clusters in different DigitalOcean regions (e.g., `NYC1`, `AMS3`, `SGP1`).
+2.  **k8gb Installation:** Install k8gb in each of these DOKS clusters.
+3.  **DNS Integration:** k8gb needs to integrate with an external DNS provider (e.g., DigitalOcean DNS, AWS Route53, Cloudflare, etc.) that it can control to update DNS records based on cluster health and the chosen GSLB strategy.
+4.  **Gslb CRD Configuration:** You would define `Gslb` resources in your clusters. This CRD would specify:
+    *   The Vrooli Ingress or Service to be globally load-balanced.
+    *   The GSLB strategy (e.g., failover, round-robin between geo-tagged clusters).
+    *   Geo tags for your clusters (e.g., `us-east`, `eu-central`).
+    *   Details for your DNS provider integration.
+
+When a user tries to access Vrooli, their DNS query would be resolved by the k8gb-managed DNS records, directing them to the most appropriate regional DOKS cluster running Vrooli based on the configured strategy and real-time health checks.
+
+### Considerations for Implementing GSLB:
+
+*   **Data Replication and Synchronization:** If Vrooli uses stateful components like PostgreSQL, you'll need a strategy for replicating or synchronizing data across regions. This is a complex topic on its own and critical for a truly globally distributed application. Solutions might involve asynchronous replication, multi-master databases, or application-level logic for data sharding/federation.
+*   **DNS Propagation Times:** DNS changes can take time to propagate globally, which can affect how quickly failover occurs.
+*   **Complexity:** Managing a multi-cluster, globally distributed application adds operational complexity compared to a single-cluster setup.
+*   **Cost:** Running multiple clusters and potentially more sophisticated database replication setups will incur higher costs.
+
+Implementing GSLB with k8gb would be a significant architectural step, suitable when Vrooli needs to scale beyond a single region. It offers a powerful way to build a highly resilient and performant global application on Kubernetes. 

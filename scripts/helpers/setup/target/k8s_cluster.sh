@@ -195,6 +195,78 @@ k8s_cluster::install_vso_helm_chart() {
     fi
 }
 
+# Install CrunchyData PGO (Postgres Operator) using Helm
+k8s_cluster::install_pgo_operator() {
+    local pgo_namespace="postgres-operator" # Standard namespace for PGO
+    local pgo_release_name="pgo"
+    local pgo_chart_name="crunchydata/pgo"
+    # Specify a version for reproducibility, check CrunchyData for latest stable version
+    # See https://www.crunchydata.com/developers/download-postgres/containers/postgres-operator-5x for latest versions
+    local pgo_chart_version="5.8.2"
+
+    if ! helm status "$pgo_release_name" -n "$pgo_namespace" > /dev/null 2>&1; then
+        log::info "📦 Installing CrunchyData PGO (Postgres Operator) Helm chart..."
+
+        log::info "Adding/Updating CrunchyData Helm repository..."
+        if ! helm repo list | grep -q "crunchydata"; then
+            helm repo add crunchydata https://charts.crunchydata.com || { log::error "Failed to add CrunchyData Helm repository."; return 1; }
+        fi
+        helm repo update crunchydata || { log::error "Failed to update CrunchyData Helm repository."; return 1; }
+
+        if helm install "$pgo_release_name" "$pgo_chart_name" \
+            --version "$pgo_chart_version" \
+            --namespace "$pgo_namespace" \
+            --create-namespace \
+            --wait --timeout 10m; then # Wait for PGO to be ready
+            log::success "CrunchyData PGO Helm chart installed successfully in '$pgo_namespace' namespace."
+        else
+            log::error "Failed to install CrunchyData PGO Helm chart."
+            log::info "Check 'kubectl get pods -n $pgo_namespace' and logs for errors."
+            return 1
+        fi
+    else
+        log::info "CrunchyData PGO (Postgres Operator) seems to be already installed in '$pgo_namespace' namespace."
+    fi
+}
+
+# Install Spotahome Redis Operator using Helm
+k8s_cluster::install_spotahome_redis_operator() {
+    local operator_namespace="redis-operator" # Recommended namespace or choose your own
+    local operator_release_name="spotahome-redis-operator"
+    local operator_chart_name="redis-operator/redis-operator"
+    # Check Spotahome Redis Operator releases for the latest chart version
+    local operator_chart_version="1.2.4" # As of last check, but verify latest stable from their repo
+
+    if ! helm status "$operator_release_name" -n "$operator_namespace" > /dev/null 2>&1; then
+        log::info "📦 Installing Spotahome Redis Operator Helm chart..."
+
+        log::info "Adding/Updating Spotahome Redis Operator Helm repository..."
+        if ! helm repo list | grep -q "redis-operator"; then # Using generic name, ensure it matches actual repo name if different
+            helm repo add redis-operator https://spotahome.github.io/redis-operator || { log::error "Failed to add Spotahome Redis Operator Helm repository."; return 1; }
+        fi
+        helm repo update redis-operator || { log::error "Failed to update Spotahome Redis Operator Helm repository."; return 1; }
+
+        # The operator chart should install its CRD. If not, CRD must be installed first.
+        # kubectl create -f https://raw.githubusercontent.com/spotahome/redis-operator/master/manifests/databases.spotahome.com_redisfailovers.yaml
+        # (Consider pinning CRD to a specific version matching the operator chart version)
+
+        if helm install "$operator_release_name" "$operator_chart_name" \
+            --version "$operator_chart_version" \
+            --namespace "$operator_namespace" \
+            --create-namespace \
+            --wait --timeout 10m; then
+            log::success "Spotahome Redis Operator Helm chart installed successfully in '$operator_namespace' namespace."
+        else
+            log::error "Failed to install Spotahome Redis Operator Helm chart."
+            log::info "Ensure the RedisFailover CRD is installed if the chart doesn't include it or if there are CRD compatibility issues."
+            log::info "Check 'kubectl get pods -n $operator_namespace' and logs for errors."
+            return 1
+        fi
+    else
+        log::info "Spotahome Redis Operator seems to be already installed in '$operator_namespace' namespace."
+    fi
+}
+
 # Configure Vault for Kubernetes authentication (basic dev setup)
 # Assumes Vault is running in dev mode with root token "root"
 k8s_cluster::configure_dev_vault() {
@@ -366,8 +438,17 @@ k8s_cluster::install_kubernetes() {
                 log::error "Skipping Vault configuration due to installation failure."
             fi
             k8s_cluster::install_vso_helm_chart || log::error "Vault Secrets Operator installation failed. VSO-based secrets won't work."
+            # Add PGO installation here for development environments
+            k8s_cluster::install_pgo_operator || log::error "CrunchyData PGO installation failed."
+            k8s_cluster::install_spotahome_redis_operator || log::error "Spotahome Redis Operator installation failed."
         else
             log::info "SECRETS_SOURCE is not 'vault'. Skipping in-cluster Vault and VSO installation."
+            # Consider if PGO should be installed even if Vault is not the secrets source,
+            # if local in-cluster Postgres is desired for development regardless of Vault.
+            # For now, linking it to the Vault/VSO block for simplicity, implying a more "full-featured" dev setup.
+            # If PGO is always desired in dev, move this call outside the 'if secrets_source_lower == vault' block
+            # but still within 'if env::in_development'.
+            # Current placement: PGO is installed if Vault is also being installed for dev.
         fi
     else
         log::info "📦 Configuring production Kubernetes cluster 'vrooli-prod-cluster'..."

@@ -17,9 +17,6 @@ replicaCount:
   ui: 3       # Example: 3 replicas for the UI service for load balancing and HA.
   server: 2   # Example: 2 replicas for the server/API for load balancing and HA.
   jobs: 1     # Example: 1 replica for the jobs service, adjust based on job workload and concurrency needs.
-  adminer: 0  # Adminer (database management tool) is disabled in production for security reasons.
-  postgres: 1 # For a simple setup. Production databases often require more complex HA/replication strategies (e.g., Patroni, cloud provider RDS).
-  redis: 1    # For a simple setup. Production Redis might use clustering or sentinel for HA.
   nsfwDetector: 1 # Number of replicas for the NSFW Detector service in production. Adjust based on load.
 
 # --- Image Tag Overrides for Production ---
@@ -27,14 +24,18 @@ replicaCount:
 # Using 'latest' or mutable tags in production is generally discouraged as it can lead to unpredictable deployments.
 services:
   ui:
-    tag: "0.1.0" # FIXME: Replace with the actual production-ready image tag for the UI service.
+    tag: "0.1.0" # Changed automatically during build process by version.sh
   server:
-    tag: "0.1.0" # FIXME: Replace with the actual production-ready image tag for the server service.
+    tag: "0.1.0" # Changed automatically during build process by version.sh
   jobs:
-    tag: "0.1.0" # FIXME: Replace with the actual production-ready image tag for the jobs service.
+    tag: "0.1.0" # Changed automatically during build process by version.sh
   nsfwDetector:
     enabled: true # Enable the NSFW detector service in the production environment.
     # tag: "1.1.0" # Assuming values.yaml has the correct production tag for nsfwDetector, or override here.
+
+# Disable Adminer in production using the top-level key
+adminer:
+  enabled: false
 
 # --- Ingress Configuration for Production ---
 # Enable and configure Ingress for exposing services externally in production.
@@ -46,7 +47,7 @@ ingress:
     kubernetes.io/ingress.class: nginx # Example: Specifies that the Nginx Ingress controller should handle this Ingress.
     # cert-manager.io/cluster-issuer: "letsencrypt-prod" # Example: If using cert-manager for automatic TLS certificates.
   hosts:
-    - host: your-prod-domain.com # FIXME: Replace with your actual production domain name.
+    - host: do-origin.vrooli.com # The DNS-only domain that traffic is routed to
       paths:
         - path: / # Route all traffic from the root path.
           pathType: ImplementationSpecific # Or Prefix, Exact. Depends on Ingress controller behavior.
@@ -61,7 +62,7 @@ ingress:
     - secretName: your-prod-tls-secret # FIXME: Replace with the name of the Kubernetes Secret containing your TLS certificate and key for the production domain.
                                        # This secret is often managed by cert-manager or manually created.
       hosts:
-        - your-prod-domain.com # FIXME: Replace with your actual production domain name.
+        - do-origin.vrooli.com # The DNS-only domain that traffic is routed to
 
 # --- Secrets Management for Production (via VSO) ---
 # Production secrets (e.g., database passwords, API keys, JWT keys) are managed by the Vault Secrets Operator (VSO).
@@ -69,55 +70,154 @@ ingress:
 # This section in `values-prod.yaml` ensures VSO is enabled and can override specific Vault paths if production secrets
 # are stored in different locations within Vault compared to development/default paths.
 
-# Legacy secrets block (commented out as VSO is preferred):
-# # secrets:
-# #   DB_PASSWORD: "CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE"
-# #   JWT_PRIVATE_KEY: |
-# #     -----BEGIN RSA PRIVATE KEY-----
-# #     CHANGE_ME_IN_CI_SECRETS_OR_VALUES_FILE
-# #     -----END RSA PRIVATE KEY-----
-# #   # POSTGRES_DB: "vrooli_prod_db" # Example: Add if your app needs it via env var from secret
-# #   # POSTGRES_USER: "vrooli_prod_user" # Example
-
-# --- Vault Secrets Operator (VSO) Configuration for Production ---
-vso:
-  enabled: true # Ensure VSO is enabled for production to manage secrets securely.
-  # Production-specific VSO overrides can be placed here if needed.
-  # For example, if the production Vault instance has a different address, role, or requires specific secret paths.
-  # vaultAddr: "https://prod-vault.example.com" # Example: Production Vault address (should be secure HTTPS).
-  # k8sAuthRole: "vrooli-app-prod" # Example: A dedicated Vault role for production applications.
-
-  # It is highly recommended to use different Vault paths for production secrets to isolate them from other environments.
-  # Ensure these paths are correctly populated in your production Vault instance and are accessible by the `k8sAuthRole`.
-  secrets: # Override specific secret paths for production here.
-    postgres:
-      # Path in Vault for PostgreSQL credentials specific to the production environment.
-      vaultPath: "secret/data/vrooli-prod/postgres" # FIXME: Ensure this path is correct for your production Vault setup.
-    # redis: # Assuming redis uses the same vso.secrets.redis.vaultPath from values.yaml unless overridden
-    #   vaultPath: "secret/data/vrooli-prod/redis"
-    app:
-      # Path in Vault for general application secrets specific to production.
-      vaultPath: "secret/data/vrooli-prod/app-config"   # FIXME: Ensure this path is correct for your production Vault setup.
-    dockerhub:
-      # Path in Vault for Docker Hub credentials, potentially using a production-specific account or token.
-      vaultPath: "secret/data/vrooli-prod/dockerhub-creds" # FIXME: Ensure this path is correct for your production Vault setup.
-
 # --- Persistence Settings for Production ---
 # Configures PersistentVolumeClaims (PVCs) for stateful services in production.
 # It's crucial to use appropriate storage sizes and StorageClasses suitable for production workloads (e.g., SSDs, high IOPS).
+# Note: Persistence for PostgreSQL and Redis is primarily managed via their operator-specific sections
+# (pgoPostgresql.instances.storage and spotahomeRedis.redis.storage).
+# The nsfwDetector is configured here if it requires direct PVCs.
 persistence:
-  postgres:
-    enabled: true
-    size: 10Gi # FIXME: Increase storage size for PostgreSQL based on production data volume. Consider monitoring and auto-scaling if supported.
-    # Specify a StorageClass optimized for production database workloads (e.g., high IOPS SSD).
-    storageClass: "your-prod-ssd-storageclass" # FIXME: Replace with the name of an appropriate StorageClass in your production Kubernetes cluster.
-  redis:
-    enabled: true
-    size: 1Gi  # FIXME: Increase storage size for Redis if using persistence for caching or session data, based on production needs.
-    # Specify a StorageClass optimized for fast caching workloads if Redis persistence is critical.
-    storageClass: "your-prod-fast-storageclass" # FIXME: Replace with the name of an appropriate StorageClass.
   nsfwDetector:
     enabled: true # Enable persistence for NSFW detector if it downloads/caches models or data.
-    size: "10Gi"  # FIXME: Adjust size as needed for NSFW models/data in production.
+    size: "1Gi" 
     storageClass: "your-prod-standard-storageclass" # FIXME: Specify appropriate StorageClass for model storage.
+
+# --- CrunchyData PGO PostgreSQL Configuration Overrides for Production ---
+pgoPostgresql:
+  enabled: true # Ensure PGO is enabled for production
+  instances:
+    count: 3 # Ensure 3 replicas for HA in production (1 primary, 2 replicas)
+    storage:
+      size: "100Gi" # Set PostgreSQL data storage size for production
+      storageClass: "your-prod-ssd-storageclass" # FIXME: Replace with your actual production SSD StorageClass
+    # Pod Anti-Affinity for PostgreSQL instances to ensure they are scheduled on different nodes/zones
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: "postgres-operator.crunchydata.com/cluster"
+                  operator: In
+                  values:
+                    - "vrooli-pg" # Matches .Values.pgoPostgresql.clusterName
+                - key: "postgres-operator.crunchydata.com/instance-set" # Label for instance sets in PGO
+                  operator: Exists
+            topologyKey: "kubernetes.io/hostname"
+          # Uncomment and adapt for AZ-level anti-affinity if your cluster spans multiple AZs
+          # - labelSelector:
+          #     matchExpressions:
+          #       - key: "postgres-operator.crunchydata.com/cluster"
+          #         operator: In
+          #         values:
+          #           - "vrooli-pg"
+          #       - key: "postgres-operator.crunchydata.com/instance-set"
+          #         operator: Exists
+          #   topologyKey: "topology.kubernetes.io/zone"
+  pgBouncer:
+    replicas: 2 # Ensure 2 replicas for pgBouncer HA
+  backups:
+    enabled: true
+    pgBackRest:
+      repos:
+        - name: "repo1" # Default repo name
+          # --- S3-based Repository for Production ---
+          # FIXME: Uncomment and configure for S3. Ensure the PVC-based 'volume' config (if any from base values.yaml) is not active for this repo.
+          s3:
+            bucket: "your-vrooli-prod-pgbackrest-s3-bucket" # FIXME: Your S3 bucket name
+            endpoint: "s3.your-region.amazonaws.com"        # FIXME: Your S3 endpoint (e.g., s3.us-east-1.amazonaws.com)
+            region: "your-region"                           # FIXME: e.g., us-east-1
+            # secretName: "pgo-s3-credentials" # FIXME: K8s Secret in {{ .Release.Namespace }} containing AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for pgBackRest S3 access.
+                                               # This secret needs to be created manually or via VSO if PGO supports it.
+            # path: "vrooli-prod/backups" # Optional: path within the bucket
+          # --- PVC-based Repository (Ensure this is NOT used for prod S3 repo) ---
+          # volume: # This should be removed or ensured it's not configured if S3 is active for this repo.
+          #   storage: "5Gi"
+      retentionFullType: "count" # or "time"
+      retentionFullCount: 7      # Keep last 7 full backups - adjust as needed
+
+# --- Spotahome Redis Operator Configuration Overrides for Production ---
+spotahomeRedis:
+  enabled: true # Ensure Spotahome Redis Operator is enabled
+  redis:
+    replicas: 3 # Ensure 3 Redis instances for HA (1 master, 2 replicas)
+    storage:
+      persistentVolumeClaim:
+        spec:
+          resources:
+            requests:
+              storage: "2Gi" # Set Redis storage size for production
+        storageClassName: "your-prod-fast-storageclass" # FIXME: Replace with your actual fast StorageClass for Redis
+      keepAfterDeletion: true # CRITICAL: Keep PVCs when RedisFailover CR is deleted in production
+    # Pod Anti-Affinity for Redis server pods
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: "app.kubernetes.io/name" # Adjust label key based on Spotahome operator's pod labels
+                  operator: In
+                  values:
+                    - {{ printf "%s-%s" .Release.Name .Values.spotahomeRedis.name | trunc 63 | trimSuffix "-" }} # Default Helm name construction for the RedisFailover resource
+                - key: "databases.spotahome.com/component" # Label often used by Spotahome
+                  operator: In
+                  values: ["redis"]
+            topologyKey: "kubernetes.io/hostname"
+          # Uncomment and adapt for AZ-level anti-affinity if your cluster spans multiple AZs
+          # - labelSelector:
+          #     matchExpressions:
+          #       - key: "app.kubernetes.io/name"
+          #         operator: In
+          #         values:
+          #           - {{ printf "%s-%s" .Release.Name .Values.spotahomeRedis.name | trunc 63 | trimSuffix "-" }}
+          #       - key: "databases.spotahome.com/component"
+          #         operator: In
+          #         values: ["redis"]
+          #   topologyKey: "topology.kubernetes.io/zone"
+  sentinel:
+    replicas: 3 # Ensure 3 Sentinel instances for quorum
+    # Pod Anti-Affinity for Sentinel pods
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: "app.kubernetes.io/name" # Adjust label key based on Spotahome operator's pod labels
+                  operator: In
+                  values:
+                    - {{ printf "%s-%s" .Release.Name .Values.spotahomeRedis.name | trunc 63 | trimSuffix "-" }}
+                - key: "databases.spotahome.com/component" # Label often used by Spotahome
+                  operator: In
+                  values: ["sentinel"]
+            topologyKey: "kubernetes.io/hostname"
+          # Uncomment and adapt for AZ-level anti-affinity
+          # - labelSelector:
+          #     matchExpressions:
+          #       - key: "app.kubernetes.io/name"
+          #         operator: In
+          #         values:
+          #           - {{ printf "%s-%s" .Release.Name .Values.spotahomeRedis.name | trunc 63 | trimSuffix "-" }}
+          #       - key: "databases.spotahome.com/component"
+          #         operator: In
+          #         values: ["sentinel"]
+          #   topologyKey: "topology.kubernetes.io/zone"
+
+# --- Vault Secrets Operator (VSO) Configuration ---
+vso:
+  enabled: true
+  # vaultAddr: "https://prod-vault.your-domain.com" # FIXME: Uncomment and set your production Vault address
+  # k8sAuthRole: "vrooli-app-prod" # FIXME: Uncomment and set your production Vault role
+  secrets:
+    postgres:
+      enabled: false # Keep false as PGO manages its own user secrets
+      # vaultPath: "secret/data/vrooli-prod/postgres" # Path from existing values-prod.yaml
+    redis:
+      enabled: true # Ensure Redis VSO secret sync is enabled
+      vaultPath: "secret/data/vrooli-prod/redis" # FIXME: Ensure this path is correct
+      k8sSecretName: "vrooli-redis-auth" # Must match spotahomeRedis.auth.secretPath
+    app:
+      enabled: true
+      vaultPath: "secret/data/vrooli-prod/app-config"   # FIXME: Ensure this path is correct
+    dockerhub:
+      enabled: true
+      vaultPath: "secret/data/vrooli-prod/dockerhub-creds" # FIXME: Ensure this path is correct
  
