@@ -460,35 +460,57 @@ docker::tag_and_push_images() {
         log::error "DOCKERHUB_USERNAME must be set."
         exit "$ERROR_DOCKER_LOGIN_FAILED"
     fi
-    if [ -z "${PROJECT_VERSION:-}" ]; then
-        log::warning "PROJECT_VERSION is not set. Using 'latest' as the tag."
-        PROJECT_VERSION="latest"
+    
+    local current_version="${PROJECT_VERSION:-}" # Use PROJECT_VERSION set by build.sh
+    if [ -z "$current_version" ]; then
+        log::warning "PROJECT_VERSION is not set by the calling script (e.g., build.sh). Using 'latest' as the version tag."
+        current_version="latest"
     fi
   
     local services=("server" "ui" "jobs") # Define services with Docker images
     local image_name # local variable for image name
-    local docker_image_tag # local variable for docker image tag
+    local version_tag # specific version tag
+    local floating_tag # dev or prod tag
+
+    # Determine the floating tag (dev/prod) based on the global ENVIRONMENT variable
+    # env::in_production sources this global variable
+    if env::in_production; then # env::in_production doesn't take an argument, uses global $ENVIRONMENT
+        floating_tag="prod"
+    else
+        floating_tag="dev"
+    fi
   
     for service in "${services[@]}"; do
         image_name="@vrooli/${service}" # This is the local image name convention used by pnpm + Docker
-        docker_image_tag="${DOCKERHUB_USERNAME}/${service}:${PROJECT_VERSION}"
-    
-        log::info "Tagging image ${image_name} as ${docker_image_tag}"
-        if ! docker tag "${image_name}" "${docker_image_tag}"; then
-            log::error "Failed to tag image ${image_name}. Does the local image exist?"
-            # Optionally, attempt to build if not found, or simply error out.
-            # For now, we assume images are built by prior 'pnpm run build' steps which should create them.
-            # Example: pnpm --filter @vrooli/server build should create @vrooli/server
-            # Docker build commands within package.json scripts should name images like @vrooli/server, not just 'server'
-            continue # Skip to next service if tagging fails
+        
+        # Tag with specific version
+        version_tag="${DOCKERHUB_USERNAME}/${service}:${current_version}"
+        log::info "Tagging image ${image_name} as ${version_tag}"
+        if ! docker tag "${image_name}" "${version_tag}"; then
+            log::error "Failed to tag image ${image_name} with version ${current_version}. Does the local image exist?"
+            continue 
         fi
     
-        log::info "Pushing image ${docker_image_tag} to Docker Hub..."
-        if ! docker push "${docker_image_tag}"; then
-            log::error "Failed to push image ${docker_image_tag}."
-            # Consider retry logic or specific error handling
+        log::info "Pushing image ${version_tag} to Docker Hub..."
+        if ! docker push "${version_tag}"; then
+            log::error "Failed to push image ${version_tag}."
         else
-            log::success "Successfully pushed ${docker_image_tag}"
+            log::success "Successfully pushed ${version_tag}"
+        fi
+
+        # Tag with floating tag (dev/prod)
+        local floating_tag_full="${DOCKERHUB_USERNAME}/${service}:${floating_tag}"
+        log::info "Tagging image ${image_name} as ${floating_tag_full}"
+        if ! docker tag "${image_name}" "${floating_tag_full}"; then
+            log::error "Failed to tag image ${image_name} with floating tag ${floating_tag}."
+            # This failure is less critical than the versioned tag, so don't continue here necessarily
+        else
+            log::info "Pushing image ${floating_tag_full} to Docker Hub..."
+            if ! docker push "${floating_tag_full}"; then
+                log::error "Failed to push image ${floating_tag_full}."
+            else
+                log::success "Successfully pushed ${floating_tag_full}"
+            fi
         fi
     done
   

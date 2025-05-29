@@ -104,19 +104,27 @@ In essence, the Helm chart's file organization promotes clarity, maintainability
 
 ### Installing the Chart
 
-To deploy the Vrooli application using this Helm chart, you will use commands like `helm install` or `helm upgrade --install`. Detailed examples for development and production deployments, along with other essential Helm and kubectl commands, are provided in the "Common Helm & Kubernetes Commands" section below.
+To deploy the Vrooli application using this Helm chart, you will use commands like `helm install` or `helm upgrade --install`. These commands are orchestrated by our project scripts:
+*   **Local Kubernetes Development (e.g., Minikube):** The `scripts/helpers/develop/target/k8s_cluster.sh` script (invoked by `scripts/main/develop.sh --target k8s-cluster`) deploys the chart directly from the `k8s/chart/` source directory. It typically uses `k8s/chart/values.yaml` as the base and applies overrides from `k8s/chart/values-dev.yaml`.
+*   **Staging/Production Deployments:** The `scripts/main/deploy.sh -s k8s` script uses a packaged Helm chart (`.tgz` file) that was created by `scripts/main/build.sh`.
+    *   The `build.sh` script packages the contents of `k8s/chart/` (including its `values.yaml`).
+    *   Crucially, `build.sh` also copies environment-specific values files (e.g., `k8s/chart/values-dev.yaml`, `k8s/chart/values-prod.yaml`) into a separate location within the build artifact (specifically, to `ARTIFACTS_DIR/helm-value-files/`).
+    *   The `deploy.sh` script (via `scripts/helpers/deploy/k8s.sh`) then uses the packaged chart (`.tgz`) and applies the appropriate environment-specific values file *from the build artifact* (e.g., `ARTIFACTS_DIR/helm-value-files/values-prod.yaml`) using the `-f` flag.
 
-Generally, the process involves:
-1.  Ensuring your `kubectl` is configured to point to the correct Kubernetes cluster (local Minikube, staging, or production).
-2.  Customizing the appropriate values file (`values-dev.yaml` for development, `values-prod.yaml` for production) to match your environment's specific needs (e.g., image tags, resource limits, ingress hostnames, secret paths in Vault).
-3.  Running the `helm install` or `helm upgrade --install` command, specifying your release name, the chart path (`k8s/chart/`), and the relevant values files.
+The general Helm command structure (as used by the scripts) looks similar to this:
+`helm upgrade --install <release-name> <path-to-chart-source-or-package> -f <base-values.yaml> -f <environment-specific-values.yaml> --namespace <target-namespace> --create-namespace`
 
-For instance, the command structure will look similar to this (refer to the common commands section for exact examples):
-`helm upgrade --install <release-name> k8s/chart/ -f k8s/chart/values.yaml -f k8s/chart/values-<env>.yaml --namespace <target-namespace> --create-namespace`
+**Key Takeaway for Values Files:**
+*   For local development targeting Minikube (via `develop.sh`), customizations are made directly in `k8s/chart/values-dev.yaml`.
+*   For staging/production deployments (via `build.sh` then `deploy.sh`), the `values-<env>.yaml` (e.g., `values-prod.yaml`) from the `k8s/chart/` directory at the time of the build is packaged into the deployment artifact and used during the Helm upgrade. Ensure this file is correct before running `build.sh`.
 
 **Important:**
-*   For **production deployments**, always use `values-prod.yaml` and double-check all configurations, especially image tags, resource allocations, secret paths, and external endpoints.
-*   For **development deployments** (e.g., to Minikube or a staging cluster), use `values-dev.yaml`. It's also common to have a `values-local.yaml` (gitignored) for individual developer overrides during local testing.
+*   For **production deployments** (using `deploy.sh`):
+    *   Always ensure the `k8s/chart/values-prod.yaml` in your source code is accurate and committed *before* running `scripts/main/build.sh`. This file's content will be included in the build artifact and used for the production deployment.
+    *   Double-check all configurations, especially image tags, resource allocations, secret paths, and external endpoints within this `values-prod.yaml`.
+    *   The `scripts/helpers/deploy/k8s.sh` script will abort if it's a production deployment and the corresponding `values-prod.yaml` is not found in the build artifact.
+*   For **local development deployments** (e.g., to Minikube via `develop.sh`):
+    *   The script uses `k8s/chart/values-dev.yaml` directly from your workspace.
 
 ### Uninstalling the Chart
 
@@ -141,17 +149,17 @@ The following table lists some of the key configurable parameters of the Vrooli 
 | `replicaCount.server`                 | Number of replicas for the Server service                                   | `1`                                         |
 | `replicaCount.jobs`                   | Number of replicas for the Jobs service                                     | `1`                                         |
 | `services.ui.repository`              | Image name or full path for UI service. If name, combined with `image.registry`. | `ui`                                        |
-| `services.ui.tag`                     | Image tag for UI service                                                    | `dev` (typically overridden by env values)  |
+| `services.ui.tag`                     | Image tag for UI service. **Note:** For deployments via `deploy.sh`, this may be overridden by the script itself. See "Image Tag Management" below. | `dev` (typically overridden by env values)  |
 | `services.ui.port`                    | Container port for UI service                                               | `3000`                                      |
 | `services.ui.probes.livenessPath`     | Liveness probe HTTP path for UI service                                     | `/healthcheck` (or specific health endpoint)|
 | `services.ui.probes.readinessPath`    | Readiness probe HTTP path for UI service                                    | `/healthcheck` (or specific health endpoint)|
 | `services.server.repository`          | Image name or full path for Server service. If name, combined with `image.registry`. | `server`                                    |
-| `services.server.tag`                 | Image tag for Server service                                                | `dev` (typically overridden by env values)  |
+| `services.server.tag`                 | Image tag for Server service. **Note:** For deployments via `deploy.sh`, this may be overridden by the script itself. See "Image Tag Management" below. | `dev` (typically overridden by env values)  |
 | `services.server.port`                | Container port for Server service                                           | `5329`                                      |
 | `services.server.probes.livenessPath` | Liveness probe HTTP path for Server service                                 | `/healthcheck`                              |
 | `services.server.probes.readinessPath`| Readiness probe HTTP path for Server service                                | `/healthcheck`                              |
 | `services.jobs.repository`            | Image name or full path for Jobs service. If name, combined with `image.registry`. | `jobs`                                      |
-| `services.jobs.tag`                   | Image tag for Jobs service                                                  | `dev` (typically overridden by env values)  |
+| `services.jobs.tag`                   | Image tag for Jobs service. **Note:** For deployments via `deploy.sh`, this may be overridden by the script itself. See "Image Tag Management" below. | `dev` (typically overridden by env values)  |
 | `services.jobs.probes.livenessPath`   | Liveness probe HTTP path for Jobs service                                   | `/healthcheck` (if applicable)              |
 | `services.jobs.probes.readinessPath`  | Readiness probe HTTP path for Jobs service                                  | `/healthcheck` (if applicable)              |
 | `config.env`                          | Environment setting (e.g., development, production)                       | `development`                               |
@@ -180,16 +188,20 @@ The following table lists some of the key configurable parameters of the Vrooli 
 | `vso.secrets.redis.vaultPath`         | Vault path for Redis credentials                                            | `secret/data/vrooli/redis`                  |
 | `vso.secrets.redis.k8sSecretName`     | Kubernetes Secret name for Redis credentials                                | `vrooli-redis-creds`                        |
 
-*(This is a subset of parameters. Refer to `k8s/chart/values.yaml`, `values-dev.yaml`, and `values-prod.yaml` for all options and their detailed comments.)*
+*(This is a subset of parameters. Refer to `k8s/chart/values.yaml`, and the source `k8s/chart/values-dev.yaml` and `k8s/chart/values-prod.yaml` files for all options and their detailed comments. The environment-specific files are packaged into build artifacts for deployment.)*
 
 ### Important Operational Notes (from chart README)
 
-*   **Container Registry & Image Tags:** The Docker image repositories and tags for your services (`server`, `jobs`, `ui`, `nsfwDetector`) are configured within the Helm chart's values files (e.g., `values.yaml`, `values-dev.yaml`).
+*   **Container Registry & Image Tags:** The Docker image repositories and tags for your services (`server`, `jobs`, `ui`) are primarily configured within the Helm chart's values files.
+    *   **Values Files:**
+        *   The base `k8s/chart/values.yaml` provides defaults.
+        *   Environment-specific overrides (e.g., image tags, replica counts) should be set in `k8s/chart/values-dev.yaml` (for local/Minikube development via `develop.sh`) and `k8s/chart/values-prod.yaml` (for production deployments via `build.sh` and `deploy.sh`).
+        *   When `scripts/main/build.sh` runs, it copies the `values-<env>.yaml` files from `k8s/chart/` into the build artifact. The `scripts/main/deploy.sh` script then uses this artifact-bundled `values-<env>.yaml` file.
     *   A global registry is defined in `.Values.image.registry` (e.g., `docker.io/yourusername`).
-    *   Each service (under `.Values.services.<serviceName>`) has a `repository` field.
-        *   If `repository` is a simple name (e.g., `server`), it's combined with the global registry (e.g., `docker.io/yourusername/server`).
-        *   If `repository` is a full image path (e.g., `another-registry.com/namespace/image`), it's used directly, ignoring the global registry. This is how the `nsfwDetector` is configured, for example.
     *   Ensure these settings point to your actual container registry and the correct image versions for each service and environment.
+    *   **Image Tag Management for `deploy.sh`:**
+        *   Tags for production deployments are injected into `values-prod.yaml` during the build process when you supply a `--version` flag to `build.sh`. Without `--version`, build.sh uses the version from `package.json` but does not modify Helm chart files.
+        *   No script-based `--set` overrides are applied during deployment; Helm uses the tags defined in the values files.
     *Example in `values.yaml` (structure may vary based on chart design):*
     ```yaml
     image:
@@ -212,19 +224,20 @@ The following table lists some of the key configurable parameters of the Vrooli 
         tag: "1.1.0"
     # ... and so on for other services
     ```
-*   **Configuration Values:** Thoroughly review and customize `k8s/chart/values.yaml` and the environment-specific `values-*.yaml` files to match your application's requirements for each environment. This includes database connection strings, API keys, resource requests/limits, replica counts, etc.
-*   **Secrets Management (Vault Integration):** This chart is designed to integrate with HashiCorp Vault via the Vault Secrets Operator (VSO) for managing sensitive data like API keys and database passwords.
-    *   **Prerequisites:** A running HashiCorp Vault instance (can be in-cluster) and the Vault Secrets Operator must be installed and configured in your Kubernetes cluster.
-    *   **Chart Configuration:**
-        *   Enable VSO integration by setting `.Values.vso.enabled: true` in your values file.
+*   **Configuration Values:**
+    *   Thoroughly review and customize `k8s/chart/values.yaml`.
+    *   For local development via `scripts/main/develop.sh --target k8s-cluster`, edit `k8s/chart/values-dev.yaml` directly.
+    *   For staging/production deployments via `scripts/main/deploy.sh`, ensure `k8s/chart/values-prod.yaml` (or `values-staging.yaml`, etc.) is correct in your source code *before* running `scripts/main/build.sh`. The `build.sh` script will package this file into the build artifact, and `deploy.sh` will use that packaged version.
+    These files manage settings like database connection strings, API keys, resource requests/limits, replica counts, etc.
+*   **Secrets Management (Vault Integration):** This chart is designed to integrate with HashiCorp Vault via the Vault Secrets Operator (VSO) for managing sensitive data.
+    *   **Prerequisites:** A running HashiCorp Vault instance and the Vault Secrets Operator must be installed and configured in your Kubernetes cluster.
+    *   **Helm Chart Configuration:**
+        *   Enable VSO integration by setting `.Values.vso.enabled: true`. This should be done in the appropriate values file (`k8s/chart/values.yaml` or overridden in `k8s/chart/values-<env>.yaml`).
         *   Configure `.Values.vso.vaultAddr` to point to your Vault service.
         *   Specify the Vault role VSO should use via `.Values.vso.k8sAuthRole`.
-        *   Define which secrets to sync under `.Values.vso.secrets` in your `values.yaml`. For each entry, you'll specify the `vaultPath` (where the secret lives in Vault), the `k8sSecretName` (the name of the Kubernetes `Secret` VSO will create), and optionally `dataMappings` if you need to rename keys from Vault to the K8s Secret (see "Local Development Setup" for a `dataMappings` example). The `templates/vso-secrets.yaml` template iterates through these configurations.
-    *   **Workflow:** When deployed, this chart will create `VaultConnection`, `VaultAuth`, and `VaultSecret` custom resources based on the templates in `k8s/chart/templates/`. The VSO controller watches these resources, authenticates to Vault, fetches the specified secrets, and automatically creates or updates standard Kubernetes `Secret` objects in your release namespace.
-    *   **Application Pods:** The application deployments (e.g., `deployment.yaml`, `postgresql-statefulset.yaml`, `redis-statefulset.yaml`) are configured to mount these VSO-managed Kubernetes `Secret` objects to obtain their credentials and configuration.
-    *   **Vault Population:** You are responsible for populating the actual secret data into the correct paths within your HashiCorp Vault instance.
-    *   This approach centralizes secret management in Vault and aligns with best practices. Refer to the comments in `values.yaml` under the `vso` section and the VSO documentation for more details.
-    *   The Kubernetes documentation on [Good practices for Kubernetes Secrets](https://kubernetes.io/docs/concepts/security/secrets-good-practices/) remains a valuable resource for understanding underlying concepts.
+        *   Define which secrets to sync under `.Values.vso.secrets`.
+        *   The `scripts/main/deploy.sh` flow relies on these configurations being correctly set in the `values-<env>.yaml` file that is packaged into the build artifact.
+    *   **Workflow:** When deployed (via `develop.sh` for local K8s or `deploy.sh` for other environments), the Helm chart will create `VaultConnection`, `VaultAuth`, and `VaultSecret` custom resources. The VSO controller then syncs secrets.
 *   **Health Checks & Probes:** Ensure that the liveness and readiness probes defined in your Helm templates (e.g., in `templates/deployment.yaml`, and configurable via `services.<name>.probes` in `values.yaml`) correctly point to health check endpoints in your applications. The paths like `/healthcheck` or `/` are common defaults but might need adjustment based on your application's specific health endpoints.
 *   **Resource Allocation:** The CPU and memory `requests` and `limits` defined in the chart's templates (and configurable via `services.<name>.resources` in `values.yaml` or environment-specific values files) are crucial for stable operation. Monitor your application's performance and adjust these as needed for each environment.
 *   **Stateful Services (PostgreSQL, Redis):**
@@ -255,51 +268,52 @@ This section lists common commands useful for managing the Vrooli Helm chart and
 
 Ensure your `kubectl` context is pointing to the correct cluster before running installation or upgrade commands.
 
-*   **Lint the Chart:**
-    Checks the chart for syntax errors and adherence to best practices.
+*   **Lint the Chart (Source):**
+    Checks the chart in your local `k8s/chart/` directory.
     ```bash
     helm lint k8s/chart/
     ```
 
-*   **Template the Chart (Dry Run - Local Render):**
-    Renders the templates locally and prints the YAML output. Useful for debugging what Kubernetes manifests will be generated.
+*   **Template the Chart (Dry Run - Local Render from Source):**
+    Renders templates locally from `k8s/chart/` using specified values files. Useful for debugging.
     ```bash
-    # Example for development values in 'staging' namespace
-    helm template vrooli-dev k8s/chart/ -f k8s/chart/values.yaml -f k8s/chart/values-dev.yaml --namespace staging > rendered-dev-manifests.yaml
+    # Example for development values from source, targeting 'dev' namespace
+    helm template vrooli-dev k8s/chart/ -f k8s/chart/values.yaml -f k8s/chart/values-dev.yaml --namespace dev > rendered-dev-manifests.yaml
     ```
 
-*   **Dry Run Install/Upgrade (Server-Side Validation):**
-    Simulates an install or upgrade by sending the chart to the Kubernetes API server for validation, without actually deploying resources. This is useful for catching structural errors in your chart or values before a live deployment attempt.
+*   **Dry Run Install/Upgrade (Server-Side Validation, Simulating `deploy.sh`):**
+    This simulates how `scripts/main/deploy.sh` would run, using a *packaged chart* and *specific values file from an artifact*.
+    To truly simulate `deploy.sh`, you would first run `scripts/main/build.sh` to create the `.tgz` chart package and the `helm-value-files/` in an artifact structure.
+    Then, you would point Helm to the packaged chart and the relevant extracted values file:
     ```bash
-    # Example for development values in 'staging' namespace
-    helm upgrade --install vrooli-dev k8s/chart/ \
-      -f k8s/chart/values.yaml \
-      -f k8s/chart/values-dev.yaml \
-      --namespace staging --create-namespace --dry-run --debug
-    
-    # Example for production values in 'production' namespace
-    helm upgrade --install vrooli-prod k8s/chart/ \
-      -f k8s/chart/values.yaml \
-      -f k8s/chart/values-prod.yaml \
+    # Assuming build artifacts for version 0.1.0 are in ./build_output/0.1.0/artifacts/
+    # And packaged chart is ./build_output/0.1.0/artifacts/k8s-chart-packages/vrooli-0.1.0.tgz
+    # And prod values are ./build_output/0.1.0/artifacts/helm-value-files/values-prod.yaml
+
+    # Example for production values from (simulated) artifact, targeting 'production' namespace
+    helm upgrade --install vrooli-prod ./build_output/0.1.0/artifacts/k8s-chart-packages/vrooli-0.1.0.tgz \
+      -f ./build_output/0.1.0/artifacts/helm-value-files/values-prod.yaml \
+      # Add any --set overrides that deploy.sh would add, like image tags
+      --set services.server.tag=0.1.0 \ 
       --namespace production --create-namespace --dry-run --debug
     ```
 
-*   **Development Deployment (Install/Upgrade):**
-    Deploys or updates the application for a development/staging environment. The `--create-namespace` flag will create the namespace if it doesn't exist.
+*   **Development Deployment (via `scripts/main/develop.sh`):**
+    This script handles deploying the chart directly from your `k8s/chart/` source to Minikube.
     ```bash
-    helm upgrade --install vrooli-dev k8s/chart/ \
-      -f k8s/chart/values.yaml \
-      -f k8s/chart/values-dev.yaml \
-      --namespace staging --create-namespace
+    # Example:
+    bash scripts/main/develop.sh --target k8s-cluster 
+    # This uses k8s/chart/values-dev.yaml by default.
     ```
 
-*   **Production Deployment (Install/Upgrade):**
-    Deploys or updates the application for a production environment. **Ensure `values-prod.yaml` is thoroughly reviewed and configured.**
+*   **Staging/Production Deployment (via `scripts/main/deploy.sh -s k8s`):**
+    This script uses a packaged chart and values from the build artifact.
     ```bash
-    helm upgrade --install vrooli-prod k8s/chart/ \
-      -f k8s/chart/values.yaml \
-      -f k8s/chart/values-prod.yaml \
-      --namespace production --create-namespace
+    # Example for deploying 'prod' environment, version from $VERSION variable
+    # Ensure $VERSION is set, e.g., export VERSION="$(node -p "require('./package.json').version")"
+    # export ENVIRONMENT="prod" (or staging)
+    # bash scripts/main/deploy.sh -s k8s -e "$ENVIRONMENT" -v "$VERSION"
+    # (Example command, check deploy.sh for exact arguments)
     ```
 
 *   **Run Helm Tests:**
@@ -372,80 +386,16 @@ Ensure your `kubectl` context is pointing to the correct cluster. Replace `<your
     kubectl get secret <secret-name> -n <your-namespace> -o yaml # To view secret content (often base64 encoded)
     ```
 
-**Deploying the Vrooli Chart Locally:**
+**Deploying the Vrooli Chart Locally (Using `scripts/main/develop.sh` for Minikube):**
 
-This section assumes you are deploying to a local Minikube setup, potentially with an in-cluster Vault for secrets as configured by `scripts/main/setup.sh --target k8s-cluster`.
+The `scripts/main/develop.sh --target k8s-cluster` command is the primary way to deploy to a local Minikube setup.
+*   It uses the Helm chart directly from your `k8s/chart/` source directory.
+*   It applies `k8s/chart/values.yaml` and overrides it with `k8s/chart/values-dev.yaml`.
+*   It also applies further overrides via `--set` for image tags (setting them to `dev`) and potentially `image.pullPolicy`.
 
-*   **Secrets Management (Vault Integration):**
-    *   **Prerequisites:**
-        *   A running HashiCorp Vault instance accessible from your Minikube cluster.
-        *   The Vault Secrets Operator installed in Minikube.
-        *   (The `scripts/main/setup.sh --target k8s-cluster` command handles this if `--secrets-source vault` is used.)
-    *   **Chart Configuration for VSO (in `values-dev.yaml` or a custom values file for local):**
-        *   Ensure `.Values.vso.enabled: true`.
-        *   Set `.Values.vso.vaultAddr` (e.g., `http://vault.vault.svc.cluster.local:8200` for the typical dev setup using the in-cluster Vault service).
-        *   Configure `.Values.vso.k8sAuthRole` (e.g., `vrooli-app`). This role must be configured in Vault and bound to the Kubernetes service account used by the Vault Secrets Operator or your application pods, depending on the auth flow.
-        *   Define the secrets to sync under `.Values.vso.secrets`. For each secret (e.g., `redis`, `postgres`, `app`):
-            *   Set `enabled: true`.
-            *   Specify `vaultPath`: The path to the secret in Vault's K/V store (e.g., `secret/data/vrooli/redis`).
-            *   Specify `k8sSecretName`: The name of the Kubernetes `Secret` that VSO will create/manage in the release namespace.
-            *   Optionally use `dataMappings` to map keys from the Vault secret to different key names in the Kubernetes `Secret`. This is useful if your application expects specific environment variable names.
-        Example snippet for `values-dev.yaml` or a local override file:
-            ```yaml
-            # values-dev.yaml (or values-local.yaml)
-            vso:
-              enabled: true
-              # Default for in-cluster dev Vault, assumes Vault service 'vault' in namespace 'vault'.
-              # '.cluster.local' is the default cluster domain, often optional for in-cluster resolution.
-              vaultAddr: "http://vault.vault.svc.cluster.local:8200"
-              k8sAuthMount: "kubernetes" # Default k8s auth mount path in Vault
-              k8sAuthRole: "vrooli-app"  # Role configured in Vault for your app/VSO
-              secrets:
-                redis:
-                  enabled: true
-                  vaultPath: "secret/data/vrooli/redis" # Example path for KV v2
-                  k8sSecretName: "vrooli-redis-creds"
-                  # Example: if Vault stores { "password": "..." } and app needs REDIS_PASSWORD
-                  dataMappings:
-                    - vaultKey: "password"      # Key in Vault secret
-                      k8sKey: "REDIS_PASSWORD"  # Key in the created K8s Secret
-                postgres:
-                  enabled: true
-                  vaultPath: "secret/data/vrooli/postgres"
-                  k8sSecretName: "vrooli-postgres-creds"
-                  dataMappings:
-                    - vaultKey: "POSTGRES_USER"
-                      k8sKey: "POSTGRES_USER"
-                    - vaultKey: "POSTGRES_PASSWORD"
-                      k8sKey: "POSTGRES_PASSWORD"
-                    # Add other necessary mappings like POSTGRES_DB, POSTGRES_HOST if managed in Vault
-                app: # General application secrets
-                  enabled: true
-                  vaultPath: "secret/data/vrooli/app"
-                  k8sSecretName: "vrooli-app-secrets"
-                  # Example:
-                  # dataMappings:
-                  #   - vaultKey: "someApiKey"
-                  #     k8sKey: "SOME_API_KEY"
-                  #   - vaultKey: "anotherSetting"
-                  #     k8sKey: "ANOTHER_SETTING"
-
-                # Example for Docker Hub credentials if needed for private images
-                # dockerhub:
-                #   enabled: true
-                #   vaultPath: "secret/data/vrooli/dockerhub" # Store .dockerconfigjson content here as a value
-                #   k8sSecretName: "dockerhub-credentials"
-                #   k8sSecretType: "kubernetes.io/dockerconfigjson" # Special type for image pull secrets
-                #   # VSO needs to be configured to handle this appropriately, often by having a single key in Vault
-                #   # whose value is the entire .dockerconfigjson string.
-                #   # dataMappings:
-                #   #   - vaultKey: "dockerconfigjson" # Key in Vault holding the JSON string
-                #   #     k8sKey: ".dockerconfigjson" # Required key in the K8s secret of this type
-            ```
-    *   **Populate Secrets in Vault:** Before deploying the chart, ensure the actual secret data is populated in your Vault instance at the specified paths (e.g., using `vault kv put secret/vrooli/redis password=yourpassword`). Remember KV v2 paths are prefixed with `secret/data/`.
-    *   **Deployment:** Deploy the chart using `helm upgrade --install` with your development values file. The VSO will watch the `VaultSecret` custom resources created by the chart and then sync the secrets from Vault to standard Kubernetes `Secret` objects. Application pods will then mount these Kubernetes `Secret` objects.
-*   **Production Secrets Consideration:**
-    *   The local development Vault setup (often using Vault's `dev` server mode, which is auto-unsealed and uses in-memory storage by default) is **NOT SUITABLE FOR PRODUCTION.**
-    *   Production deployments must use a hardened, HA Vault setup. VSO in the production cluster will connect to this production Vault.
+*   **Secrets Management (Vault Integration for Local K8s Development):**
+    *   When using `scripts/main/develop.sh --target k8s-cluster` with Vault enabled (via `scripts/main/setup.sh --secrets-source vault`):
+        *   The VSO configurations in `k8s/chart/values-dev.yaml` (e.g., `vso.enabled`, `vso.vaultAddr`, `vso.secrets`) are used.
+        *   Ensure these point to your local/dev Vault instance and the correct secret paths.
 
 This Helm chart provides a structured and maintainable way to manage your Kubernetes deployments as the Vrooli application evolves. 

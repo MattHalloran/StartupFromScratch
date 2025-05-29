@@ -303,54 +303,48 @@ k8s_cluster::configure_dev_vault() {
     fi
 
     log::info "Configuring Kubernetes auth method..."
-    # Get Kubernetes service account issuer and host details (requires service account in Vault pod)
-    # The official Vault Helm chart sets up necessary RBAC for this.
-    # This assumes the default service account token for the Vault pod can access the tokenreview API and k8s API server.
-    # Note: Using VAULT_SKIP_VERIFY=true for simplicity in dev. Production would need proper CA setup.
-    # The command `kubectl exec ... -- vault write auth/kubernetes/config ...` needs the VAULT_TOKEN to be set.
-    # Since we are using dev mode, the root token is 'root'.
-    # We pass it directly to the vault command.
-    # Fetch Kubernetes host and CA from within the cluster (from vault pod's perspective)
-    local K8S_HOST
-    K8S_HOST=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_PORT_443_TCP_ADDR)
+    # Fetch Kubernetes host and port from the Vault pod's environment
+    local K8S_HOST K8S_PORT
+    K8S_HOST=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_HOST)
+    K8S_PORT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_PORT_HTTPS)
+
     if [ -z "$K8S_HOST" ]; then
-        K8S_HOST=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- getent hosts kubernetes.default.svc | awk '{ print $1 }')
-        if [ -z "$K8S_HOST" ]; then
-            log::warning "Could not automatically determine Kubernetes host from Vault pod. Using default."
-            K8S_HOST="kubernetes.default.svc" # This might not resolve if vault pod DNS is misconfigured.
+        log::warning "KUBERNETES_SERVICE_HOST not found in Vault pod's environment. This is unexpected."
+        log::warning "Falling back to service DNS name 'kubernetes.default.svc' for kubernetes_host."
+        K8S_HOST="kubernetes.default.svc" 
+    fi
+
+    if [ -z "$K8S_PORT" ]; then
+        log::warning "KUBERNETES_SERVICE_PORT_HTTPS not found in Vault pod. Trying KUBERNETES_SERVICE_PORT."
+        K8S_PORT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_PORT)
+        if [ -z "$K8S_PORT" ]; then
+            log::warning "KUBERNETES_SERVICE_PORT also not found. Defaulting to port 443 for kubernetes_host."
+            K8S_PORT="443"
         fi
     fi
     
-    local K8S_PORT="443" # Default HTTPS port
-
-    # Get the service account JWT and CA cert from the Vault pod's environment
-    # The Vault Helm chart should mount these.
     # Path to the service account token Vault will use to validate other tokens
     local SA_JWT_TOKEN_PATH="/var/run/secrets/kubernetes.io/serviceaccount/token"
     # Path to the CA certificate for the K8s API server
     local SA_CA_CERT_PATH="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-
-    # Construct the command to write Kubernetes auth config
-    # The token_reviewer_jwt needs to be read from the file inside the pod
-    # The kubernetes_ca_cert also needs to be read from the file inside the pod
-    # The `kubernetes_host` needs to be the internal cluster IP for the API server
     
-    log::info "Writing Kubernetes auth config to Vault (Host: https://${K8S_HOST}:${K8S_PORT})..."
-    # The values for token_reviewer_jwt and kubernetes_ca_cert are read *inside* the pod by Vault itself when it processes the API call.
-    # We tell Vault *where* to find them.
-    # However, for `vault write` CLI, we need to pass the *content* of the CA cert.
-    # The `kubernetes_host` is critical.
-    # Using default issuer.
+    log::info "Attempting to configure Vault Kubernetes auth with API server at https://${K8S_HOST}:${K8S_PORT}"
 
     # Read the CA cert content to pass to vault write
     local K8S_CA_CERT_CONTENT
     K8S_CA_CERT_CONTENT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- cat "$SA_CA_CERT_PATH")
+
+    if [ -z "$K8S_CA_CERT_CONTENT" ]; then
+        log::error "Failed to read Kubernetes CA certificate from Vault pod at $SA_CA_CERT_PATH."
+        return 1
+    fi
     
     if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault write auth/kubernetes/config \
         token_reviewer_jwt=@"$SA_JWT_TOKEN_PATH" \
         kubernetes_host="https://${K8S_HOST}:${K8S_PORT}" \
         kubernetes_ca_cert="$K8S_CA_CERT_CONTENT" \
-        issuer="https://kubernetes.default.svc.cluster.local"; then # Adjust issuer if necessary
+        disable_local_ca_jwt="false" \
+        issuer="https://kubernetes.default.svc.cluster.local"; then 
         log::error "Failed to write Kubernetes auth config in Vault."
         log::info "You may need to manually configure it using 'kubectl exec -n $VAULT_NAMESPACE $VAULT_POD -- vault write auth/kubernetes/config ...'"
         return 1
@@ -451,28 +445,97 @@ k8s_cluster::install_kubernetes() {
             # Current placement: PGO is installed if Vault is also being installed for dev.
         fi
     else
-        log::info "📦 Configuring production Kubernetes cluster 'vrooli-prod-cluster'..."
-        : "${KUBE_API_SERVER:?Environment variable KUBE_API_SERVER must be set}"
-        : "${KUBE_CA_CERT_PATH:?Environment variable KUBE_CA_CERT_PATH must be set}"
-        kubectl config set-cluster vrooli-prod-cluster \
-            --server="${KUBE_API_SERVER}" \
-            --certificate-authority="${KUBE_CA_CERT_PATH}" \
-            --embed-certs=true
-        if [ -n "${KUBE_BEARER_TOKEN:-}" ]; then
-            kubectl config set-credentials prod-user --token="${KUBE_BEARER_TOKEN}"
-        else
-            : "${KUBE_CLIENT_CERT_PATH:?Environment variable KUBE_CLIENT_CERT_PATH must be set}"
-            : "${KUBE_CLIENT_KEY_PATH:?Environment variable KUBE_CLIENT_KEY_PATH must be set}"
-            kubectl config set-credentials prod-user \
-                --client-certificate="${KUBE_CLIENT_CERT_PATH}" \
-                --client-key="${KUBE_CLIENT_KEY_PATH}" \
+        # This block handles non-development environments (e.g., staging, production)
+        log::info "📦 Configuring kubectl for remote Kubernetes cluster..."
+        # Method 1: If your CI/CD pipeline has a complete kubeconfig file in base64 form,
+        # you can set the KUBECONFIG_CONTENT_BASE64 environment variable to that base64-encoded content.
+        # The script will decode it into a file (e.g., ~/.kube/config_ci_vrooli) and point KUBECONFIG to it.
+        # Prioritize KUBECONFIG_CONTENT_BASE64 if available (common for CI/CD)
+        if [ -n "${KUBECONFIG_CONTENT_BASE64:-}" ]; then
+            log::info "Found KUBECONFIG_CONTENT_BASE64. Configuring kubectl from its content."
+            local kubeconfig_dir="$HOME/.kube"
+            local kubeconfig_file_ci="${kubeconfig_dir}/config_ci_vrooli" # Use a distinct name
+            mkdir -p "$kubeconfig_dir"
+            
+            # Decode and write to a temporary kubeconfig file
+            if echo "${KUBECONFIG_CONTENT_BASE64}" | base64 -d > "$kubeconfig_file_ci"; then
+                export KUBECONFIG="$kubeconfig_file_ci"
+                log::success "kubectl configured using KUBECONFIG written to $kubeconfig_file_ci."
+                # Optionally, validate by trying to get current context or cluster info
+                if kubectl config current-context > /dev/null 2>&1; then
+                    log::info "Successfully connected. Current context: $(kubectl config current-context)"
+                else
+                    log::warning "kubectl configured, but could not get current context. Check KUBECONFIG content and cluster accessibility."
+                fi
+            else
+                log::error "Failed to decode KUBECONFIG_CONTENT_BASE64 or write to $kubeconfig_file_ci."
+                log::error "Ensure KUBECONFIG_CONTENT_BASE64 is a valid base64 encoded kubeconfig."
+                # Do not exit here, allow fallback to KUBE_API_SERVER method if that's intended
+            fi
+        # Method 2 (Fallback): If no KUBECONFIG_CONTENT_BASE64, configure kubectl programmatically using individual variables:
+        #   KUBE_API_SERVER       - URL of the Kubernetes API server
+        #   KUBE_CA_CERT_PATH     - Path to the CA certificate file for TLS verification
+        #   KUBE_BEARER_TOKEN     - Bearer token for authentication (optional if using client cert)
+        #   KUBE_CLIENT_CERT_PATH - Path to the client certificate for mTLS auth (alternative to bearer token)
+        #   KUBE_CLIENT_KEY_PATH  - Path to the client private key for mTLS auth
+        elif [ -n "${KUBE_API_SERVER:-}" ]; then
+            log::info "Configuring kubectl using KUBE_API_SERVER and related variables for 'vrooli-prod-cluster'..."
+            : "${KUBE_API_SERVER:?Environment variable KUBE_API_SERVER must be set for programmatic cluster config}"
+            : "${KUBE_CA_CERT_PATH:?Environment variable KUBE_CA_CERT_PATH must be set for programmatic cluster config}"
+
+            # Define cluster, user, and context names
+            local cluster_name="vrooli-remote-cluster" # Generic name for remote
+            local user_name="vrooli-remote-user"
+            local context_name="vrooli-remote-context"
+
+            # Prefer KUBECONFIG to be set to a specific file for this operation to avoid modifying the default ~/.kube/config directly
+            # If $KUBECONFIG is already set (e.g., from KUBECONFIG_CONTENT_BASE64 step if it failed partially), respect it.
+            # Otherwise, use a temporary one or a dedicated one for this script's actions.
+            local temp_kubeconfig=""
+            if [ -z "${KUBECONFIG:-}" ]; then
+                temp_kubeconfig=$(mktemp)
+                export KUBECONFIG="$temp_kubeconfig"
+                log::info "Temporarily setting KUBECONFIG to $temp_kubeconfig for this operation."
+            fi
+
+            kubectl config set-cluster "$cluster_name" \
+                --server="${KUBE_API_SERVER}" \
+                --certificate-authority="${KUBE_CA_CERT_PATH}" \
                 --embed-certs=true
+            
+            if [ -n "${KUBE_BEARER_TOKEN:-}" ]; then
+                kubectl config set-credentials "$user_name" --token="${KUBE_BEARER_TOKEN}"
+            elif [ -n "${KUBE_CLIENT_CERT_PATH:-}" ] && [ -n "${KUBE_CLIENT_KEY_PATH:-}" ]; then
+                : "${KUBE_CLIENT_CERT_PATH:?Environment variable KUBE_CLIENT_CERT_PATH must be set if KUBE_BEARER_TOKEN is not}"
+                : "${KUBE_CLIENT_KEY_PATH:?Environment variable KUBE_CLIENT_KEY_PATH must be set if KUBE_BEARER_TOKEN is not}"
+                kubectl config set-credentials "$user_name" \
+                    --client-certificate="${KUBE_CLIENT_CERT_PATH}" \
+                    --client-key="${KUBE_CLIENT_KEY_PATH}" \
+                    --embed-certs=true
+            else
+                log::error "Insufficient credentials for remote Kubernetes cluster. Set KUBE_BEARER_TOKEN or (KUBE_CLIENT_CERT_PATH and KUBE_CLIENT_KEY_PATH)."
+                if [ -n "$temp_kubeconfig" ]; then rm -f "$temp_kubeconfig"; fi # Clean up temp KUBECONFIG
+                # exit 1 # Or return 1, depending on desired script behavior on failure
+                return 1 # Indicate failure to configure
+            fi
+            
+            kubectl config set-context "$context_name" \
+                --cluster="$cluster_name" \
+                --user="$user_name"
+            kubectl config use-context "$context_name"
+            log::success "kubectl context '$context_name' configured and set successfully using KUBE_API_SERVER."
+
+            if [ -n "$temp_kubeconfig" ]; then
+                log::info "Original KUBECONFIG environment restored (was $temp_kubeconfig)."
+                # If you want the settings to persist in default ~/.kube/config, you'd merge here.
+                # For CI, using the KUBECONFIG var pointing to the temp file is usually sufficient for the job's duration.
+                # If this script needs to make ~/.kube/config the source of truth, more logic is needed here.
+                # For now, this temp KUBECONFIG is ephemeral.
+            fi
+        else
+            log::warning "kubectl configuration for remote cluster skipped: KUBECONFIG_CONTENT_BASE64 not set, and KUBE_API_SERVER not set."
+            log::warning "Ensure kubectl is manually configured to point to the target remote cluster, or provide necessary env vars."
         fi
-        kubectl config set-context vrooli-prod-cluster \
-            --cluster=vrooli-prod-cluster \
-            --user=prod-user
-        kubectl config use-context vrooli-prod-cluster
-        log::success "Production Kubernetes cluster 'vrooli-prod-cluster' configured successfully"
     fi
 }
 

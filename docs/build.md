@@ -17,12 +17,14 @@ All build logic is encapsulated in the main build script `scripts/main/build.sh`
 
 ### Usage
 
+**Note:** To inject the project version into the Helm chart (Chart.yaml) and service tags (values-prod.yaml), supply the `--version` flag to `build.sh`. Without `--version`, build.sh uses the package.json version and will overwrite published Docker images with the same version if you're pushing to a registry.
+
 ```bash
-# Development build (uses .env-dev)
+# Development build (uses .env-dev; does NOT rewrite Helm charts)
 bash scripts/main/build.sh
 
-# Production build (uses .env-prod)
-bash scripts/main/build.sh --production
+# Production build (uses .env-prod and rewrites Helm chart/appVersion and service tags)
+bash scripts/main/build.sh --production --version "$(node -p 'require(\"./package.json\").version')"
 ```
 
 ### Script Workflow

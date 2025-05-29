@@ -7,7 +7,7 @@
     "types": "dist/index.d.ts",
     "scripts": {
         "clean": "rimraf dist",
-        "copy": "cpy \"src/**/*.{txt,lua,html,prisma,sql}\" \"src/auth/message_signing/rust/pkg/*.{wasm,json,cjs}\" dist",
+        "copy": "cpy \"src/**/*.{txt,lua,html,prisma,sql,json}\" \"src/auth/message_signing/rust/pkg/*.{wasm,json,cjs}\" dist",
         "build:shared": "pnpm --dir ../shared run build",
         "build:compile": "swc src -d dist --source-maps --ignore \"**/*.test.*\"",
         "build": "cross-env NODE_ENV=production run-s clean build:compile copy",

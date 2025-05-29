@@ -34,6 +34,7 @@ common_deps::check_and_install() {
     system::check_and_install "grep"
     system::check_and_install "mkdir"
     system::check_and_install "script"
+    system::check_and_install "yq"
 
     log::success "✅ Common dependencies checked/installed."
     return 0

@@ -176,6 +176,34 @@ build::main() {
     build::parse_arguments "$@"
     log::header "🔨 Starting build for ${ENVIRONMENT} environment..."
 
+    # Mandate --version for production builds and warn/confirm if same as current
+    if env::in_production; then # Checks if $ENVIRONMENT is "prod" or "production"
+        if [ "${VERSION_SPECIFIED_BY_USER}" != "yes" ]; then
+            log::error "ERROR: For production builds (environment: ${ENVIRONMENT}), the --version <version> flag is mandatory."
+            log::error "Please specify the exact version to build and deploy."
+            exit "${exit_codes_ERROR_USAGE}"
+        else
+            # Version was specified for a production build, check if it's the same as current
+            local current_project_version
+            current_project_version=$(version::get_project_version)
+            if [ "$VERSION" == "$current_project_version" ]; then
+                log::warning "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                log::warning "!! WARNING: THE SUPPLIED VERSION ($VERSION) IS THE SAME AS THE CURRENT PROJECT VERSION  !!"
+                log::warning "!!          IN PACKAGE.JSON. PROCEEDING WILL OVERWRITE ANY EXISTING REMOTE          !!"
+                log::warning "!!          ARTIFACTS AND DOCKER IMAGES PUBLISHED FOR THIS VERSION.                 !!"
+                log::warning "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                
+                local confirm_overwrite
+                log::prompt "Are you sure you want to proceed with building version $VERSION? (y/N): " confirm_overwrite
+                if ! flow::is_yes "${confirm_overwrite:-no}"; then # Default to 'no' if user just presses Enter
+                    log::info "Build aborted by user."
+                    exit "${exit_codes_SUCCESS}"
+                fi
+                log::info "User confirmed proceeding with version $VERSION."
+            fi
+        fi
+    fi
+
     source "${MAIN_DIR}/setup.sh" "$@"
 
     log::info "Cleaning previous build artifacts..."
@@ -199,6 +227,7 @@ build::main() {
 
     if [ "${VERSION_SPECIFIED_BY_USER}" = "yes" ]; then
         log::info "User specified version '${VERSION}'. Updating project version..."
+        # Note: Updates package.jsons and helm values files with the new version
         version::set_project_version "$VERSION"
     else
         log::info "Using project version '${VERSION}' from package.json. No explicit version update will be performed by this script."
@@ -289,9 +318,9 @@ build::main() {
                 local chart_name
                 chart_name=$(grep '^name:' "${chart_source_path}/Chart.yaml" | awk '{print $2}')
                 if [ -z "$chart_name" ]; then
-                    log::warning "Could not determine chart name from ${chart_source_path}/Chart.yaml. Using a default or failing."
-                    # Handle error or set a default, e.g. chart_name="vrooli"
-                    chart_name="vrooli" # Defaulting, consider making this more robust
+                    log::error "Could not determine chart name from ${chart_source_path}/Chart.yaml."
+                    log::error "Please ensure Chart.yaml contains a valid 'name:' field."
+                    exit "$ERROR_BUILD_FAILED"
                 fi
 
                 if helm package "$chart_source_path" --version "$VERSION" --app-version "$VERSION" --destination "$chart_destination_path"; then
@@ -300,6 +329,34 @@ build::main() {
                     log::error "Helm chart packaging failed."
                     exit "$ERROR_BUILD_FAILED"
                 fi
+
+                log::info "Copying Helm environment-specific values files..."
+                local helm_values_source_dir="${var_ROOT_DIR}/k8s/chart"
+                local helm_values_dest_dir="${artifacts_dir}/helm-value-files"
+                
+                mkdir -p "$helm_values_dest_dir"
+                
+                # Find and copy values-*.yaml files, excluding values.yaml itself
+                # Using a loop to handle cases where find might not be ideal or for more control
+                local found_values_files=false
+                for val_file in "${helm_values_source_dir}/values-"*.yaml; do
+                    if [ -f "$val_file" ]; then # Check if the glob matched an actual file
+                        if ! cp "$val_file" "$helm_values_dest_dir/"; then
+                            log::error "Failed to copy Helm values file: $val_file to $helm_values_dest_dir"
+                            # Decide if this is a fatal error
+                        else
+                            log::info "Copied $val_file to $helm_values_dest_dir"
+                            found_values_files=true
+                        fi
+                    fi
+                done
+
+                if [ "$found_values_files" = true ]; then
+                    log::success "Successfully copied Helm environment-specific values files."
+                else
+                    log::warning "No environment-specific Helm values files (values-*.yaml) found in $helm_values_source_dir to copy."
+                fi
+
                 # --- END NEW K8S BUILD LOGIC ---
                 ;;
             *)

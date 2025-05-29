@@ -122,4 +122,73 @@ You can also manually trigger the workflows from the GitHub Actions tab using th
 
 **Note:** Both lint and test steps run by default and their failures do not block deployment. You can use the above options to skip them in manual runs.
 
+---
+### Kubernetes Deployments
+
+Our CI/CD workflows can also deploy to Kubernetes clusters using the `scripts/main/deploy.sh` helper with `--source k8s`.
+
+#### Configuring `kubectl` Access in GitHub Actions
+
+Before running the deployment step, you must configure `kubectl` so it can communicate with your Kubernetes cluster. You can do this in two ways:
+
+1. **Using a base64-encoded kubeconfig file**
+   - Store your cluster's kubeconfig file as a GitHub Actions secret named `KUBECONFIG_CONTENT_BASE64` (its content base64-encoded).
+   - In your workflow, decode it and write to `~/.kube/config`:
+     ```yaml
+     - name: Configure kubectl (KUBECONFIG_CONTENT_BASE64)
+       run: |
+         mkdir -p ~/.kube
+         echo "${{ secrets.KUBECONFIG_CONTENT_BASE64 }}" | base64 -d > ~/.kube/config
+         export KUBECONFIG=~/.kube/config
+     ```
+
+2. **Using individual environment variables**
+   - Set the following secrets in GitHub Actions:
+     - `KUBE_API_SERVER`: API server URL of your Kubernetes cluster.
+     - `KUBE_CA_CERT_PATH`: Base64-encoded CA certificate (or path to a CA file on the runner).
+     - `KUBE_BEARER_TOKEN` _or_ `KUBE_CLIENT_CERT_PATH` & `KUBE_CLIENT_KEY_PATH`: Credentials for authentication.
+   - Example snippet:
+     ```yaml
+     - name: Export Kubernetes variables
+       run: |
+         echo "KUBE_API_SERVER=${{ secrets.KUBE_API_SERVER }}" >> $GITHUB_ENV
+         echo "KUBE_CA_CERT_PATH=${{ secrets.KUBE_CA_CERT_PATH }}" >> $GITHUB_ENV
+         echo "KUBE_BEARER_TOKEN=${{ secrets.KUBE_BEARER_TOKEN }}" >> $GITHUB_ENV
+     ```
+
+#### Example Workflow for Kubernetes Deployment
+
+```yaml
+jobs:
+  deploy-k8s:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Configure kubectl access (choose one method above)
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_CONTENT_BASE64 }}" | base64 -d > ~/.kube/config
+          export KUBECONFIG=~/.kube/config
+
+      - name: Build artifacts
+        run: |
+          export VERSION=$(node -p "require('./package.json').version")
+          bash scripts/main/build.sh --production --version "$VERSION"
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Ensure VERSION and ENVIRONMENT are set, for example:
+          export VERSION=$(node -p "require('./package.json').version")
+          export ENVIRONMENT=production
+          bash scripts/main/deploy.sh --source k8s --environment "$ENVIRONMENT" --version "$VERSION"
+```
+
+See [Kubernetes README (`k8s/README.md`)](./k8s/README.md) for details on chart configuration and values file management.
+
 --- 
