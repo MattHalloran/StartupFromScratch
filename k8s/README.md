@@ -238,6 +238,7 @@ The following table lists some of the key configurable parameters of the Vrooli 
     These files manage settings like database connection strings, API keys, resource requests/limits, replica counts, etc.
 *   **Secrets Management (Vault Integration):** This chart is designed to integrate with HashiCorp Vault via the Vault Secrets Operator (VSO) for managing sensitive data.
     *   **Prerequisites:** A running HashiCorp Vault instance and the Vault Secrets Operator must be installed and configured in your Kubernetes cluster. The `scripts/helpers/setup/target/k8s_cluster.sh` script can assist with setting up a development Vault instance, including creating necessary policies and roles.
+    *   **Important KVv2 Path Convention:** When defining Vault policies or `vaultPath` in VSO configurations for the KVv2 secrets engine (mounted at `secret/`), always ensure the path includes the `/data/` segment (e.g., `secret/data/vrooli/your-path`). Failure to do so will result in permission errors or secrets not being synced.
     *   **Vault Policies & Roles:**
         *   Five distinct Vault policies are defined in `k8s/dev-support/vault-policies/`:
             *   `vrooli-config-shared-all-read-policy.hcl`: For non-sensitive configuration accessible by UI, server, and jobs. (Path: `secret/data/vrooli/config/shared-all`)

@@ -15,8 +15,8 @@ jwt::do_keys_exist() {
     # Check existence of staging and production JWT key pairs; report if missing or partial
     local any_missing=0
     for env in staging production; do
-        local priv_var="${env^^}_JWT_PRIV_KEY_FILE"
-        local pub_var="${env^^}_JWT_PUB_KEY_FILE"
+        local priv_var="var_${env^^}_JWT_PRIV_KEY_FILE"
+        local pub_var="var_${env^^}_JWT_PUB_KEY_FILE"
         local priv_file="${!priv_var}"
         local pub_file="${!pub_var}"
         if [[ -f "$priv_file" && -f "$pub_file" ]]; then
@@ -38,8 +38,8 @@ jwt::generate_key_pair() {
 
     log::header "Generating JWT key pairs for staging & production"
     for env in staging production; do
-        local priv_var="${env^^}_JWT_PRIV_KEY_FILE"
-        local pub_var="${env^^}_JWT_PUB_KEY_FILE"
+        local priv_var="var_${env^^}_JWT_PRIV_KEY_FILE"
+        local pub_var="var_${env^^}_JWT_PUB_KEY_FILE"
         local priv_file="${!priv_var}"
         local pub_file="${!pub_var}"
 
