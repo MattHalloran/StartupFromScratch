@@ -177,16 +177,23 @@ The following table lists some of the key configurable parameters of the Vrooli 
 | `vso.enabled`                         | Enable Vault Secrets Operator integration                                   | `true`                                      |
 | `vso.vaultAddr`                       | Address of the Vault instance                                               | `http://vault.vault.svc.cluster.local:8200` |
 | `vso.k8sAuthMount`                    | Path where Kubernetes auth method is mounted in Vault                       | `kubernetes`                                |
-| `vso.k8sAuthRole`                     | Vault role for VSO to assume                                                | `vrooli-app`                                |
-| `vso.secrets.app.enabled`             | Enable syncing general app secrets via VSO                                  | `true`                                      |
-| `vso.secrets.app.vaultPath`           | Vault path for general app secrets (e.g., `secret/data/vrooli/app`)         | `secret/data/vrooli/app`                    |
-| `vso.secrets.app.k8sSecretName`       | Kubernetes Secret name for general app secrets                              | `vrooli-app-secrets`                        |
+| `vso.k8sAuthRole`                     | Vault role for VSO to assume                                                | `vrooli-vso-sync-role` (updated)            |
+| `vso.secrets.sharedConfigAll.enabled` | Enable syncing shared, non-sensitive config for all services via VSO        | `true`                                      |
+| `vso.secrets.sharedConfigAll.vaultPath`| Vault path for shared, non-sensitive config (e.g., `secret/data/vrooli/config/shared-all`)| `secret/data/vrooli/config/shared-all`    |
+| `vso.secrets.sharedConfigAll.k8sSecretName`| K8s Secret name for shared, non-sensitive config                          | `vrooli-config-shared-all`                |
+| `vso.secrets.sharedSecretsServerJobs.enabled`| Enable syncing sensitive secrets for server/jobs via VSO                | `true`                                      |
+| `vso.secrets.sharedSecretsServerJobs.vaultPath`| Vault path for sensitive server/jobs secrets (e.g., `secret/data/vrooli/secrets/shared-server-jobs`)| `secret/data/vrooli/secrets/shared-server-jobs` |
+| `vso.secrets.sharedSecretsServerJobs.k8sSecretName`| K8s Secret name for sensitive server/jobs secrets                   | `vrooli-secrets-shared-server-jobs`     |
 | `vso.secrets.postgres.enabled`        | Enable syncing PostgreSQL credentials via VSO                               | `true`                                      |
-| `vso.secrets.postgres.vaultPath`      | Vault path for PostgreSQL credentials                                       | `secret/data/vrooli/postgres`               |
+| `vso.secrets.postgres.vaultPath`      | Vault path for PostgreSQL credentials (e.g., `secret/data/vrooli/secrets/postgres`) | `secret/data/vrooli/secrets/postgres`     |
 | `vso.secrets.postgres.k8sSecretName`  | Kubernetes Secret name for PostgreSQL credentials                           | `vrooli-postgres-creds`                     |
 | `vso.secrets.redis.enabled`           | Enable syncing Redis credentials via VSO                                    | `true`                                      |
-| `vso.secrets.redis.vaultPath`         | Vault path for Redis credentials                                            | `secret/data/vrooli/redis`                  |
+| `vso.secrets.redis.vaultPath`         | Vault path for Redis credentials (e.g., `secret/data/vrooli/secrets/redis`)    | `secret/data/vrooli/secrets/redis`        |
 | `vso.secrets.redis.k8sSecretName`     | Kubernetes Secret name for Redis credentials                                | `vrooli-redis-creds`                        |
+| `vso.secrets.dockerhubPullSecret.enabled` | Enable syncing Docker Hub pull credentials via VSO                       | `true`                                      |
+| `vso.secrets.dockerhubPullSecret.vaultPath` | Vault path for Docker Hub pull credentials (e.g., `secret/data/vrooli/dockerhub/pull-credentials`) | `secret/data/vrooli/dockerhub/pull-credentials` |
+| `vso.secrets.dockerhubPullSecret.k8sSecretName` | K8s Secret name for Docker Hub pull credentials                    | `vrooli-dockerhub-pull-secret`            |
+| `vso.secrets.dockerhubPullSecret.type` | Type of the K8s Secret for Docker Hub credentials                         | `kubernetes.io/dockerconfigjson`            |
 
 *(This is a subset of parameters. Refer to `k8s/chart/values.yaml`, and the source `k8s/chart/values-dev.yaml` and `k8s/chart/values-prod.yaml` files for all options and their detailed comments. The environment-specific files are packaged into build artifacts for deployment.)*
 
@@ -230,14 +237,68 @@ The following table lists some of the key configurable parameters of the Vrooli 
     *   For staging/production deployments via `scripts/main/deploy.sh`, ensure `k8s/chart/values-prod.yaml` (or `values-staging.yaml`, etc.) is correct in your source code *before* running `scripts/main/build.sh`. The `build.sh` script will package this file into the build artifact, and `deploy.sh` will use that packaged version.
     These files manage settings like database connection strings, API keys, resource requests/limits, replica counts, etc.
 *   **Secrets Management (Vault Integration):** This chart is designed to integrate with HashiCorp Vault via the Vault Secrets Operator (VSO) for managing sensitive data.
-    *   **Prerequisites:** A running HashiCorp Vault instance and the Vault Secrets Operator must be installed and configured in your Kubernetes cluster.
+    *   **Prerequisites:** A running HashiCorp Vault instance and the Vault Secrets Operator must be installed and configured in your Kubernetes cluster. The `scripts/helpers/setup/target/k8s_cluster.sh` script can assist with setting up a development Vault instance, including creating necessary policies and roles.
+    *   **Vault Policies & Roles:**
+        *   Five distinct Vault policies are defined in `k8s/dev-support/vault-policies/`:
+            *   `vrooli-config-shared-all-read-policy.hcl`: For non-sensitive configuration accessible by UI, server, and jobs. (Path: `secret/data/vrooli/config/shared-all`)
+            *   `vrooli-secrets-shared-server-jobs-read-policy.hcl`: For sensitive secrets accessible only by server and jobs. (Path: `secret/data/vrooli/secrets/shared-server-jobs`)
+            *   `vrooli-secrets-postgres-read-policy.hcl`: For PostgreSQL credentials. (Path: `secret/data/vrooli/secrets/postgres`)
+            *   `vrooli-secrets-redis-read-policy.hcl`: For Redis credentials. (Path: `secret/data/vrooli/secrets/redis`)
+            *   `vrooli-secrets-dockerhub-read-policy.hcl`: For Docker Hub pull credentials. (Path: `secret/data/vrooli/dockerhub/*`)
+        *   These policies are applied by `scripts/helpers/setup/target/k8s_cluster.sh` during development Vault setup.
+        *   A Vault Kubernetes authentication role named `vrooli-vso-sync-role` is created and bound to these policies. This is the role VSO uses.
     *   **Helm Chart Configuration:**
-        *   Enable VSO integration by setting `.Values.vso.enabled: true`. This should be done in the appropriate values file (`k8s/chart/values.yaml` or overridden in `k8s/chart/values-<env>.yaml`).
+        *   Enable VSO integration by setting `.Values.vso.enabled: true`. This is generally the default.
         *   Configure `.Values.vso.vaultAddr` to point to your Vault service.
-        *   Specify the Vault role VSO should use via `.Values.vso.k8sAuthRole`.
-        *   Define which secrets to sync under `.Values.vso.secrets`.
+        *   Set the Vault role VSO should use via `.Values.vso.k8sAuthRole: "vrooli-vso-sync-role"`.
+        *   Define which secrets to sync under `.Values.vso.secrets`. This section now has a more granular structure:
+            ```yaml
+            # Example structure in values.yaml
+            vso:
+              # ... other VSO settings
+              secrets:
+                sharedConfigAll: # Non-sensitive, for UI, server, jobs
+                  enabled: true
+                  vaultPath: "secret/data/vrooli/config/shared-all"
+                  k8sSecretName: "vrooli-config-shared-all"
+                  # type: Opaque (default)
+                  # templates: ... (if specific data transformation is needed)
+                sharedSecretsServerJobs: # Sensitive, for server, jobs
+                  enabled: true
+                  vaultPath: "secret/data/vrooli/secrets/shared-server-jobs"
+                  k8sSecretName: "vrooli-secrets-shared-server-jobs"
+                postgres: # For PostgreSQL
+                  enabled: true
+                  vaultPath: "secret/data/vrooli/secrets/postgres"
+                  k8sSecretName: "vrooli-postgres-creds"
+                redis: # For Redis
+                  enabled: true
+                  vaultPath: "secret/data/vrooli/secrets/redis"
+                  k8sSecretName: "vrooli-redis-creds"
+                dockerhubPullSecret: # For Docker Hub credentials
+                  enabled: true
+                  vaultPath: "secret/data/vrooli/dockerhub/pull-credentials" # Example path
+                  k8sSecretName: "vrooli-dockerhub-pull-secret"
+                  type: kubernetes.io/dockerconfigjson
+                  templates:
+                    .dockerconfigjson: |
+                      {
+                        "auths": {
+                          "https://index.docker.io/v1/": {
+                            "username": "{{ .Data.username }}",
+                            "password": "{{ .Data.password }}",
+                            "auth": "{{ printf \"%s:%s\" .Data.username .Data.password | b64enc }}"
+                          }
+                        }
+                      }
+            ```
         *   The `scripts/main/deploy.sh` flow relies on these configurations being correctly set in the `values-<env>.yaml` file that is packaged into the build artifact.
-    *   **Workflow:** When deployed (via `develop.sh` for local K8s or `deploy.sh` for other environments), the Helm chart will create `VaultConnection`, `VaultAuth`, and `VaultSecret` custom resources. The VSO controller then syncs secrets.
+    *   **Workflow:** When deployed, the Helm chart creates `VaultConnection`, `VaultAuth`, and individual `VaultSecret` custom resources (one for each entry under `vso.secrets`). The VSO controller then syncs the specified Vault paths into distinct Kubernetes `Secret` objects (e.g., `vrooli-config-shared-all`, `vrooli-secrets-shared-server-jobs`, etc.).
+    *   **Application Usage:**
+        *   The `k8s/chart/templates/deployment.yaml` template has been updated to mount these granular secrets into the appropriate pods (UI, server, jobs) using `envFrom`.
+        *   The UI deployment will only have access to `vrooli-config-shared-all`.
+        *   The server and jobs deployments will have access to `vrooli-config-shared-all`, `vrooli-secrets-shared-server-jobs`, `vrooli-postgres-creds`, and `vrooli-redis-creds`.
+        *   The `vrooli-dockerhub-pull-secret` is used as an `imagePullSecret` for all deployments.
 *   **Health Checks & Probes:** Ensure that the liveness and readiness probes defined in your Helm templates (e.g., in `templates/deployment.yaml`, and configurable via `services.<name>.probes` in `values.yaml`) correctly point to health check endpoints in your applications. The paths like `/healthcheck` or `/` are common defaults but might need adjustment based on your application's specific health endpoints.
 *   **Resource Allocation:** The CPU and memory `requests` and `limits` defined in the chart's templates (and configurable via `services.<name>.resources` in `values.yaml` or environment-specific values files) are crucial for stable operation. Monitor your application's performance and adjust these as needed for each environment.
 *   **Stateful Services (PostgreSQL, Redis):**
@@ -395,7 +456,8 @@ The `scripts/main/develop.sh --target k8s-cluster` command is the primary way to
 
 *   **Secrets Management (Vault Integration for Local K8s Development):**
     *   When using `scripts/main/develop.sh --target k8s-cluster` with Vault enabled (via `scripts/main/setup.sh --secrets-source vault`):
-        *   The VSO configurations in `k8s/chart/values-dev.yaml` (e.g., `vso.enabled`, `vso.vaultAddr`, `vso.secrets`) are used.
-        *   Ensure these point to your local/dev Vault instance and the correct secret paths.
+        *   The `scripts/helpers/setup/target/k8s_cluster.sh` script will configure the local Minikube Vault instance with the policies and the `vrooli-vso-sync-role`.
+        *   The VSO configurations in `k8s/chart/values-dev.yaml` (e.g., `vso.enabled`, `vso.vaultAddr`, `vso.k8sAuthRole: "vrooli-vso-sync-role"`, and the granular `vso.secrets` structure) are used.
+        *   Ensure these point to your local/dev Vault instance and the correct secret paths as defined by the policies (e.g., `secret/data/vrooli/config/shared-all`).
 
 This Helm chart provides a structured and maintainable way to manage your Kubernetes deployments as the Vrooli application evolves. 

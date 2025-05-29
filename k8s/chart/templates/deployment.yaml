@@ -44,7 +44,11 @@ spec:
         - name: {{ $name }}
           securityContext:
             {{- toYaml $.Values.securityContext | nindent 12 }}
-          image: "{{ $.Values.image.registry }}/{{ $svc.repository }}:{{ $svc.tag | default $.Chart.AppVersion }}"
+          image: "{{- if and (ne $name "nsfwDetector") (hasPrefix "docker.io/" $.Values.image.registry) -}}
+                     {{ $.Values.image.registry }}/{{ $svc.repository }}:{{ $svc.tag | default $.Chart.AppVersion }}
+                   {{- else -}}
+                     {{ $svc.repository }}:{{ $svc.tag | default $.Chart.AppVersion }}
+                   {{- end -}}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           ports:
             - name: http # Assuming all services expose an HTTP port, adjust if not
@@ -53,48 +57,85 @@ spec:
           env:
             - name: ENV
               value: {{ $.Values.config.env | quote }}
-            {{- if and (or (eq $name "server") (eq $name "jobs")) $.Values.pgoPostgresql.enabled }}
-            # PGO PostgreSQL Connection Details
-            - name: POSTGRES_HOST
-              value: {{ printf "%s-primary" $.Values.pgoPostgresql.clusterName }} # Default primary service name convention for PGO
-            - name: POSTGRES_PORT
-              value: "5432" # PGO default
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName (index $.Values.pgoPostgresql.users 0).name }} # PGO default secret name for user
-                  key: user
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName (index $.Values.pgoPostgresql.users 0).name }}
-                  key: password
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: {{ printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName (index $.Values.pgoPostgresql.users 0).name }}
-                  key: dbname # PGO user secret also contains the initial database name
+            # Environment variables from VSO-managed secrets
+          envFrom:
+            # Shared non-sensitive config for ALL services
+            - secretRef:
+                name: {{ .Values.vso.secrets.sharedConfigAll.k8sSecretName | quote }}
+                optional: true # Make it optional in case the secret is not yet created or enabled
+
+            {{- if or (eq $name "server") (eq $name "jobs") }}
+            # Shared sensitive secrets ONLY for server and jobs
+            - secretRef:
+                name: {{ .Values.vso.secrets.sharedSecretsServerJobs.k8sSecretName | quote }}
+                optional: true 
+            # PostgreSQL credentials from VSO (if VSO syncs them) ONLY for server and jobs
+            # This assumes keys like POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB are in the secret
+            # If PGO direct secrets are used, those take precedence or this might be redundant
+            - secretRef:
+                name: {{ .Values.vso.secrets.postgres.k8sSecretName | quote }}
+                optional: true
+            # Redis credentials from VSO ONLY for server and jobs
+            - secretRef:
+                name: {{ .Values.vso.secrets.redis.k8sSecretName | quote }}
+                optional: true
             {{- end }}
 
-            {{- if and (or (eq $name "server") (eq $name "jobs")) $.Values.spotahomeRedis.enabled }}
-            # Spotahome Redis (Sentinel) Connection Details
-            - name: REDIS_SENTINEL_HOSTS
-              value: "rfs-{{ $.Values.spotahomeRedis.name }}" # Service name for Sentinels created by Spotahome operator
-            - name: REDIS_SENTINEL_PORT
-              value: "26379" # Default Sentinel port
-            - name: REDIS_MASTER_NAME
-              value: "mymaster" # Default master name used by Spotahome operator, verify if changed in Sentinel config
-            - name: REDIS_PASSWORD
+            # --- Existing PGO PostgreSQL Connection Details ---
+            # These will be used if the corresponding VSO-synced K8s secret (vrooli-postgres-creds) for DB connection
+            # does not contain these specific keys, or if that VSO secret is marked optional and not found.
+            # This provides a fallback/alternative to direct PGO secret usage.
+            {{- if and (or (eq $name "server") (eq $name "jobs")) $.Values.pgoPostgresql.enabled $.Values.pgoPostgresql.users }}
+            {{- with index $.Values.pgoPostgresql.users 0 }}
+            {{- $pgoUserSecretName := printf "%s-pguser-%s" $.Values.pgoPostgresql.clusterName .name }}
+            - name: PGO_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgoUserSecretName }}
+                  key: user
+                  optional: true # Make optional to prefer VSO secret if available and has same effective keys
+            - name: PGO_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgoUserSecretName }}
+                  key: password
+                  optional: true
+            - name: PGO_POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgoUserSecretName }}
+                  key: dbname 
+                  optional: true
+            {{- end }} {{/* End with user */}}
+            - name: PGO_POSTGRES_HOST # This uses PGO service names directly
+              value: {{ printf "%s-primary" $.Values.pgoPostgresql.clusterName }} 
+            - name: PGO_POSTGRES_PORT
+              value: "5432"
+            {{- end }} {{/* End PGO enabled and users exist */}}
+
+            # --- Existing Spotahome Redis (Sentinel) Connection Details ---
+            # Similar to PGO, these direct configurations can serve as a fallback or primary
+            # if the VSO-synced K8s secret (vrooli-redis-creds) is optional and not found, or lacks these keys.
+            {{- if and (or (eq $name "server") (eq $name "jobs")) $.Values.spotahomeRedis.enabled $.Values.spotahomeRedis.auth.secretPath }}
+            - name: DIRECT_REDIS_SENTINEL_HOSTS
+              value: "rfs-{{ $.Values.spotahomeRedis.name }}"
+            - name: DIRECT_REDIS_SENTINEL_PORT
+              value: "26379"
+            - name: DIRECT_REDIS_MASTER_NAME
+              value: "mymaster" 
+            - name: DIRECT_REDIS_PASSWORD # Password from the Spotahome operator's configured secret
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.spotahomeRedis.auth.secretPath }}
-                  key: password # Assuming the secret has a 'password' key
-            {{- end }}
+                  key: password
+                  optional: true # Make optional to prefer VSO secret if available
+            {{- end }} {{/* End Spotahome Redis enabled */}}
 
+            # Preserve existing service-specific env vars from values
             {{- if $svc.env }}
-            {{- range $key, $value := $svc.env }}
-            - name: {{ $key }}
-              value: {{ $value | quote }}
+            {{- range $envKey, $envValue := $svc.env }}
+            - name: {{ $envKey }}
+              value: {{ $envValue | quote }}
             {{- end }}
             {{- end }}
           {{- with $svc.probes }}

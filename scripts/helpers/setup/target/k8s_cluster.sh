@@ -282,13 +282,21 @@ k8s_cluster::configure_dev_vault() {
 
     local VAULT_POD="vault-0"
     local VAULT_NAMESPACE="vault"
-    local VAULT_K8S_AUTH_ROLE_NAME="vrooli-app" # Must match values.vso.k8sAuthRole
+    # This VAULT_K8S_AUTH_ROLE_NAME will be used by Vault Secrets Operator (VSO)
+    # to authenticate with Vault and sync secrets.
+    # It must match the 'role' specified in the VaultAuth CRD used by VSO.
+    # See k8s/chart/templates/vso-auth.yaml (if it exists) or Helm values for 'vso.k8sAuthRole'.
+    # We are changing this from 'vrooli-app' to a more specific 'vrooli-vso-sync-role'
+    local VAULT_K8S_AUTH_ROLE_NAME="vrooli-vso-sync-role" 
     
-    # For development, we'll allow the role to be used by 'default' service accounts
-    # from any namespace where a Vrooli dev instance might be deployed.
-    # For a tighter setup, specify exact namespaces.
-    local BOUND_SA_NAMESPACES="*" 
-    local BOUND_SA_NAMES="default" # Assumes VaultAuth in the app's namespace uses the 'default' SA
+    # Define the service account name and namespace that VSO will use to authenticate.
+    # This typically defaults to 'default' SA in the namespace where VSO's VaultAuth CR is deployed.
+    # For dev, if VSO's VaultAuth CR is in the 'dev' namespace (where the app is deployed),
+    # and uses the 'default' service account, then these are correct.
+    # If VSO's VaultAuth CR is in 'vault-secrets-operator-system' and uses a dedicated SA, adjust accordingly.
+    # For now, assuming VSO's VaultAuth CR will be in the app's namespace ('dev' or '*') and use 'default' SA.
+    local BOUND_SA_NAMESPACES="*" # Or be specific e.g., "dev"
+    local BOUND_SA_NAMES="default" # Or the specific SA name VSO's VaultAuth uses.
 
     log::info "Attempting to enable Kubernetes auth method in Vault..."
     # Check if already enabled
@@ -303,34 +311,23 @@ k8s_cluster::configure_dev_vault() {
     fi
 
     log::info "Configuring Kubernetes auth method..."
-    # Fetch Kubernetes host and port from the Vault pod's environment
     local K8S_HOST K8S_PORT
     K8S_HOST=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_HOST)
     K8S_PORT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_PORT_HTTPS)
 
     if [ -z "$K8S_HOST" ]; then
-        log::warning "KUBERNETES_SERVICE_HOST not found in Vault pod's environment. This is unexpected."
-        log::warning "Falling back to service DNS name 'kubernetes.default.svc' for kubernetes_host."
+        log::warning "KUBERNETES_SERVICE_HOST not found in Vault pod's environment."
         K8S_HOST="kubernetes.default.svc" 
     fi
-
     if [ -z "$K8S_PORT" ]; then
-        log::warning "KUBERNETES_SERVICE_PORT_HTTPS not found in Vault pod. Trying KUBERNETES_SERVICE_PORT."
-        K8S_PORT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_PORT)
-        if [ -z "$K8S_PORT" ]; then
-            log::warning "KUBERNETES_SERVICE_PORT also not found. Defaulting to port 443 for kubernetes_host."
-            K8S_PORT="443"
-        fi
+        log::warning "KUBERNETES_SERVICE_PORT_HTTPS not found. Trying KUBERNETES_SERVICE_PORT or defaulting to 443."
+        K8S_PORT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- printenv KUBERNETES_SERVICE_PORT 2>/dev/null || echo "443")
     fi
     
-    # Path to the service account token Vault will use to validate other tokens
     local SA_JWT_TOKEN_PATH="/var/run/secrets/kubernetes.io/serviceaccount/token"
-    # Path to the CA certificate for the K8s API server
     local SA_CA_CERT_PATH="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
     
     log::info "Attempting to configure Vault Kubernetes auth with API server at https://${K8S_HOST}:${K8S_PORT}"
-
-    # Read the CA cert content to pass to vault write
     local K8S_CA_CERT_CONTENT
     K8S_CA_CERT_CONTENT=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- cat "$SA_CA_CERT_PATH")
 
@@ -339,69 +336,93 @@ k8s_cluster::configure_dev_vault() {
         return 1
     fi
     
-    if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault write auth/kubernetes/config \
-        token_reviewer_jwt=@"$SA_JWT_TOKEN_PATH" \
-        kubernetes_host="https://${K8S_HOST}:${K8S_PORT}" \
-        kubernetes_ca_cert="$K8S_CA_CERT_CONTENT" \
-        disable_local_ca_jwt="false" \
+    if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault write auth/kubernetes/config \\
+        token_reviewer_jwt=@"$SA_JWT_TOKEN_PATH" \\
+        kubernetes_host="https://${K8S_HOST}:${K8S_PORT}" \\
+        kubernetes_ca_cert="$K8S_CA_CERT_CONTENT" \\
+        disable_local_ca_jwt="false" \\
         issuer="https://kubernetes.default.svc.cluster.local"; then 
         log::error "Failed to write Kubernetes auth config in Vault."
-        log::info "You may need to manually configure it using 'kubectl exec -n $VAULT_NAMESPACE $VAULT_POD -- vault write auth/kubernetes/config ...'"
         return 1
     fi
     log::success "Kubernetes auth method configured in Vault."
 
+    # --- Apply Vrooli Specific Policies ---
+    log::info "Applying Vrooli-specific Vault policies..."
+    local policy_dir="${var_ROOT_DIR}/k8s/dev-support/vault-policies"
+    local policies_to_apply=(
+        # Configuration variables
+        "vrooli-config-shared-all-read:${policy_dir}/vrooli-config-shared-all-read-policy.hcl"
+        # Only available to the server/jobs. E.g. API keys
+        "vrooli-secrets-shared-server-jobs-read:${policy_dir}/vrooli-secrets-shared-server-jobs-read-policy.hcl"
+        # Postgres secrets
+        "vrooli-secrets-postgres-read:${policy_dir}/vrooli-secrets-postgres-read-policy.hcl"
+        # Redis secrets
+        "vrooli-secrets-redis-read:${policy_dir}/vrooli-secrets-redis-read-policy.hcl"
+        # Docker Hub pull secrets
+        "vrooli-secrets-dockerhub-read:${policy_dir}/vrooli-secrets-dockerhub-read-policy.hcl"
+    )
 
-    log::info "Creating Vault role '${VAULT_K8S_AUTH_ROLE_NAME}' for Vrooli application..."
-    # This role allows pods with specific service accounts in specific namespaces to authenticate.
-    # For VSO, the operator itself will authenticate using a role. For application pods to get secrets directly (if not using VSO), they'd need a role.
-    # The role for VSO to use when syncing secrets should be configured in values.yaml (vso.k8sAuthRole).
-    # Here we create that role.
-    # bound_service_account_names should be the SA that VSO itself runs as (if VSO needs to auth to Vault directly for *itself*)
-    # OR the SA that the application pods will run as (if they were to auth directly, which they won't with VSO).
-    # For VSO, it needs a policy that allows it to read the configured secret paths.
-    
-    # Let's assume the VSO pod runs with a service account like 'vault-secrets-operator' in 'vault-secrets-operator-system'
-    # Or if using a default SA for the vrooli app itself, it would be 'default' in APP_NAMESPACE
-    # For the VSO CRDs (VaultAuth), the 'role' specified there is this Vault role.
+    for item in "${policies_to_apply[@]}"; do
+        IFS=":" read -r policy_name policy_file <<< "$item"
+        if [ ! -f "$policy_file" ]; then
+            log::error "Policy file $policy_file not found. Skipping policy $policy_name."
+            continue
+        fi
+        log::info "Writing policy '$policy_name' from $policy_file..."
+        # Read file content and pass to vault policy write to avoid issues with special characters in path for `cat`
+        local policy_content
+        policy_content=$(cat "$policy_file")
+        if kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault policy write "$policy_name" - <<< "$policy_content"; then
+            log::success "Successfully wrote policy '$policy_name'."
+        else
+            log::error "Failed to write policy '$policy_name'."
+            # return 1 # Decide if this should be a fatal error
+        fi
+    done
 
+    # Comma-separated list of policies for the role
+    local assigned_policies="vrooli-config-shared-all-read,vrooli-secrets-shared-server-jobs-read,vrooli-secrets-postgres-read,vrooli-secrets-redis-read,vrooli-secrets-dockerhub-read"
+
+    log::info "Creating Vault K8s auth role '${VAULT_K8S_AUTH_ROLE_NAME}' for VSO..."
     if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault write "auth/kubernetes/role/${VAULT_K8S_AUTH_ROLE_NAME}" \
-        bound_service_account_names="${BOUND_SA_NAMES}" \\
-        bound_service_account_namespaces="${BOUND_SA_NAMESPACES}" \\
-        policies="default" \\ # CRITICAL: This needs to be a more restrictive policy for production.
+        bound_service_account_names="${BOUND_SA_NAMES}" \
+        bound_service_account_namespaces="${BOUND_SA_NAMESPACES}" \
+        policies="${assigned_policies}" \
         ttl="24h"; then
         log::error "Failed to create Vault role '${VAULT_K8S_AUTH_ROLE_NAME}'."
-        log::info "You may need to manually create it."
         return 1
     fi
-    log::success "Vault role '${VAULT_K8S_AUTH_ROLE_NAME}' created."
+    log::success "Vault role '${VAULT_K8S_AUTH_ROLE_NAME}' created with policies: ${assigned_policies}."
     
-    # Optional: Create a default policy for vrooli-app if 'default' is not sufficient
-    # Example:
-    # kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault policy write vrooli-app-policy - <<EOF
-    # path "secret/data/vrooli/*" {
-    #   capabilities = ["read"]
-    # }
-    # EOF
-    # And then assign `policies="vrooli-app-policy"` to the role.
-
-    # For KV v2, enable at secret/ if not already there (Helm chart usually does this)
     log::info "Ensuring KVv2 engine is mounted at 'secret/'..."
     if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault secrets list -format=json | jq -e '.["secret/"]'; then
+        log::info "Attempting to enable KVv2 secrets engine at path 'secret'..."
         if ! kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault secrets enable -path=secret kv-v2; then
             log::error "Failed to enable KVv2 secrets engine at 'secret/'."
-            # return 1 # This might not be critical if it already exists but not listed as expected.
+            # Consider if this is fatal. If it already exists but with a different type, it might be an issue.
         else
             log::success "KVv2 secrets engine enabled at 'secret/'."
         fi
     else
-        log::info "Secrets engine at 'secret/' seems to exist."
+        log::info "Secrets engine at 'secret/' seems to exist. Verifying type..."
+        # Further check if it's actually kv and version 2
+        local secret_engine_type
+        secret_engine_type=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault secrets list -format=json | jq -r '.["secret/"].type')
+        local secret_engine_options
+        secret_engine_options=$(kubectl exec -n "$VAULT_NAMESPACE" "$VAULT_POD" -- env VAULT_TOKEN=root vault secrets list -format=json | jq -r '.["secret/"].options')
+
+        if [[ "$secret_engine_type" == "kv" ]] && [[ "$secret_engine_options" == *'"version":"2"'* ]]; then
+            log::info "KVv2 engine confirmed at 'secret/'."
+        else
+            log::warning "Existing engine at 'secret/' is not KVv2 (type: $secret_engine_type, options: $secret_engine_options). Manual intervention may be needed."
+            # This could be a point of failure if an incompatible engine is at 'secret/'.
+        fi
     fi
 
-
     log::success "Development Vault basic configuration complete."
-    log::info "Next steps: Populate secrets in Vault at paths like 'secret/data/vrooli/redis', 'secret/data/vrooli/postgres', 'secret/data/vrooli/app'."
-    log::info "Example: kubectl exec -n vault vault-0 -- env VAULT_TOKEN=root vault kv put secret/vrooli/redis password=yourredispassword"
+    log::info "Next steps: Populate secrets in Vault at paths like 'secret/data/vrooli/config/shared-all', 'secret/data/vrooli/secrets/shared-server-jobs', etc."
+    log::info "Example: kubectl exec -n $VAULT_NAMESPACE $VAULT_POD -- env VAULT_TOKEN=root vault kv put secret/data/vrooli/config/shared-all STRIPE_PUBLIC_KEY=pk_test_123"
 }
 
 k8s_cluster::install_kubernetes() {

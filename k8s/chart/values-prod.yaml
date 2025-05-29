@@ -205,19 +205,53 @@ spotahomeRedis:
 vso:
   enabled: true
   # vaultAddr: "https://prod-vault.your-domain.com" # FIXME: Uncomment and set your production Vault address
-  # k8sAuthRole: "vrooli-app-prod" # FIXME: Uncomment and set your production Vault role
+  k8sAuthRole: "vrooli-vso-sync-role" # Ensure this matches the role configured in Vault
+  # vaultAuthRef: "" # Inherited or set if specific for prod
+
   secrets:
+    # Non-sensitive configuration shared by UI, Server, and Jobs for Production
+    sharedConfigAll:
+      enabled: true
+      vaultPath: "secret/data/vrooli-prod/config/shared-all" # Prod-specific path
+      k8sSecretName: "vrooli-config-shared-all"
+
+    # Sensitive secrets shared between Server and Jobs for Production
+    sharedSecretsServerJobs:
+      enabled: true
+      vaultPath: "secret/data/vrooli-prod/secrets/shared-server-jobs" # Prod-specific path
+      k8sSecretName: "vrooli-secrets-shared-server-jobs"
+
+    # PostgreSQL credentials for Production
+    # PGO typically manages its own user secrets directly in K8s.
+    # If VSO is used here, it might be to sync a master credential or a PGO-created secret from one K8s cluster/Vault to another.
+    # For most direct PGO usage, this particular VSO secret might be disabled if apps use PGO secrets directly.
     postgres:
-      enabled: false # Keep false as PGO manages its own user secrets
-      # vaultPath: "secret/data/vrooli-prod/postgres" # Path from existing values-prod.yaml
+      enabled: true # REVIEW: Enable only if VSO is actively managing/syncing prod DB creds from this Vault path.
+                    # If PGO handles secrets that apps consume directly, this might be false.
+      vaultPath: "secret/data/vrooli-prod/secrets/postgres" # Prod-specific path
+      k8sSecretName: "vrooli-postgres-creds"
+
+    # Redis credentials for Production
     redis:
-      enabled: true # Ensure Redis VSO secret sync is enabled
-      vaultPath: "secret/data/vrooli-prod/redis" # FIXME: Ensure this path is correct
-      k8sSecretName: "vrooli-redis-auth" # Must match spotahomeRedis.auth.secretPath
-    app:
+      enabled: true # Enable if VSO syncs prod Redis creds
+      vaultPath: "secret/data/vrooli-prod/secrets/redis" # Prod-specific path
+      k8sSecretName: "vrooli-redis-creds" # Ensure this matches spotahomeRedis.auth.secretPath if operator uses it
+      
+    # Docker Hub pull secret for Production
+    dockerhubPullSecret:
       enabled: true
-      vaultPath: "secret/data/vrooli-prod/app-config"   # FIXME: Ensure this path is correct
-    dockerhub:
-      enabled: true
-      vaultPath: "secret/data/vrooli-prod/dockerhub-creds" # FIXME: Ensure this path is correct
+      vaultPath: "secret/data/vrooli-prod/dockerhub/pull-credentials" # Prod-specific path
+      k8sSecretName: "vrooli-dockerhub-pull-secret"
+      type: kubernetes.io/dockerconfigjson
+      templates:
+        .dockerconfigjson: |
+          {
+            \"auths\": {
+              \"https://index.docker.io/v1/\": {
+                \"username\": \"{{ .Data.username }}\",
+                \"password\": \"{{ .Data.password }}\",
+                \"auth\": \"{{ printf \\\"%s:%s\\\" .Data.username .Data.password | b64enc }}\"
+              }
+            }
+          }
  
