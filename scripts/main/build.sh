@@ -213,6 +213,16 @@ build::main() {
     build_packages
     verify_build
 
+    # Create Brave Rewards verification file after packages (specifically UI) are built
+    if ! brave_rewards::create_verification_file; then
+        log::error "Failed to create Brave Rewards verification file."
+    fi
+
+    # Create Twilio domain verification file
+    if ! twilio_verification::create_verification_file; then
+        log::error "Failed to create Twilio domain verification file. Review warnings above."
+    fi
+
     if flow::is_yes "$TEST"; then
         log::header "Running tests..."
         # Run tests without rebuilding packages

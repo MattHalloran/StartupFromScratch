@@ -126,6 +126,26 @@ setup::main() {
         ci::generate_key_pair
     fi
 
+    # Setup Stripe CLI testing for local development environments
+    if env::in_development && ! flow::is_yes "$IS_CI"; then
+        # Check if any common Stripe keys are set
+        if [[ -n "${STRIPE_API_KEY-}" ]] || \
+           [[ -n "${STRIPE_SECRET_KEY-}" ]] || \
+           [[ -n "${STRIPE_PUBLISHABLE_KEY-}" ]] || \
+           [[ -n "${STRIPE_WEBHOOK_SECRET-}" ]]; then
+            log::info "Stripe environment variables detected. Attempting Stripe CLI setup..."
+            # Call the setup function from the sourced script
+            if stripe_cli::setup; then
+                log::info "Stripe CLI setup function completed successfully."
+            else
+                log::error "Stripe CLI setup function reported an issue. Check logs above."
+            fi
+        else
+            log::info "No Stripe environment variables (STRIPE_API_KEY, STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET) found."
+            log::info "Skipping Stripe CLI setup. To enable, define at least one of these in your .env file."
+        fi
+    fi
+
     # Both CI and development environments can run tests
     if flow::is_yes "$IS_CI" || env::in_development; then
         bats::install
