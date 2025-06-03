@@ -2,6 +2,314 @@
 
 This directory (`k8s/`) contains the Kubernetes configurations required to deploy the Vrooli application. We primarily use [Helm](https://helm.sh/) to package and manage these configurations.
 
+## Architecture Overview
+
+The following diagrams provide visual representations of the Vrooli Kubernetes architecture:
+
+### Overall System Architecture
+
+```mermaid
+graph TB
+    subgraph "External Access"
+        Internet[Internet/Users]
+        Ingress[Ingress Controller]
+    end
+    
+    subgraph "Vrooli Namespace"
+        subgraph "Application Services"
+            UI[UI Service<br/>Port: 3000]
+            Server[Server Service<br/>Port: 5329]
+            Jobs[Jobs Service<br/>Background Processing]
+            NSFW[NSFW Detector<br/>steelcityamir/safe-content-ai]
+            Adminer[Adminer<br/>DB Admin Tool]
+        end
+        
+        subgraph "Data Layer (Operator Managed)"
+            PGO[PostgreSQL Cluster<br/>CrunchyData PGO]
+            Redis[Redis Failover<br/>Spotahome Operator]
+        end
+        
+        subgraph "Secrets Management"
+            VSO[Vault Secrets Operator]
+            Vault[(HashiCorp Vault)]
+            K8sSecrets[Kubernetes Secrets]
+        end
+        
+        subgraph "Configuration"
+            ConfigMap[ConfigMap<br/>Non-sensitive config]
+        end
+    end
+    
+    Internet --> Ingress
+    Ingress --> UI
+    Ingress --> Server
+    
+    UI --> Server
+    Server --> PGO
+    Server --> Redis
+    Jobs --> PGO
+    Jobs --> Redis
+    Jobs --> NSFW
+    
+    Vault --> VSO
+    VSO --> K8sSecrets
+    K8sSecrets --> UI
+    K8sSecrets --> Server
+    K8sSecrets --> Jobs
+    ConfigMap --> UI
+    ConfigMap --> Server
+    ConfigMap --> Jobs
+    
+    Adminer --> PGO
+    
+    classDef service fill:#e1f5fe
+    classDef data fill:#fff3e0
+    classDef secrets fill:#f3e5f5
+    classDef external fill:#e8f5e8
+    
+    class UI,Server,Jobs,NSFW,Adminer service
+    class PGO,Redis data
+    class VSO,Vault,K8sSecrets secrets
+    class Internet,Ingress external
+```
+
+### Service Connectivity and Data Flow
+
+```mermaid
+graph LR
+    subgraph "Frontend"
+        UI[UI Container<br/>React App<br/>Port: 3000]
+    end
+    
+    subgraph "Backend Services"
+        Server[Server Container<br/>API Server<br/>Port: 5329]
+        Jobs[Jobs Container<br/>Background Processing]
+    end
+    
+    subgraph "AI/ML Services"
+        NSFW[NSFW Detector<br/>Content Moderation]
+    end
+    
+    subgraph "Data Persistence"
+        direction TB
+        PGCluster[PostgreSQL Cluster]
+        PGPrimary[Primary Instance]
+        PGReplica[Replica Instance]
+        PGBackup[pgBackRest Backups]
+        
+        RedisCluster[Redis Failover Cluster]
+        RedisMaster[Redis Master]
+        RedisReplica[Redis Replica]
+        RedisSentinel[Redis Sentinel]
+        
+        PGCluster --> PGPrimary
+        PGCluster --> PGReplica
+        PGCluster --> PGBackup
+        
+        RedisCluster --> RedisMaster
+        RedisCluster --> RedisReplica
+        RedisCluster --> RedisSentinel
+    end
+    
+    subgraph "Development Tools"
+        Adminer[Adminer<br/>DB Admin Interface]
+    end
+    
+    UI -->|HTTP API Calls| Server
+    Server -->|SQL Queries| PGPrimary
+    Server -->|Cache Operations| RedisMaster
+    Jobs -->|SQL Operations| PGPrimary
+    Jobs -->|Cache Operations| RedisMaster
+    Jobs -->|Content Analysis| NSFW
+    Adminer -->|Admin Access| PGPrimary
+    
+    PGPrimary -.->|Replication| PGReplica
+    RedisMaster -.->|Replication| RedisReplica
+    RedisSentinel -.->|Monitoring| RedisMaster
+    RedisSentinel -.->|Monitoring| RedisReplica
+    
+    classDef frontend fill:#e3f2fd
+    classDef backend fill:#fff3e0
+    classDef ai fill:#f3e5f5
+    classDef data fill:#e8f5e8
+    classDef tools fill:#fce4ec
+    
+    class UI frontend
+    class Server,Jobs backend
+    class NSFW ai
+    class PGCluster,PGPrimary,PGReplica,PGBackup,RedisCluster,RedisMaster,RedisReplica,RedisSentinel data
+    class Adminer tools
+```
+
+### Secrets Management Flow
+
+```mermaid
+graph TD
+    subgraph "HashiCorp Vault"
+        VaultServer[Vault Server]
+        
+        subgraph "Secret Paths"
+            SharedConfig[secret/data/vrooli/config/shared-all<br/>Non-sensitive configuration]
+            SharedSecrets[secret/data/vrooli/secrets/shared-server-jobs<br/>Sensitive server/jobs secrets]
+            PostgresSecrets[secret/data/vrooli/secrets/postgres<br/>Database credentials]
+            RedisSecrets[secret/data/vrooli/secrets/redis<br/>Redis credentials]
+            DockerSecrets[secret/data/vrooli/dockerhub/pull-credentials<br/>Image pull secrets]
+        end
+    end
+    
+    subgraph "Kubernetes Cluster"
+        subgraph "Vault Secrets Operator"
+            VaultAuth[VaultAuth CR<br/>K8s authentication]
+            VaultConnection[VaultConnection CR<br/>Vault endpoint config]
+            VaultSecret1[VaultSecret CR<br/>shared-config-all]
+            VaultSecret2[VaultSecret CR<br/>shared-secrets-server-jobs]
+            VaultSecret3[VaultSecret CR<br/>postgres]
+            VaultSecret4[VaultSecret CR<br/>redis]
+            VaultSecret5[VaultSecret CR<br/>dockerhub-pull-secret]
+        end
+        
+        subgraph "Kubernetes Secrets"
+            K8sSecret1[vrooli-config-shared-all<br/>ConfigMap alternative]
+            K8sSecret2[vrooli-secrets-shared-server-jobs<br/>Server/Jobs secrets]
+            K8sSecret3[vrooli-postgres-creds<br/>DB access]
+            K8sSecret4[vrooli-redis-creds<br/>Cache access]
+            K8sSecret5[vrooli-dockerhub-pull-secret<br/>Image pull secret]
+        end
+        
+        subgraph "Application Pods"
+            UIPod[UI Pod<br/>Access: shared-config-all]
+            ServerPod[Server Pod<br/>Access: all secrets]
+            JobsPod[Jobs Pod<br/>Access: all secrets]
+        end
+    end
+    
+    VaultServer --> SharedConfig
+    VaultServer --> SharedSecrets
+    VaultServer --> PostgresSecrets
+    VaultServer --> RedisSecrets
+    VaultServer --> DockerSecrets
+    
+    VaultAuth --> VaultServer
+    VaultConnection --> VaultServer
+    
+    SharedConfig --> VaultSecret1 --> K8sSecret1
+    SharedSecrets --> VaultSecret2 --> K8sSecret2
+    PostgresSecrets --> VaultSecret3 --> K8sSecret3
+    RedisSecrets --> VaultSecret4 --> K8sSecret4
+    DockerSecrets --> VaultSecret5 --> K8sSecret5
+    
+    K8sSecret1 --> UIPod
+    K8sSecret1 --> ServerPod
+    K8sSecret1 --> JobsPod
+    
+    K8sSecret2 --> ServerPod
+    K8sSecret2 --> JobsPod
+    K8sSecret3 --> ServerPod
+    K8sSecret3 --> JobsPod
+    K8sSecret4 --> ServerPod
+    K8sSecret4 --> JobsPod
+    
+    K8sSecret5 -.->|ImagePullSecret| UIPod
+    K8sSecret5 -.->|ImagePullSecret| ServerPod
+    K8sSecret5 -.->|ImagePullSecret| JobsPod
+    
+    classDef vault fill:#4285f4,color:#fff
+    classDef vso fill:#ff9800,color:#fff
+    classDef k8ssecret fill:#4caf50,color:#fff
+    classDef pod fill:#9c27b0,color:#fff
+    
+    class VaultServer,SharedConfig,SharedSecrets,PostgresSecrets,RedisSecrets,DockerSecrets vault
+    class VaultAuth,VaultConnection,VaultSecret1,VaultSecret2,VaultSecret3,VaultSecret4,VaultSecret5 vso
+    class K8sSecret1,K8sSecret2,K8sSecret3,K8sSecret4,K8sSecret5 k8ssecret
+    class UIPod,ServerPod,JobsPod pod
+```
+
+### Deployment and Build Flow
+
+```mermaid
+graph TD
+    subgraph "Development Workflow"
+        DevCode[Code Changes]
+        LocalTest[Local Testing]
+        DevDeploy[scripts/main/develop.sh<br/>--target k8s-cluster]
+    end
+    
+    subgraph "Production Workflow"
+        ProdCode[Production Code]
+        BuildScript[scripts/main/build.sh<br/>Creates artifacts]
+        DeployScript[scripts/main/deploy.sh<br/>-s k8s -e prod]
+    end
+    
+    subgraph "Helm Chart Structure"
+        ChartYaml[Chart.yaml<br/>Metadata & Dependencies]
+        ValuesYaml[values.yaml<br/>Default configuration]
+        ValuesDev[values-dev.yaml<br/>Development overrides]
+        ValuesProd[values-prod.yaml<br/>Production overrides]
+        Templates[templates/<br/>K8s resource templates]
+        Tests[tests/<br/>Chart validation tests]
+    end
+    
+    subgraph "Kubernetes Resources Created"
+        Deployments[Deployments<br/>ui, server, jobs, nsfwDetector, adminer]
+        Services[Services<br/>Internal networking]
+        Ingress[Ingress<br/>External access]
+        ConfigMaps[ConfigMaps<br/>Configuration]
+        PGOCluster[PostgresCluster CR<br/>CrunchyData PGO]
+        RedisFailover[RedisFailover CR<br/>Spotahome Redis]
+        VSOResources[VSO Custom Resources<br/>VaultAuth, VaultConnection, VaultSecret]
+        K8sSecrets[Kubernetes Secrets<br/>From VSO sync]
+    end
+    
+    subgraph "Testing & Validation"
+        HelmTest[helm test<br/>Chart tests]
+        GoldenFiles[test-golden-files.sh<br/>Manifest validation]
+        HealthChecks[Health Probes<br/>Liveness & Readiness]
+    end
+    
+    DevCode --> LocalTest
+    LocalTest --> DevDeploy
+    DevDeploy --> ChartYaml
+    DevDeploy --> ValuesYaml
+    DevDeploy --> ValuesDev
+    
+    ProdCode --> BuildScript
+    BuildScript --> DeployScript
+    DeployScript --> ChartYaml
+    DeployScript --> ValuesYaml
+    DeployScript --> ValuesProd
+    
+    ChartYaml --> Templates
+    ValuesYaml --> Templates
+    ValuesDev --> Templates
+    ValuesProd --> Templates
+    
+    Templates --> Deployments
+    Templates --> Services
+    Templates --> Ingress
+    Templates --> ConfigMaps
+    Templates --> PGOCluster
+    Templates --> RedisFailover
+    Templates --> VSOResources
+    
+    VSOResources --> K8sSecrets
+    
+    Tests --> HelmTest
+    Tests --> GoldenFiles
+    Deployments --> HealthChecks
+    
+    classDef dev fill:#4caf50
+    classDef prod fill:#f44336,color:#fff
+    classDef chart fill:#ff9800
+    classDef resources fill:#2196f3,color:#fff
+    classDef testing fill:#9c27b0,color:#fff
+    
+    class DevCode,LocalTest,DevDeploy,ValuesDev dev
+    class ProdCode,BuildScript,DeployScript,ValuesProd prod
+    class ChartYaml,ValuesYaml,Templates chart
+    class Deployments,Services,Ingress,ConfigMaps,PGOCluster,RedisFailover,VSOResources,K8sSecrets resources
+    class HelmTest,GoldenFiles,HealthChecks,Tests testing
+```
+
 ## What is Kubernetes?
 
 Briefly, Kubernetes (often abbreviated as K8s) is an open-source system for automating deployment, scaling, and management of containerized applications. It groups containers that make up an application into logical units for easy management and discovery.
