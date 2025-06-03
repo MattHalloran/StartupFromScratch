@@ -14,116 +14,212 @@ source "${BUILD_DIR}/../utils/system.sh"
 source "${BUILD_DIR}/../utils/var.sh"
 
 googlePlayStore::get_env_vars() {
-    if [ -z "${KEYSTORE_PATH:-}" ]; then
-        KEYSTORE_PATH="${var_ROOT_DIR}/upload-keystore.jks"
-    fi
-    if [ -z "${KEYSTORE_ALIAS:-}" ]; then
-        KEYSTORE_ALIAS="upload"
-    fi
-    if [ -z "${KEYSTORE_PASSWORD:-}" ]; then
-        KEYSTORE_PASSWORD="${GOOGLE_PLAY_KEYSTORE_PASSWORD}"
-    fi
+    # Keystore details
+    KEYSTORE_PATH="${KEYSTORE_PATH:-${var_ROOT_DIR}/upload-keystore.jks}"
+    KEYSTORE_ALIAS="${KEYSTORE_ALIAS:-upload}"
+    KEYSTORE_PASSWORD="${KEYSTORE_PASSWORD:-${GOOGLE_PLAY_KEYSTORE_PASSWORD-}}"
+
+    # Keystore Distinguished Name (DN) components
+    KEYSTORE_DN_CN="${KEYSTORE_DN_CN-}" # Common Name (e.g., Your Full Name)
+    KEYSTORE_DN_OU="${KEYSTORE_DN_OU-}" # Organizational Unit
+    KEYSTORE_DN_O="${KEYSTORE_DN_O-}"  # Organization
+    KEYSTORE_DN_L="${KEYSTORE_DN_L-}"  # Locality/City
+    KEYSTORE_DN_ST="${KEYSTORE_DN_ST-}" # State/Province
+    KEYSTORE_DN_C="${KEYSTORE_DN_C-}"   # Country Code (2 letters)
+
+    # Android App Details
+    ANDROID_PACKAGE_NAME="${ANDROID_PACKAGE_NAME-}"
+    # Optional: A second SHA-256 fingerprint for assetlinks.json
+    GOOGLE_PLAY_DOMAIN_FINGERPRINT="${GOOGLE_PLAY_DOMAIN_FINGERPRINT-}"
 }
 
-# Check for keytool and install JDK if it's not available. This is
-# used for signing the app in the Google Play store
-googlePlayStore::install_jdk() {
+# Check for keytool (JDK) and openssl, and install if not available.
+googlePlayStore::install_dependencies() {
+    log::info "Checking for keytool (Java Development Kit)..."
     if ! system::is_command "keytool"; then
-        system::should_run_update && system::update
-        system::install_pkg "default-jdk"
-        log::success "JDK installed. keytool should now be available."
+        log::info "keytool not found. Attempting to install default-jdk..."
+        if ! system::install_pkg "default-jdk"; then
+            log::error "Failed to install default-jdk. keytool is required for Android signing."
+            log::error "Please install JDK manually and ensure keytool is in your PATH."
+            return 1
+        fi
+        log::success "default-jdk installed successfully. keytool should now be available."
     else
-        log::info "keytool is already installed"
+        log::info "keytool is already installed."
     fi
+
+    log::info "Checking for openssl..."
+    if ! system::is_command "openssl"; then
+        log::info "openssl not found. Attempting to install openssl..."
+        if ! system::install_pkg "openssl"; then
+            log::error "Failed to install openssl. It is required for generating assetlinks.json."
+            return 1
+        fi
+        log::success "openssl installed successfully."
+    else
+        log::info "openssl is already installed."
+    fi
+    
+    return 0
 }
 
 # Sets up the keystore file for the Google Play Store
 googlePlayStore::setup_keystore() {
-    googlePlayStore::get_env_vars
-
-    # Check if keystore file exists
-    if [ ! -f "${KEYSTORE_PATH}" ]; then
-        if flow::is_yes "${YES:-}"; then
-            log::info "Keystore file not found. This is needed to upload the app the Google Play store. Creating keystore file..."
-            REPLY="y"
-        else
-            log::prompt "Keystore file not found. This is needed to upload the app the Google Play store. Would you like to create the file? (Y/n)"
-            read -n1 -r REPLY
-            echo
-        fi
-        if flow::is_yes "$REPLY"; then
-            googlePlayStore::setup_keystore
-
-            # Generate the keystore file
-            log::header "Generating keystore file..."
-            log::info "Before we begin, you'll need to provide some information for the keystore certificate:"
-            log::info "This information should be accurate, but it does not have to match exactly with the information you used to register your Google Play account."
-            log::info "1. First and Last Name: Your full legal name. Example: John Doe"
-            log::info "2. Organizational Unit: The department within your organization managing the key. Example: IT"
-            log::info "3. Organization: The legal name of your company or organization. Example: Vrooli"
-            log::info "4. City or Locality: The city where your organization is based. Example: New York City"
-            log::info "5. State or Province: The state or province where your organization is located. Example: New York"
-            log::info "6. Country Code: The two-letter ISO code for the country of your organization. Example: US"
-            log::info "This information helps to identify the holder of the key."
-            if flow::is_yes "${YES:-}"; then
-                log::info "Skipping confirmation..."
-                REPLY="y"
-            else
-                log::prompt "Press any key to continue..."
-                read -n1 -r -s
-            fi
-
-            log::info "Generating keystore file for Google Play Store"
-            keytool -genkey -v -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -keyalg RSA -keysize 2048 -validity 10000 -storepass "${KEYSTORE_PASSWORD}"
-        fi
+    log::header "Setting up Google Play Keystore..."
+    
+    # Ensure KEYSTORE_PASSWORD etc. are populated
+    # Note: googlePlayStore::get_env_vars was already called by the main function
+    if [ -z "${KEYSTORE_PASSWORD}" ]; then
+        log::info "GOOGLE_PLAY_KEYSTORE_PASSWORD (or KEYSTORE_PASSWORD) is not set. Skipping keystore setup."
+        return 0
     fi
-}
 
-# TODO I don't think is is being used. Probably should be used somewhere?
-googlePlayStore::create_assetlinks_file() {
-    googlePlayStore::get_env_vars
-
-    # Create assetlinks.json file for Google Play Store
     if [ -f "${KEYSTORE_PATH}" ]; then
-        log::header "Creating dist/.well-known/assetlinks.json file so Google can verify the app with the website..."
-        # Export the PEM file from keystore
-        PEM_PATH="${var_ROOT_DIR}/upload_certificate.pem"
-        if ! keytool -export -rfc -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -file "${PEM_PATH}" -storepass "${KEYSTORE_PASSWORD}"; then
-            log::warning "PEM file could not be generated. The app cannot be uploaded to the Google Play store without it."
-            return 1
-        fi
-
-        # Extract SHA-256 fingerprint
-        if ! GOOGLE_PLAY_FINGERPRINT=$(keytool -list -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -storepass "${KEYSTORE_PASSWORD}" -v | grep "SHA256:" | awk '{ print $2 }'); then
-            log::warning "SHA-256 fingerprint could not be extracted. The app cannot be uploaded to the Google Play store without it."
-            return 1
-        else
-            log::success "SHA-256 fingerprint extracted successfully: $GOOGLE_PLAY_FINGERPRINT"
-        fi
-
-        # Create assetlinks.json file for Google Play Store
-        if [ -n "${GOOGLE_PLAY_FINGERPRINT}" ]; then
-            log::info "Creating dist/.well-known/assetlinks.json file for Google Play Trusted Web Activity (TWA)..."
-            mkdir -p "${var_ROOT_DIR}/packages/ui/dist/.well-known"
-            cd "${var_ROOT_DIR}/packages/ui/dist/.well-known"
-            {
-              echo "[{"
-              echo "    \"relation\": [\"delegate_permission/common.handle_all_urls\"],"
-              echo "    \"target\": {"
-              echo "      \"namespace\": \"android_app\","   
-              echo "      \"package_name\": \"com.vrooli.twa\","   
-              if [ -n "${GOOGLE_PLAY_DOMAIN_FINGERPRINT}" ]; then
-                echo "      \"sha256_cert_fingerprints\": ["
-                echo "          \"${GOOGLE_PLAY_FINGERPRINT}\","
-                echo "          \"${GOOGLE_PLAY_DOMAIN_FINGERPRINT}\""
-                echo "      ]"
-              else
-                echo "      \"sha256_cert_fingerprints\": [\"${GOOGLE_PLAY_FINGERPRINT}\"]"
-              fi
-              echo "    }"
-              echo "}]"
-            } >assetlinks.json
-            cd "${BUILD_DIR}/.."
-        fi
+        log::info "Keystore file already exists at ${KEYSTORE_PATH}. Skipping generation."
+        return 0
     fi
+
+    log::info "Keystore file not found at ${KEYSTORE_PATH}. Attempting to generate..."
+
+    # Check for all required DN components
+    local missing_dn_vars=0
+    for var_name in KEYSTORE_DN_CN KEYSTORE_DN_OU KEYSTORE_DN_O KEYSTORE_DN_L KEYSTORE_DN_ST KEYSTORE_DN_C; do
+        if [ -z "${!var_name}" ]; then
+            log::error "Required environment variable ${var_name} for keystore DN is not set."
+            missing_dn_vars=1
+        fi
+    done
+
+    if [ "${missing_dn_vars}" -eq 1 ]; then
+        log::error "Cannot generate keystore due to missing DN information. Please set all KEYSTORE_DN_* variables in your .env file."
+        return 1
+    fi
+
+    local dname_string="CN=${KEYSTORE_DN_CN}, OU=${KEYSTORE_DN_OU}, O=${KEYSTORE_DN_O}, L=${KEYSTORE_DN_L}, ST=${KEYSTORE_DN_ST}, C=${KEYSTORE_DN_C}"
+
+    log::info "Generating keystore file for Google Play Store with DName: ${dname_string}"
+    if keytool -genkey -v \
+        -keystore "${KEYSTORE_PATH}" \
+        -alias "${KEYSTORE_ALIAS}" \
+        -keyalg RSA -keysize 2048 \
+        -validity 10000 \
+        -storepass "${KEYSTORE_PASSWORD}" \
+        -dname "${dname_string}"; then
+        log::success "Keystore file generated successfully at ${KEYSTORE_PATH}"
+    else
+        log::error "Failed to generate keystore file."
+        return 1
+    fi
+    return 0
 }
+
+googlePlayStore::create_assetlinks_file() {
+    log::header "Handling assetlinks.json for Google Play..."
+
+    if [ -z "${KEYSTORE_PASSWORD}" ]; then
+        log::info "GOOGLE_PLAY_KEYSTORE_PASSWORD is not set. Skipping assetlinks.json creation."
+        return 0
+    fi
+
+    if [ ! -f "${KEYSTORE_PATH}" ]; then
+        log::warning "Keystore file not found at ${KEYSTORE_PATH}. Cannot create assetlinks.json without it."
+        log::warning "Ensure keystore setup runs successfully first."
+        return 1
+    fi
+
+    if [ -z "${ANDROID_PACKAGE_NAME}" ]; then
+        log::warning "ANDROID_PACKAGE_NAME is not set. Cannot create assetlinks.json without the package name."
+        return 1
+    fi
+
+    local well_known_dir="${var_ROOT_DIR}/packages/ui/dist/.well-known"
+    local assetlinks_file="${well_known_dir}/assetlinks.json"
+
+    log::info "Ensuring directory exists: ${well_known_dir}"
+    if ! mkdir -p "${well_known_dir}"; then
+        log::error "Failed to create directory ${well_known_dir}."
+        return 1
+    fi
+
+    log::info "Exporting certificate from keystore to generate SHA-256 fingerprint..."
+    # Use a temporary PEM file
+    local temp_pem_path
+    temp_pem_path="$(mktemp)"
+    trap "rm -f ${temp_pem_path}" EXIT
+    
+    if ! keytool -export -rfc -keystore "${KEYSTORE_PATH}" -alias "${KEYSTORE_ALIAS}" -file "${temp_pem_path}" -storepass "${KEYSTORE_PASSWORD}"; then
+        log::error "PEM file could not be generated from keystore. Cannot create assetlinks.json."
+        return 1
+    fi
+
+    log::info "Extracting SHA-256 fingerprint from certificate..."
+    local extracted_fingerprint
+    if ! extracted_fingerprint=$(openssl x509 -in "${temp_pem_path}" -fingerprint -sha256 -noout | sed 's/SHA256 Fingerprint=//g' | tr -d ':' | tr 'a-z' 'A-Z'); then    
+        log::error "SHA-256 fingerprint could not be extracted using openssl."
+        return 1
+    fi
+
+    if [ -z "${extracted_fingerprint}" ]; then
+        log::error "Extracted SHA-256 fingerprint is empty."
+        return 1
+    else
+        log::success "SHA-256 fingerprint extracted: ${extracted_fingerprint}"
+    fi
+
+    log::info "Creating ${assetlinks_file} for package ${ANDROID_PACKAGE_NAME}..."
+    
+    local fingerprints_json_array="\"${extracted_fingerprint}\""
+    if [ -n "${GOOGLE_PLAY_DOMAIN_FINGERPRINT}" ]; then
+        # Ensure the domain fingerprint is also colon-less and uppercase if needed, or formatted consistently
+        local formatted_domain_fingerprint=$(echo "${GOOGLE_PLAY_DOMAIN_FINGERPRINT}" | tr -d ':' | tr 'a-z' 'A-Z')
+        fingerprints_json_array="${fingerprints_json_array}, \"${formatted_domain_fingerprint}\""
+    fi
+
+    # Using printf for safer JSON construction
+    if ! printf '[{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "%s",
+      "sha256_cert_fingerprints": [%s]
+    }
+}]' "${ANDROID_PACKAGE_NAME}" "${fingerprints_json_array}" > "${assetlinks_file}"; then
+        log::error "Failed to write ${assetlinks_file}."
+        return 1
+    fi
+
+    log::success "${assetlinks_file} created successfully."
+    return 0
+}
+
+
+googlePlayStore::main() {
+    googlePlayStore::get_env_vars
+
+    # Only proceed if the primary trigger (keystore password) is set
+    if [ -z "${KEYSTORE_PASSWORD}" ]; then
+        log::info "GOOGLE_PLAY_KEYSTORE_PASSWORD is not set. Google Play Store specific build steps will be skipped."
+        exit 0
+    fi
+
+    if ! googlePlayStore::install_dependencies;
+        log::error "Dependency installation (JDK/openssl) failed. Aborting Google Play Store build steps."
+        exit 1
+    fi
+
+    if ! googlePlayStore::setup_keystore; then
+        log::error "Keystore setup failed. Aborting Google Play Store build steps."
+        exit 1
+    fi
+
+    if ! googlePlayStore::create_assetlinks_file; then
+        log::error "Assetlinks.json creation failed."
+        exit 1 
+    fi
+
+    log::success "Google Play Store prerequisite setup completed successfully."
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    googlePlayStore::main
+fi
