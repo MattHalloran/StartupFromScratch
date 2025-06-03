@@ -9,7 +9,7 @@ source "${SETUP_TARGET_DIR}/../../utils/log.sh"
 # shellcheck disable=SC1091
 source "${SETUP_TARGET_DIR}/../../utils/pnpm_tools.sh"
 
-setup_docker_only() {
+docker_only::setup_docker_only() {
     log::header "Setting up Docker only development/production..."
 
     pnpm_tools::setup
@@ -20,3 +20,7 @@ setup_docker_only() {
     log::success "✅ Docker images built successfully."
 }
 
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    docker_only::setup_docker_only "$@"
+fi 

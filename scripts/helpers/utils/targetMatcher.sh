@@ -21,7 +21,7 @@ match_target() {
             echo "native-linux"
             return 0
             ;;
-        m|nm|mac|macos|mac-os|native-mac)
+        m|nm|mac|macos|mac-os|native-mac|native-macos)
             echo "native-mac"
             return 0
             ;;
@@ -43,29 +43,3 @@ match_target() {
             ;;
     esac
 }
-
-# Function to execute a target-specific function based on the target
-# Usage: execute_for_target "target_string" "function_prefix"
-# Example: execute_for_target "native-linux" "setup_" will call setup_native_linux
-execute_for_target() {
-    local target="$1"
-    local prefix="$2"
-    
-    # Match the target first
-    local matched_target
-    matched_target=$(match_target "$target") || return $?
-    
-    # Convert target to function name by:
-    # 1. Replacing hyphens with underscores
-    # 2. Adding the prefix
-    local function_name="${prefix}${matched_target//-/_}"
-    
-    # Check if the function exists
-    if ! declare -F "$function_name" > /dev/null; then
-        log::error "Function $function_name does not exist"
-        return "${ERROR_FUNCTION_NOT_FOUND}"
-    fi
-    
-    # Execute the function
-    "$function_name"
-} 

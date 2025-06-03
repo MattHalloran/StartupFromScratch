@@ -6,13 +6,15 @@ UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/env.sh"
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/flow.sh"
+source "${UTILS_DIR}/exit_codes.sh"
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
+source "${UTILS_DIR}/flow.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/system.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/var.sh"
 
 docker::install() {
     if ! flow::can_run_sudo; then
@@ -305,7 +307,7 @@ docker::setup() {
     docker::install
     docker::start
     docker::setup_docker_compose
-    if ! flow::is_yes "${CI:-}"; then
+    if ! flow::is_yes "${IS_CI:-}"; then
         docker::setup_internet_access
         docker::configure_resource_limits
     fi
@@ -313,16 +315,16 @@ docker::setup() {
 
 docker::get_compose_file() {
     if env::in_production; then
-        echo "${DOCKER_COMPOSE_PROD_FILE}"
+        echo "${var_DOCKER_COMPOSE_PROD_FILE}"
     else
-        echo "${DOCKER_COMPOSE_DEV_FILE}"
+        echo "${var_DOCKER_COMPOSE_DEV_FILE}"
     fi
 }
 
 docker::build_images() {
     log::header "Building Docker images"
     local compose_file=$(docker::get_compose_file)
-    cd "$ROOT_DIR" || { log::error "Failed to change directory to project root"; exit "$ERROR_BUILD_FAILED"; }
+    cd "$var_ROOT_DIR" || { log::error "Failed to change directory to project root"; exit "$ERROR_BUILD_FAILED"; }
     if system::is_command "docker compose"; then
         docker compose -f "$compose_file" build --no-cache --progress=plain
     elif system::is_command "docker-compose"; then
@@ -341,12 +343,14 @@ docker::pull_base_images() {
         base_images=(
             "redis:7.4.0-alpine"
             "pgvector/pgvector:pg15"
+            "steelcityamir/safe-content-ai:1.1.0"
             # add production-only base images here
         )
     else
         base_images=(
             "redis:7.4.0-alpine"
             "pgvector/pgvector:pg15"
+            "steelcityamir/safe-content-ai:1.1.0"
             # add development-only base images here
         )
     fi
@@ -409,15 +413,13 @@ docker::save_images() {
     fi
 
     docker save -o "$images_tar" "${images[@]}"
+    log::success "Docker images saved to $images_tar"
 }
 
 docker::build_artifacts() {
-    local outdir="$1"
-    log::info "Building Docker artifacts..."
+    log::header "Building Docker artifacts..."
     docker::build_images
     docker::pull_base_images
-    docker::save_images "$outdir"
-    log::success "Docker images saved to $outdir/docker-images.tar"
 }
 
 docker::load_images_from_tar() {
@@ -436,4 +438,81 @@ docker::load_images_from_tar() {
         log::error "Failed to load Docker images from ${tar_path}."
         return 1
     fi
+}
+
+# Docker login. Required for sending images to Docker Hub.
+docker::login_to_dockerhub() {
+    log::header "Logging into Docker Hub..."
+    if [ -z "${DOCKERHUB_USERNAME:-}" ] || [ -z "${DOCKERHUB_TOKEN:-}" ]; then
+        log::error "DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set."
+        exit "$ERROR_DOCKER_LOGIN_FAILED"
+    fi
+    echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+    log::success "Successfully logged into Docker Hub."
+}
+
+# Tags and pushes Docker images to Docker Hub. Required for deploying to K8s, 
+# since we can't send zipped images like we can for deployment to a single VPS.
+docker::tag_and_push_images() {
+    log::header "Tagging and pushing Docker images..."
+  
+    if [ -z "${DOCKERHUB_USERNAME:-}" ]; then
+        log::error "DOCKERHUB_USERNAME must be set."
+        exit "$ERROR_DOCKER_LOGIN_FAILED"
+    fi
+    
+    local current_version="${PROJECT_VERSION:-}" # Use PROJECT_VERSION set by build.sh
+    if [ -z "$current_version" ]; then
+        log::warning "PROJECT_VERSION is not set by the calling script (e.g., build.sh). Using 'latest' as the version tag."
+        current_version="latest"
+    fi
+  
+    local services=("server" "ui" "jobs") # Define services with Docker images
+    local image_name # local variable for image name
+    local version_tag # specific version tag
+    local floating_tag # dev or prod tag
+
+    # Determine the floating tag (dev/prod) based on the global ENVIRONMENT variable
+    # env::in_production sources this global variable
+    if env::in_production; then # env::in_production doesn't take an argument, uses global $ENVIRONMENT
+        floating_tag="prod"
+    else
+        floating_tag="dev"
+    fi
+  
+    for service in "${services[@]}"; do
+        image_name="@vrooli/${service}" # This is the local image name convention used by pnpm + Docker
+        
+        # Tag with specific version
+        version_tag="${DOCKERHUB_USERNAME}/${service}:${current_version}"
+        log::info "Tagging image ${image_name} as ${version_tag}"
+        if ! docker tag "${image_name}" "${version_tag}"; then
+            log::error "Failed to tag image ${image_name} with version ${current_version}. Does the local image exist?"
+            continue 
+        fi
+    
+        log::info "Pushing image ${version_tag} to Docker Hub..."
+        if ! docker push "${version_tag}"; then
+            log::error "Failed to push image ${version_tag}."
+        else
+            log::success "Successfully pushed ${version_tag}"
+        fi
+
+        # Tag with floating tag (dev/prod)
+        local floating_tag_full="${DOCKERHUB_USERNAME}/${service}:${floating_tag}"
+        log::info "Tagging image ${image_name} as ${floating_tag_full}"
+        if ! docker tag "${image_name}" "${floating_tag_full}"; then
+            log::error "Failed to tag image ${image_name} with floating tag ${floating_tag}."
+            # This failure is less critical than the versioned tag, so don't continue here necessarily
+        else
+            log::info "Pushing image ${floating_tag_full} to Docker Hub..."
+            if ! docker push "${floating_tag_full}"; then
+                log::error "Failed to push image ${floating_tag_full}."
+            else
+                log::success "Successfully pushed ${floating_tag_full}"
+            fi
+        fi
+    done
+  
+    log::success "Finished tagging and pushing images."
 }

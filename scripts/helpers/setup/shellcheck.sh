@@ -79,3 +79,8 @@ shellcheck::install() {
 
     log::error "All fallback ShellCheck installations failed"
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    shellcheck::install "$@"
+fi

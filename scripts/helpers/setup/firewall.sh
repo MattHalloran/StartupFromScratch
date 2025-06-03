@@ -10,6 +10,8 @@ source "${SETUP_DIR}/../utils/env.sh"
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/log.sh"
+# shellcheck disable=SC1091
+source "${SETUP_DIR}/../utils/system.sh"
 
 # Check if host has internet access. Exits with error if no access.
 firewall::setup() {
@@ -23,6 +25,12 @@ firewall::setup() {
         log::warning "Skipping firewall setup due to sudo mode"
         return
     fi
+    # Skip firewall setup if ufw isn't available
+    if ! system::is_command "ufw"; then
+        log::warning "ufw not found; skipping firewall setup"
+        return
+    fi
+
     log::header "🔥🧱 Setting up firewall in $environment environment..."
     
     # Track if any changes were made
@@ -86,3 +94,8 @@ firewall::setup() {
 
     log::success "Firewall setup complete"
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    firewall::setup "$@"
+fi

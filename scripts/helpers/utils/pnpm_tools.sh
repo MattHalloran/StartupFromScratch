@@ -5,11 +5,11 @@ set -euo pipefail
 SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/locations.sh"
-# shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/log.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/system.sh"
+# shellcheck disable=SC1091
+source "${SETUP_DIR}/../utils/var.sh"
 
 # Ensure pnpm is available, using corepack if possible, otherwise fallback to npm install -g pnpm
 pnpm_tools::ensure_pnpm() {
@@ -35,13 +35,13 @@ pnpm_tools::ensure_pnpm() {
 }
 
 pnpm_tools::generate_prisma_client() {
-    HASH_FILE="${DATA_DIR}/schema-hash"
+    HASH_FILE="${var_DATA_DIR}/schema-hash"
 
     # Compute current schema hash
     if system::is_command "shasum"; then
-        CURRENT_HASH=$(shasum -a 256 "$DB_SCHEMA_FILE" | awk '{print $1}')
+        CURRENT_HASH=$(shasum -a 256 "$var_DB_SCHEMA_FILE" | awk '{print $1}')
     elif system::is_command "sha256sum"; then
-        CURRENT_HASH=$(sha256sum "$DB_SCHEMA_FILE" | awk '{print $1}')
+        CURRENT_HASH=$(sha256sum "$var_DB_SCHEMA_FILE" | awk '{print $1}')
     else
         log::error "Neither shasum nor sha256sum found; cannot compute schema hash"
         exit 1
@@ -59,7 +59,7 @@ pnpm_tools::generate_prisma_client() {
     else
         log::info "Schema changed; generating Prisma client..."
         pnpm --filter @vrooli/prisma run generate
-        mkdir -p "$DATA_DIR"
+        mkdir -p "$var_DATA_DIR"
         echo "$CURRENT_HASH" > "$HASH_FILE"
     fi
 }

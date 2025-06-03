@@ -4,8 +4,6 @@ set -euo pipefail
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
-# shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/exit_codes.sh"
@@ -13,20 +11,22 @@ source "${UTILS_DIR}/exit_codes.sh"
 source "${UTILS_DIR}/system.sh"
 # shellcheck disable=SC1091
 source "${UTILS_DIR}/vault.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/var.sh"
 
 env::dev_file_exists() {
-    [ -f "$ENV_DEV_FILE" ]
+    [ -f "$var_ENV_DEV_FILE" ]
 }
 
 env::prod_file_exists() {
-    [ -f "$ENV_PROD_FILE" ]
+    [ -f "$var_ENV_PROD_FILE" ]
 }
 
 # Load secrets from an environment file
 env::load_env_file() {
-    ENV_FILE="$ENV_PROD_FILE"
+    ENV_FILE="$var_ENV_PROD_FILE"
     if env::in_development "$NODE_ENV"; then
-        ENV_FILE="$ENV_DEV_FILE"
+        ENV_FILE="$var_ENV_DEV_FILE"
     fi
 
     if [ ! -f "$ENV_FILE" ]; then
@@ -223,9 +223,9 @@ env::load_secrets() {
     fi
 
     # Determine the correct .env file to source
-    local env_file_to_source="$ENV_PROD_FILE"
+    local env_file_to_source="$var_ENV_PROD_FILE"
     if env::in_development "$NODE_ENV"; then
-        env_file_to_source="$ENV_DEV_FILE"
+        env_file_to_source="$var_ENV_DEV_FILE"
     fi
 
     # Source the primary .env file first to load base config (like VAULT_ADDR, etc.)
@@ -240,6 +240,10 @@ env::load_secrets() {
         # In containerized environments, the file might not exist, relying solely on injected vars
         log::info "Base environment file not found: $env_file_to_source. Relying on existing environment variables."
     fi
+
+    # Default SECRETS_SOURCE to 'file' if not set, to avoid fatal errors
+    : "${SECRETS_SOURCE:=file}"
+    export SECRETS_SOURCE
 
     : "${SECRETS_SOURCE:?Required environment variable SECRETS_SOURCE is not set}"
 
@@ -269,11 +273,11 @@ env::load_secrets() {
     # Load JWT keys from their respective PEM files if they haven't been set by the primary source.
     log::info "Checking/Loading JWT keys from PEM files if not already set..."
     if env::in_development; then
-        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${STAGING_JWT_PRIV_KEY_FILE}"
-        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${STAGING_JWT_PUB_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${var_STAGING_JWT_PRIV_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${var_STAGING_JWT_PUB_KEY_FILE}"
     else
-        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${PRODUCTION_JWT_PRIV_KEY_FILE}"
-        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${PRODUCTION_JWT_PUB_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PRIV" "${var_PRODUCTION_JWT_PRIV_KEY_FILE}"
+        env::load_jwt_key_from_pem_if_unset "JWT_PUB" "${var_PRODUCTION_JWT_PUB_KEY_FILE}"
     fi
 
     log::success "Secrets loaded and processed."
@@ -313,12 +317,9 @@ env::is_location_local() {
 }
 
 env::in_production() {
-    # Use ENVIRONMENT or provided argument
-    local environment="${ENVIRONMENT:-}"
-    if [ -z "$environment" ]; then
-        environment="$ENVIRONMENT"
-    fi
-    environment=$(echo "$environment" | tr '[:upper:]' '[:lower:]') 
+    # Use provided argument (preferred), otherwise default to ENVIRONMENT
+    local environment="${1:-${ENVIRONMENT:-}}"
+    environment=$(echo "$environment" | tr '[:upper:]' '[:lower:]')
 
     case "$environment" in
         p*) return 0 ;;
@@ -327,11 +328,8 @@ env::in_production() {
 }
 
 env::in_development() {
-    # Use ENVIRONMENT or provided argument
-    local environment="${ENVIRONMENT:-}"
-    if [ -z "$environment" ]; then
-        environment="$ENVIRONMENT"
-    fi
+    # Use provided argument (preferred), otherwise default to ENVIRONMENT
+    local environment="${1:-${ENVIRONMENT:-}}"
     environment=$(echo "$environment" | tr '[:upper:]' '[:lower:]')
 
     case "$environment" in

@@ -18,7 +18,7 @@
     "test:shell": "bash scripts/__tests/__runTests.sh",
     "test:unit": "pnpm -r test",
     "test:run": "pnpm -r test:run",
-    "test": "run-s test:shell test:unit pnpm -r test"
+    "test": "run-s test:shell test:unit test:run"
   },
   "devDependencies": {
     "@swc/cli": "^0.1.60",

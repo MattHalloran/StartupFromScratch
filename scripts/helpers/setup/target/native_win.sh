@@ -9,7 +9,7 @@ source "${SETUP_TARGET_DIR}/../../utils/log.sh"
 # shellcheck disable=SC1091
 source "${SETUP_TARGET_DIR}/../../utils/system.sh"
 
-setup_native_win() {
+native_win::setup_native_win() {
     log::header "Setting up native Windows development/production..."
 
     # Check if running on Windows
@@ -53,3 +53,8 @@ setup_native_win() {
 
     log::success "Native Windows setup completed successfully!"
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    native_win::setup_native_win "$@"
+fi 

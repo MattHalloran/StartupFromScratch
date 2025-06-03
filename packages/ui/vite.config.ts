@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 export default ({ mode }: { mode: string }) => {
   // Load environment variables prefixed with VITE_
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -33,7 +35,7 @@ export default ({ mode }: { mode: string }) => {
       host: '0.0.0.0',
       port: parseInt(env.VITE_PORT_UI || '3000', 10), // Ensure port is a number
       open: false,
-      allowedHosts: [
+      allowedHosts: isDev ? true : [
         // Dynamically allow the host derived from VITE_API_URL
         apiHost,
         // Allow the corresponding do-origin host

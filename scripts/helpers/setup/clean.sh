@@ -7,17 +7,17 @@ SETUP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/flow.sh"
 # shellcheck disable=SC1091
-source "${SETUP_DIR}/../utils/locations.sh"
-# shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/log.sh"
 # shellcheck disable=SC1091
 source "${SETUP_DIR}/../utils/system.sh"
+# shellcheck disable=SC1091
+source "${SETUP_DIR}/../utils/var.sh"
 
 # Clear node_modules at the root and in all project subdirectories without descending into them
 clean::clear_node_modules() {
     log::header "Deleting all node_modules directories"
     # Prune node_modules directories to avoid find recursing into them after deletion
-    find "${ROOT_DIR}" -maxdepth 4 -type d -name "node_modules" -prune -exec rm -rf {} +
+    find "${var_ROOT_DIR}" -maxdepth 4 -type d -name "node_modules" -prune -exec rm -rf {} +
 }
 
 # Clear apt cache and 
@@ -69,4 +69,9 @@ clean::main() {
     # clean::clear_apt
     clean::prune_docker
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    clean::main "$@"
+fi
 

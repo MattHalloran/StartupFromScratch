@@ -78,8 +78,8 @@ system::install_pkg() {
     local pkg="$1"
     local pm prefix
   
-    log::header "📦 Installing system package $pkg as $(system::get_package_name $pkg)"
-    pkg=$(system::get_package_name $pkg)
+    log::header "📦 Installing system package $pkg as $(system::get_package_name "$pkg")"
+    pkg=$(system::get_package_name "$pkg")
     pm=$(system::detect_pm)
   
     # Brew never needs sudo; others only if allowed
@@ -121,6 +121,103 @@ system::install_pkg() {
     esac
     
     log::success "Installed $pkg via $pm"
+}
+
+system::install_yq_binary() {
+    log::header "📦 Installing yq (by Mike Farah) via binary download..."
+    local YQ_VERSION="v4.40.5" # Pinning to a known version
+    local YQ_OS_TYPE=""
+    local YQ_ARCH=""
+    local machine_os
+    local machine_arch
+    local YQ_INSTALL_PATH="/usr/local/bin/yq" # Common location
+
+    machine_os=$(uname -s)
+    machine_arch=$(uname -m)
+
+    case "$machine_os" in
+        "Linux") YQ_OS_TYPE="linux" ;;
+        "Darwin") YQ_OS_TYPE="darwin" ;;
+        *)
+            log::error "Unsupported OS for yq binary download: $machine_os. Please install yq manually."
+            return 1
+            ;;
+    esac
+
+    case "$machine_arch" in
+        "x86_64"|"amd64") YQ_ARCH="amd64" ;;
+        "aarch64"|"arm64") YQ_ARCH="arm64" ;;
+        *)
+            log::error "Unsupported architecture for yq binary download: $machine_arch. Please install yq manually."
+            return 1
+            ;;
+    esac
+
+    local YQ_DOWNLOAD_URL="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_${YQ_OS_TYPE}_${YQ_ARCH}"
+    local TEMP_YQ_DOWNLOAD_PATH="/tmp/yq_${YQ_OS_TYPE}_${YQ_ARCH}"
+
+    log::info "Downloading yq from ${YQ_DOWNLOAD_URL} to ${TEMP_YQ_DOWNLOAD_PATH}"
+
+    if ! curl -sSL "${YQ_DOWNLOAD_URL}" -o "${TEMP_YQ_DOWNLOAD_PATH}"; then
+        log::error "Failed to download yq binary from ${YQ_DOWNLOAD_URL}."
+        rm -f "${TEMP_YQ_DOWNLOAD_PATH}" # Clean up
+        return 1
+    fi
+
+    log::info "Moving yq binary to ${YQ_INSTALL_PATH} and setting permissions."
+    # Try to move and set permissions, may require sudo
+    if flow::maybe_run_sudo mv "${TEMP_YQ_DOWNLOAD_PATH}" "${YQ_INSTALL_PATH}"; then
+        if flow::maybe_run_sudo chmod +x "${YQ_INSTALL_PATH}"; then
+            # Verify the downloaded yq works
+            if "${YQ_INSTALL_PATH}" --version >/dev/null 2>&1 ; then
+                log::success "yq binary (Mike Farah's ${YQ_VERSION}) downloaded and installed to ${YQ_INSTALL_PATH}"
+                # No need to rm TEMP_YQ_DOWNLOAD_PATH as mv handled it
+                return 0
+            else
+                log::error "yq downloaded to ${YQ_INSTALL_PATH} but is not working correctly. Cleaning up."
+                flow::maybe_run_sudo rm -f "${YQ_INSTALL_PATH}"
+                return 1
+            fi
+        else
+            log::error "Failed to make yq binary executable at ${YQ_INSTALL_PATH}. Please check permissions. Cleaning up."
+            flow::maybe_run_sudo rm -f "${YQ_INSTALL_PATH}" # Cleanup if chmod failed
+            return 1
+        fi
+    else
+        log::error "Failed to move yq binary to ${YQ_INSTALL_PATH}. Please check permissions. Cleaning up."
+        rm -f "${TEMP_YQ_DOWNLOAD_PATH}" # mv failed, so temp file still exists
+        return 1
+    fi
+}
+
+system::check_and_install() {
+    local cmd="$1"
+    log::info "Checking for $cmd..."
+    if system::is_command "$cmd"; then
+        log::success "$cmd is already installed."
+        return 0
+    fi
+  
+    log::warning "$cmd not found. Installing…"
+    if [[ "$cmd" == "yq" ]]; then
+        if ! system::install_yq_binary; then
+             log::error "Could not install $cmd using binary download method—please install it manually."
+             exit "${ERROR_DEPENDENCY_MISSING}"
+        fi
+    else
+        if ! system::install_pkg "$cmd"; then
+            log::error "Could not install $cmd using package manager—please install it manually."
+            exit "${ERROR_DEPENDENCY_MISSING}"
+        fi
+    fi
+  
+    if system::is_command "$cmd"; then
+        log::success "$cmd installed successfully."
+    else
+        # This case should ideally be caught by the specific install functions' error handling
+        log::error "Installation of $cmd was reported as successful, but the command is still not found."
+        exit "${ERROR_DEPENDENCY_MISSING}"
+    fi
 }
 
 # Update package lists
@@ -235,21 +332,42 @@ system::purge_apt_update_notifier() {
     fi
 }
 
-system::check_and_install() {
-    local cmd="$1"
-    log::info "Checking for $cmd..."
-    if system::is_command "$cmd"; then
-        log::success "$cmd is already installed."
-        return 0
+# Cross-platform path canonicalization: resolves symlinks if possible, else lexical fallback
+system::canonicalize() {
+  local input="$1"
+  # Use realpath if available to fully resolve symlinks
+  if system::is_command realpath; then
+    realpath "$input"
+  elif system::is_command readlink; then
+    # readlink -f resolves symlinks and canonicalizes
+    readlink -f "$input"
+  else
+    # Pure Bash fallback: expand relative paths and normalize . and .. components
+    if [[ "$input" != /* ]]; then
+      input="$PWD/$input"
     fi
-  
-    log::warning "$cmd not found. Installing…"
-    system::install_pkg "$cmd"
-  
-    if system::is_command "$cmd"; then
-        log::success "$cmd installed successfully."
-    else
-        log::error "Could not install $cmd—please install it manually."
-        exit "${ERROR_DEPENDENCY_MISSING}"
-    fi
+    # Remove '/./' segments
+    input="${input//\/\.\//\/}"
+    # Split into components
+    local IFS='/'
+    read -r -a _segments <<< "$input"
+    local _result=()
+    for _seg in "${_segments[@]}"; do
+      case "$_seg" in
+        ''|'.') continue ;;
+        '..')
+          if (( ${#_result[@]} > 0 )); then
+            unset '_result[${#_result[@]}-1]'
+          fi
+          ;;
+        *) _result+=("$_seg") ;;
+      esac
+    done
+    # Reconstruct the path
+    local canonical="/"
+    for _seg in "${_result[@]}"; do
+      canonical="${canonical%/}/$_seg"
+    done
+    echo "$canonical"
+  fi
 }

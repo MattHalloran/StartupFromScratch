@@ -9,7 +9,7 @@ source "${DEVELOP_TARGET_DIR}/../../utils/log.sh"
 # shellcheck disable=SC1091
 source "${DEVELOP_TARGET_DIR}/../../utils/system.sh"
 
-brew_install() {
+nativeMac::brew_install() {
     if ! system::is_command "brew"; then
         echo "Homebrew not found, installing..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -18,7 +18,7 @@ brew_install() {
     fi
 }
 
-volta_install() {
+nativeMac::volta_install() {
     if ! system::is_command "volta"; then
         echo "Volta not found, installing..."
         brew install volta
@@ -27,24 +27,29 @@ volta_install() {
     fi
 }
 
-node_pnpm_setup() {
+nativeMac::node_pnpm_setup() {
     volta install node
     volta install pnpm
 }
 
-gnu_tools_install() {
+nativeMac::gnu_tools_install() {
     brew install coreutils findutils
 }
 
-docker_compose_infra() {
+nativeMac::docker_compose_infra() {
     docker-compose up -d
 }
 
-setup_native_mac() {
-    log::header "Setting up native Mac development..."
-    brew_install
-    volta_install
-    node_pnpm_setup
-    gnu_tools_install
-    docker_compose_infra
+nativeMac::setup_native_mac() {
+    log::header "Setting up native Mac development/production..."
+    nativeMac::brew_install
+    nativeMac::volta_install
+    nativeMac::node_pnpm_setup
+    nativeMac::gnu_tools_install
+    nativeMac::docker_compose_infra
 }
+
+# If this script is run directly, invoke its main function.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    nativeMac::setup_native_mac "$@"
+fi

@@ -4,9 +4,9 @@
 UTILS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # shellcheck disable=SC1091
-source "${UTILS_DIR}/locations.sh"
-# shellcheck disable=SC1091
 source "${UTILS_DIR}/log.sh"
+# shellcheck disable=SC1091
+source "${UTILS_DIR}/var.sh"
 
 CONN_TIMEOUT_S=10
 SETUP_MODE=false

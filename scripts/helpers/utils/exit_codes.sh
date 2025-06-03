@@ -124,6 +124,14 @@ EXIT_CODES+=("ERROR_JWT_FILE_MISSING")
 : "${DESC_ERROR_COMMAND_NOT_FOUND:=Command not found}"
 EXIT_CODES+=("ERROR_COMMAND_NOT_FOUND")
 
+: "${ERROR_SSH_FILE_MISSING:=91}"
+: "${DESC_ERROR_SSH_FILE_MISSING:=SSH key file missing}"
+EXIT_CODES+=("ERROR_SSH_FILE_MISSING")
+
+: "${ERROR_DOCKER_LOGIN_FAILED:=92}"
+: "${DESC_ERROR_DOCKER_LOGIN_FAILED:=Docker login failed}"
+EXIT_CODES+=("ERROR_DOCKER_LOGIN_FAILED")
+
 # Helper function to generate exit codes display for usage
 exit_codes::print() {
     local var_name code desc_var description

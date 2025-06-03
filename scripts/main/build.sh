@@ -15,11 +15,11 @@ source "${MAIN_DIR}/../helpers/utils/flow.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/keyless_ssh.sh"
 # shellcheck disable=SC1091
-source "${MAIN_DIR}/../helpers/utils/locations.sh"
-# shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/log.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/system.sh"
+# shellcheck disable=SC1091
+source "${MAIN_DIR}/../helpers/utils/var.sh"
 # shellcheck disable=SC1091
 source "${MAIN_DIR}/../helpers/utils/version.sh"
 # shellcheck disable=SC1091
@@ -70,18 +70,20 @@ build::parse_arguments() {
         --options "local|remote" \
         --default "local"
 
+    # This should ideally be yes by default. We should update this later when the tests are more stable.
     args::register \
         --name "test" \
         --flag "t" \
-        --desc "Run tests before building (default: true)" \
+        --desc "Run tests before building (default: no)" \
         --type "value" \
         --options "yes|no" \
-        --default "yes"
+        --default "no"
     
+    # This should ideally be yes by default. We should update this later when the files are more stable.
     args::register \
         --name "lint" \
         --flag "q" \
-        --desc "Run linting before building (default: true)" \
+        --desc "Run linting before building (default: no)" \
         --type "value" \
         --options "yes|no" \
         --default "no"
@@ -112,7 +114,15 @@ build::parse_arguments() {
     export DEST=$(args::get "dest")
     export TEST=$(args::get "test")
     export LINT=$(args::get "lint")
-    export VERSION=$(args::get "version")
+    
+    local user_supplied_version_value=$(args::get "version")
+    if [ -n "$user_supplied_version_value" ]; then
+        export VERSION="$user_supplied_version_value"
+        export VERSION_SPECIFIED_BY_USER="yes"
+    else
+        export VERSION=$(version::get_project_version) # Sets default if no -v flag
+        export VERSION_SPECIFIED_BY_USER="no"
+    fi
 
     # Split the strings into arrays
     IFS=',' read -r -a BUNDLES <<< "$bundles_str"
@@ -155,19 +165,44 @@ build::parse_arguments() {
         DEST="local"
     fi
     if [ -z "$TEST" ]; then
-        TEST="yes"
+        TEST="no"
     fi
     if [ -z "$LINT" ]; then
-        LINT="no" # Default changed to 'no' based on arg definition
-    fi
-    if [ -z "$VERSION" ]; then
-        VERSION=$(get_project_version)
+        LINT="no"
     fi
 }
 
 build::main() {
     build::parse_arguments "$@"
     log::header "🔨 Starting build for ${ENVIRONMENT} environment..."
+
+    # Mandate --version for production builds and warn/confirm if same as current
+    if env::in_production; then # Checks if $ENVIRONMENT is "prod" or "production"
+        if [ "${VERSION_SPECIFIED_BY_USER}" != "yes" ]; then
+            log::error "ERROR: For production builds (environment: ${ENVIRONMENT}), the --version <version> flag is mandatory."
+            log::error "Please specify the exact version to build and deploy."
+            exit "${exit_codes_ERROR_USAGE}"
+        else
+            # Version was specified for a production build, check if it's the same as current
+            local current_project_version
+            current_project_version=$(version::get_project_version)
+            if [ "$VERSION" == "$current_project_version" ]; then
+                log::warning "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                log::warning "!! WARNING: THE SUPPLIED VERSION ($VERSION) IS THE SAME AS THE CURRENT PROJECT VERSION  !!"
+                log::warning "!!          IN PACKAGE.JSON. PROCEEDING WILL OVERWRITE ANY EXISTING REMOTE          !!"
+                log::warning "!!          ARTIFACTS AND DOCKER IMAGES PUBLISHED FOR THIS VERSION.                 !!"
+                log::warning "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                
+                local confirm_overwrite
+                log::prompt "Are you sure you want to proceed with building version $VERSION? (y/N): " confirm_overwrite
+                if ! flow::is_yes "${confirm_overwrite:-no}"; then # Default to 'no' if user just presses Enter
+                    log::info "Build aborted by user."
+                    exit "${exit_codes_SUCCESS}"
+                fi
+                log::info "User confirmed proceeding with version $VERSION."
+            fi
+        fi
+    fi
 
     source "${MAIN_DIR}/setup.sh" "$@"
 
@@ -177,6 +212,16 @@ build::main() {
     # Need to build packages first for tests to run correctly
     build_packages
     verify_build
+
+    # Create Brave Rewards verification file after packages (specifically UI) are built
+    if ! brave_rewards::create_verification_file; then
+        log::error "Failed to create Brave Rewards verification file."
+    fi
+
+    # Create Twilio domain verification file
+    if ! twilio_verification::create_verification_file; then
+        log::error "Failed to create Twilio domain verification file. Review warnings above."
+    fi
 
     if flow::is_yes "$TEST"; then
         log::header "Running tests..."
@@ -190,7 +235,13 @@ build::main() {
         pnpm run lint
     fi
 
-    set_project_version "$VERSION"
+    if [ "${VERSION_SPECIFIED_BY_USER}" = "yes" ]; then
+        log::info "User specified version '${VERSION}'. Updating project version..."
+        # Note: Updates package.jsons and helm values files with the new version
+        version::set_project_version "$VERSION"
+    else
+        log::info "Using project version '${VERSION}' from package.json. No explicit version update will be performed by this script."
+    fi
 
     # Determine if any binary/desktop builds are requested
     local build_desktop="NO"
@@ -214,7 +265,7 @@ build::main() {
     fi
 
     log::header "🎁 Preparing build artifacts..."
-    local build_dir="${DEST_DIR}/${VERSION}"
+    local build_dir="${var_DEST_DIR}/${VERSION}"
     # Where to put build artifacts
     local artifacts_dir="${build_dir}/artifacts"
     # Where to put bundles
@@ -241,11 +292,82 @@ build::main() {
     for a in "${ARTIFACTS[@]}"; do
         case "$a" in
             docker)
-                docker::build_artifacts "$artifacts_dir"
+                docker::build_artifacts
+                docker::save_images "$artifacts_dir"
                 ;;
             k8s)
-                log::info "Building Kubernetes artifacts (stub)"
-                # TODO: Add k8s build logic
+                log::info "Building Kubernetes artifacts..."
+                # Note: Docker commands here are no accident. We need these images stored somewhere so
+                # that the k8s deployment can pull them. We're choosing to store them in Docker Hub.
+                docker::build_artifacts
+
+                export PROJECT_VERSION="$VERSION" # Ensure $VERSION is used for Docker image tagging
+                docker::login_to_dockerhub
+                docker::tag_and_push_images
+
+                # --- START NEW K8S BUILD LOGIC ---
+                log::info "Packaging Helm chart..."
+                local chart_source_path="${var_ROOT_DIR}/k8s/chart"
+                local chart_destination_path="${artifacts_dir}/k8s-chart-packages" # Store .tgz in a sub-directory
+
+                if [ ! -d "$chart_source_path" ]; then
+                    log::error "Helm chart source directory not found: $chart_source_path"
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+                mkdir -p "$chart_destination_path"
+
+                # Ensure HELM_VERSION is available, ideally it's the same as PROJECT_VERSION
+                # The `version` variable in build.sh (set as PROJECT_VERSION) should be used.
+                if [ -z "$VERSION" ]; then
+                    log::error "Project version (VERSION) is not set. Cannot package Helm chart."
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+
+                # Get chart name from Chart.yaml to predict the .tgz filename
+                # This requires yq or similar, or a simpler grep if Chart.yaml is simple
+                local chart_name
+                chart_name=$(grep '^name:' "${chart_source_path}/Chart.yaml" | awk '{print $2}')
+                if [ -z "$chart_name" ]; then
+                    log::error "Could not determine chart name from ${chart_source_path}/Chart.yaml."
+                    log::error "Please ensure Chart.yaml contains a valid 'name:' field."
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+
+                if helm package "$chart_source_path" --version "$VERSION" --app-version "$VERSION" --destination "$chart_destination_path"; then
+                    log::success "Helm chart packaged successfully to $chart_destination_path/${chart_name}-${VERSION}.tgz"
+                else
+                    log::error "Helm chart packaging failed."
+                    exit "$ERROR_BUILD_FAILED"
+                fi
+
+                log::info "Copying Helm environment-specific values files..."
+                local helm_values_source_dir="${var_ROOT_DIR}/k8s/chart"
+                local helm_values_dest_dir="${artifacts_dir}/helm-value-files"
+                
+                mkdir -p "$helm_values_dest_dir"
+                
+                # Find and copy values-*.yaml files, excluding values.yaml itself
+                # Using a loop to handle cases where find might not be ideal or for more control
+                local found_values_files=false
+                for val_file in "${helm_values_source_dir}/values-"*.yaml; do
+                    if [ -f "$val_file" ]; then # Check if the glob matched an actual file
+                        if ! cp "$val_file" "$helm_values_dest_dir/"; then
+                            log::error "Failed to copy Helm values file: $val_file to $helm_values_dest_dir"
+                            # Decide if this is a fatal error
+                        else
+                            log::info "Copied $val_file to $helm_values_dest_dir"
+                            found_values_files=true
+                        fi
+                    fi
+                done
+
+                if [ "$found_values_files" = true ]; then
+                    log::success "Successfully copied Helm environment-specific values files."
+                else
+                    log::warning "No environment-specific Helm values files (values-*.yaml) found in $helm_values_source_dir to copy."
+                fi
+
+                # --- END NEW K8S BUILD LOGIC ---
                 ;;
             *)
                 log::warning "Unknown artifact type: $a";
@@ -298,8 +420,8 @@ build::main() {
 
             # Copying logic (optional, adjust as needed)
             if env::is_location_local "$DEST"; then
-              local dest_dir="${DEST_DIR}/desktop/${c}/${VERSION}"
-              local source_dir="${DEST_DIR}/desktop"
+              local dest_dir="${var_DEST_DIR}/desktop/${c}/${VERSION}"
+              local source_dir="${var_DEST_DIR}/desktop"
               mkdir -p "${dest_dir}"
               # Copy specific installer/package file(s)
               # This is an example, glob patterns might need adjustment
@@ -321,7 +443,7 @@ build::main() {
         log::info "Setting up SSH connection to remote server ${SITE_IP} using key ${ssh_key_path}..."
         keyless_ssh::connect
 
-        local remote_bundles_dir="${REMOTE_DEST_DIR}/${VERSION}/bundles"
+        local remote_bundles_dir="${var_REMOTE_DEST_DIR}/${VERSION}/bundles"
         log::info "Ensuring remote bundles directory ${SITE_IP}:${remote_bundles_dir} exists and is empty..."
         ssh -i "$ssh_key_path" "root@${SITE_IP}" "mkdir -p ${remote_bundles_dir} && rm -rf ${remote_bundles_dir}/*" || {
             log::error "Failed to create or clean remote bundles directory ${SITE_IP}:${remote_bundles_dir}"
